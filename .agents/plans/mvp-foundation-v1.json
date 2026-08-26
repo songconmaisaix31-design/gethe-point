@@ -1,0 +1,200 @@
+{
+  "schema_version": 1,
+  "plan_id": "mvp-foundation-v1",
+  "plan_status": "draft",
+  "launch_authorized": false,
+  "planning_date": "2026-08-26",
+  "objective": "Freeze the reviewed product acceptance and machine-readable architecture contracts for the We Remember MVP before any implementation worker starts",
+  "base_ref": "BLOCKED_UNTIL_KIT_IS_IN_SHARED_BASE",
+  "planning_basis": {
+    "product_prd": "产品需求文档_都记得_PRD.md",
+    "fleet_bootstrap_sha": "4e65eba793ff1c63c695ff842e30fd0a9b3fcf07",
+    "current_shared_base_ref": "origin/main",
+    "current_shared_base_sha": "70ca3dce63e137902274c14c101e69e47a84f1cb",
+    "current_shared_base_contains_fleet_kit": false
+  },
+  "launch_guards": [
+    {
+      "id": "LG-001",
+      "status": "blocked",
+      "condition": "The selected remote base ref contains the fleet control plane, AGENTS.md, and this approved planning lineage",
+      "unblock_evidence": "A fetched remote SHA containing scripts/fleet.py, .agents/fleet.json, and AGENTS.md"
+    },
+    {
+      "id": "LG-002",
+      "status": "blocked",
+      "condition": "Product acceptance is reviewed by the product owner and plan_status is changed from draft to approved",
+      "unblock_evidence": "Reviewed PRD decision record and an approved docs/product/mvp-acceptance.json"
+    },
+    {
+      "id": "LG-003",
+      "status": "blocked",
+      "condition": "base_ref and the first wave base are replaced with the exact reviewed remote ref",
+      "unblock_evidence": "fleet.py validate succeeds after the replacement and git rev-parse resolves the ref"
+    }
+  ],
+  "constraints": [
+    "This Epoch writes product and architecture documents only; it must not add application code, dependencies, lockfiles, deployment configuration, or credentials.",
+    "The 96-hour MVP is limited to three member roles, three responsibility domains, one blocked-and-accepted handover, one deterministic care escalation chain, one responsibility report, and the explicit privacy controls in the PRD.",
+    "Private agent_dm evidence is local-first and self-visible by default; no shared write occurs without explicit speaker consent and an enforced visibility scope.",
+    "AI may draft ambiguous interpretations only. Authorization, state transitions, reminders, care escalation, deletion, export, and audit remain deterministic.",
+    "Missing information, invalid structured output, missing confirmation, or unknown safety policy produces blocked or human-confirmation state, never implicit success.",
+    "No real household, health, account, or credential data may appear in fixtures, logs, prompts, documentation, or evidence.",
+    "Visual implementation cannot start until platform, viewport matrix, states, assets, tokens, and screenshot acceptance are frozen.",
+    "Implementation checks and package-manager commands must come from the accepted architecture output; this plan does not invent them."
+  ],
+  "global_acceptance": [
+    "The PRD is reviewed and every P0 item maps to an observable user outcome, a deterministic or AI owner, a data boundary, and a verification method.",
+    "A fictional demo fixture contract covers at least three responsibility domains, eight valid signals, and two discussion-only non-task messages.",
+    "Tech-Spec.md, API_CONTRACT.md, JSON Schemas, state-machine contracts, privacy threat model, and implementation-contract.json form one consistent source of truth.",
+    "The architecture output selects the smallest maintainable stack, exact repository layout, package manager, dependency policy, local commands, and track checks with documented tradeoffs.",
+    "The accepted architecture SHA contains the accepted product SHA in its history and is pushed without history rewriting.",
+    "No implementation Wave is generated or dispatched until all launch guards are closed and the foundation SHA is accepted."
+  ],
+  "risk_register": [
+    {
+      "id": "R-001",
+      "severity": "blocker",
+      "owner_track": "control",
+      "risk": "The fleet kit exists only on a local bootstrap branch, so origin/main cannot create valid coordinator or worker worktrees.",
+      "mitigation": "Merge or push the reviewed control plane first, fetch it, then replace the blocked base ref with the exact remote ref.",
+      "gate": "LG-001 and LG-003"
+    },
+    {
+      "id": "R-002",
+      "severity": "blocker",
+      "owner_track": "product",
+      "risk": "The PRD is pending review and the visual source, platform constraints, and acceptance matrix are not frozen.",
+      "mitigation": "PROD-001 freezes scope, UI facts, demo truth boundaries, and a machine-readable acceptance manifest before architecture starts.",
+      "gate": "LG-002"
+    },
+    {
+      "id": "R-003",
+      "severity": "critical",
+      "owner_track": "architecture",
+      "risk": "Consent, health visibility, deletion, and high-risk content errors could expose private data or create unsafe behavior.",
+      "mitigation": "Define explicit trust boundaries, deny-by-default transitions, deletion cascades, audit semantics, redacted model input, and high-risk routing in contracts and threat-model tests.",
+      "gate": "ARCH-001 acceptance"
+    },
+    {
+      "id": "R-004",
+      "severity": "high",
+      "owner_track": "architecture",
+      "risk": "Unvalidated LLM output could silently create tasks, transfer responsibility, or activate care behavior.",
+      "mitigation": "Schema validation, one bounded retry, human-confirmation fallback, prompt versioning, and a hard rule that consequential execution is deterministic.",
+      "gate": "ARCH-001 acceptance"
+    },
+    {
+      "id": "R-005",
+      "severity": "high",
+      "owner_track": "product",
+      "risk": "Ten P0 capabilities can exceed the 96-hour budget and dilute the ownership-transfer story.",
+      "mitigation": "Preserve the seven-step demo spine, remove P1 first, and require an explicit product decision before cutting any P0 surface.",
+      "gate": "PROD-001 acceptance"
+    },
+    {
+      "id": "R-006",
+      "severity": "blocker",
+      "owner_track": "architecture",
+      "risk": "No implementation stack or exact test commands are currently selected, so implementation task checks would be fictional.",
+      "mitigation": "ARCH-001 must produce implementation-contract.json with exact paths, commands, package manager, and check ownership before the implementation Epoch is authored.",
+      "gate": "ARCH-001 acceptance"
+    },
+    {
+      "id": "R-007",
+      "severity": "high",
+      "owner_track": "product",
+      "risk": "The subject experience may be unusable for older adults even if automated UI checks pass.",
+      "mitigation": "Freeze accessibility criteria now and reserve a separate human usability receipt for one-tap reminder acknowledgement before release.",
+      "gate": "Product acceptance plus later QA evidence"
+    },
+    {
+      "id": "R-008",
+      "severity": "medium",
+      "owner_track": "control",
+      "risk": "Local tests, screenshots, HTTP responses, deployment configuration, and public runtime evidence can be confused with release or submission acceptance.",
+      "mitigation": "Require evidence labels for Local, Fixture, Public Runtime, Deployment, and Official Acceptance; never promote one level into another.",
+      "gate": "Foundation documentation and final release manifest"
+    }
+  ],
+  "waves": [
+    {
+      "id": "product-freeze",
+      "description": "Freeze what the MVP must prove to users and judges before technical design begins",
+      "depends_on": [],
+      "base": {
+        "type": "ref",
+        "value": "BLOCKED_UNTIL_KIT_IS_IN_SHARED_BASE"
+      },
+      "tasks": [
+        {
+          "id": "PROD-001",
+          "title": "Freeze MVP scope, demo truth boundaries, and observable acceptance",
+          "track": "product",
+          "write_paths": [
+            "产品需求文档_都记得_PRD.md",
+            "docs/product/**"
+          ],
+          "spec": "Review the pending PRD and produce docs/product/mvp-acceptance.json, docs/product/demo-fixture-contract.json, and concise supporting Markdown. Map every P0 capability to the user problem it solves, observable states, privacy boundary, deterministic versus AI responsibility, failure behavior, demo evidence, and explicit non-goals. Freeze the target platform decision, viewport and accessibility matrix, required data states, visual source/assets/tokens requirements, seven-step demo spine, Fixture labeling, and 96-hour scope-cut rules. Do not choose implementation details or write product code.",
+          "acceptance": [
+            "PRD status and decision log truthfully record reviewed, blocked, and deferred decisions",
+            "Every P0 item maps to an observable outcome, acceptance evidence, failure state, and owning future track",
+            "The seven-step demo includes explicit consent, neutral reporting, blocked handover, two-party acceptance, reminder transfer, deterministic care escalation, and the final workload reduction",
+            "Fixture data is fictional, contains no personal data, and defines at least three domains, eight valid signals, and two discussion-only non-tasks",
+            "Target platform, viewports, accessibility requirements, UI states, asset/token source, and screenshot QA criteria are explicit before visual work",
+            "P1 and non-goals are separated from P0; any P0 cut requires a recorded product decision",
+            "mvp-acceptance.json and demo-fixture-contract.json parse successfully as UTF-8 JSON"
+          ],
+          "checks": [
+            "python -m json.tool docs/product/mvp-acceptance.json",
+            "python -m json.tool docs/product/demo-fixture-contract.json"
+          ],
+          "agent": "codex"
+        }
+      ]
+    },
+    {
+      "id": "architecture-freeze",
+      "description": "Translate accepted product behavior into machine-readable contracts and exact implementation inputs",
+      "depends_on": [
+        "PROD-001"
+      ],
+      "base": {
+        "type": "task",
+        "task": "PROD-001"
+      },
+      "tasks": [
+        {
+          "id": "ARCH-001",
+          "title": "Freeze architecture, API, schemas, state machines, security boundaries, and implementation checks",
+          "track": "architecture",
+          "write_paths": [
+            "contracts/**",
+            "schemas/**",
+            "docs/architecture/**",
+            "Tech-Spec.md",
+            "API_CONTRACT.md"
+          ],
+          "spec": "Consume only the accepted PROD-001 SHA. Define the smallest maintainable architecture for the 96-hour MVP without implementation code. Produce Tech-Spec.md, API_CONTRACT.md, versioned JSON Schemas, consent and visibility policies, first-class five-stage Task ownership fields, handover and care state machines, deletion/export/audit semantics, LLMProvider and structured-output contracts, deterministic clock and demo-mode behavior, observability and redaction rules, trust-boundary threat analysis, and representative success/failure examples. Produce docs/architecture/implementation-contract.json as the sole input for the next planning Epoch; it must select the stack, package manager, repository layout, exact per-track commands, dependency policy, local run procedure, and release evidence levels with reasons and user impact.",
+          "acceptance": [
+            "Task.discoveredBy, deadlineKeptBy, scheduledBy, executedBy, and followedUpBy are required persisted contract fields",
+            "agent_dm evidence remains self-visible and cannot enter shared storage without explicit speaker consent and visibility enforcement",
+            "Handover cannot enter accepted until required information and both confirmations exist; reminders move only after acceptance",
+            "Care rules require human activation and every consequential care transition is deterministic and testable with a controllable clock",
+            "Invalid or timed-out AI output gets one bounded retry and then a human-confirmation state; it cannot activate consequential behavior",
+            "Evidence deletion, consent withdrawal, AI disablement, export, and space deletion have explicit authorization, cascade, audit, and failure semantics",
+            "High-risk content routes to non-diagnostic safety guidance and never becomes an ordinary task",
+            "The selected stack and every dependency are justified against delivery speed, privacy, maintainability, and offline demo reliability",
+            "implementation-contract.json defines non-overlapping physical paths and exact build, type, lint, unit, contract, E2E, accessibility, and security checks for the next Epoch",
+            "All contract and schema JSON files parse successfully and representative success/failure examples are present"
+          ],
+          "checks": [
+            "python -m json.tool docs/architecture/implementation-contract.json",
+            "python -c \"import json, pathlib; files=list(pathlib.Path('contracts').rglob('*.json'))+list(pathlib.Path('schemas').rglob('*.json')); assert files, 'no contract JSON files'; [json.loads(path.read_text(encoding='utf-8')) for path in files]; print(f'validated {len(files)} contract JSON files')\""
+          ],
+          "agent": "codex"
+        }
+      ]
+    }
+  ]
+}
