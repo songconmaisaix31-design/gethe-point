@@ -1,0 +1,3 @@
+scripts:
+  setup: |
+    python -B scripts/fleet.py validate .agents/plans/example.json

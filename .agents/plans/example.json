@@ -1,0 +1,205 @@
+{
+  "schema_version": 1,
+  "objective": "Build the We Remember MVP with consent-first data boundaries and deterministic consequential workflows",
+  "base_ref": "origin/main",
+  "waves": [
+    {
+      "id": "foundation",
+      "description": "Freeze shared data, API, consent, visibility, state-machine, and fixture contracts before implementation",
+      "depends_on": [],
+      "base": {
+        "type": "ref",
+        "value": "origin/main"
+      },
+      "tasks": [
+        {
+          "id": "ARCH-001",
+          "title": "Freeze the MVP contracts and architecture baseline",
+          "track": "architecture",
+          "write_paths": [
+            "contracts/**",
+            "schemas/**",
+            "docs/architecture/**",
+            "Tech-Spec.md",
+            "API_CONTRACT.md"
+          ],
+          "spec": "Define the first-class five-stage Task fields, consent and visibility rules, handover and care state machines, API boundaries, JSON Schemas, failure semantics, and representative contract examples. Do not implement product code.",
+          "acceptance": [
+            "Task ownership stages are persisted fields rather than view-time inference",
+            "Private agent_dm content cannot cross into shared data without explicit speaker consent",
+            "Handover remains blocked until information is complete and both parties confirm",
+            "Care escalation is deterministic and care rules require human activation",
+            "All structured AI outputs have schemas and blocked-by-default failure semantics"
+          ],
+          "checks": [],
+          "agent": "codex"
+        }
+      ]
+    },
+    {
+      "id": "parallel-build",
+      "description": "Build isolated consumers from the accepted architecture SHA",
+      "depends_on": [
+        "ARCH-001"
+      ],
+      "base": {
+        "type": "task",
+        "task": "ARCH-001"
+      },
+      "tasks": [
+        {
+          "id": "WEB-001",
+          "title": "Build the role-specific accessible web experience",
+          "track": "web",
+          "write_paths": [
+            "apps/web/**",
+            "packages/ui/**"
+          ],
+          "spec": "Consume the frozen contracts to implement the primary, partner, and subject experiences, including consent, neutral responsibility reporting, blocked handover, evidence access, and accessible care acknowledgement.",
+          "acceptance": [
+            "Primary, partner, and subject home experiences remain distinct",
+            "Subject UI meets the PRD accessibility constraints",
+            "Blocked state and consent visibility are explicit",
+            "No blame, score, ranking, or diagnostic language is introduced"
+          ],
+          "checks": [],
+          "agent": "codex"
+        },
+        {
+          "id": "API-001",
+          "title": "Build the application API boundary",
+          "track": "api",
+          "write_paths": [
+            "services/api/**"
+          ],
+          "spec": "Expose the frozen application contract with input validation, authorization boundaries, explicit error states, and no secret leakage.",
+          "acceptance": [
+            "Requests and responses conform to the frozen schemas",
+            "Authorization is enforced at every shared-data boundary",
+            "Errors preserve blocked, failed, and partial truth instead of defaulting to success"
+          ],
+          "checks": [],
+          "agent": "codex"
+        },
+        {
+          "id": "AI-001",
+          "title": "Build schema-validated AI drafting services",
+          "track": "ai",
+          "write_paths": [
+            "services/ai/**"
+          ],
+          "spec": "Implement witness, responsibility-domain, handover, and boundary-agent drafts behind the frozen interfaces. Send only the minimum necessary redacted context and validate all structured output.",
+          "acceptance": [
+            "All structured output is schema validated",
+            "One retry is bounded and a second failure degrades to human confirmation",
+            "Prompt versions, latency, and token usage are auditable without logging sensitive content",
+            "The boundary agent cannot bypass deterministic authorization"
+          ],
+          "checks": [],
+          "agent": "codex"
+        },
+        {
+          "id": "DOMAIN-001",
+          "title": "Build consent, responsibility, and handover domain rules",
+          "track": "domain",
+          "write_paths": [
+            "services/domain/**"
+          ],
+          "spec": "Implement deterministic consent, visibility, five-stage ownership, responsibility aggregation, handover, deletion, and audit rules from the frozen contract.",
+          "acceptance": [
+            "Private-to-shared transitions require explicit speaker consent",
+            "Accepted handover requires complete information and two confirmations",
+            "Evidence deletion marks dependent conclusions and triggers recomputation",
+            "Audit records cover consequential transitions"
+          ],
+          "checks": [],
+          "agent": "codex"
+        },
+        {
+          "id": "CARE-001",
+          "title": "Build the deterministic care escalation state machine",
+          "track": "care",
+          "write_paths": [
+            "services/care/**"
+          ],
+          "spec": "Implement human-confirmed care rules, acknowledgement timeouts, escalation, closure, and unresolved evidence without any LLM in the consequential execution path.",
+          "acceptance": [
+            "Draft care rules cannot activate without human confirmation",
+            "Reminder, acknowledgement, timeout, escalation, closure, and unresolved paths are deterministic",
+            "High-risk content is routed to explicit safety guidance without diagnosis"
+          ],
+          "checks": [],
+          "agent": "codex"
+        },
+        {
+          "id": "QA-001",
+          "title": "Build fixtures and end-to-end acceptance",
+          "track": "qa",
+          "write_paths": [
+            "tests/e2e/**",
+            "fixtures/**"
+          ],
+          "spec": "Create fictional but representative fixtures and acceptance coverage for consent, visibility, neutral reporting, blocked handover, care escalation, deletion, failure, and high-risk boundaries.",
+          "acceptance": [
+            "The fixture includes at least three responsibility domains and eight valid signals",
+            "At least two discussion-only messages are rejected as tasks",
+            "Success and representative failure paths identify the owning track",
+            "Fixtures contain no real personal data or secrets"
+          ],
+          "checks": [],
+          "agent": "codex"
+        }
+      ]
+    },
+    {
+      "id": "integration",
+      "description": "Merge accepted task SHAs exactly and validate the complete demo flow",
+      "depends_on": [
+        "ARCH-001",
+        "WEB-001",
+        "API-001",
+        "AI-001",
+        "DOMAIN-001",
+        "CARE-001",
+        "QA-001"
+      ],
+      "base": {
+        "type": "task",
+        "task": "ARCH-001"
+      },
+      "tasks": [
+        {
+          "id": "INT-001",
+          "title": "Assemble and verify the release candidate",
+          "track": "integration",
+          "write_paths": [
+            "apps/demo-shell/**",
+            "deploy/**",
+            "README.md",
+            "package.json",
+            "pnpm-workspace.yaml",
+            "pnpm-lock.yaml",
+            "package-lock.json",
+            "yarn.lock",
+            "pyproject.toml",
+            "uv.lock",
+            "requirements*.txt",
+            "Dockerfile",
+            ".dockerignore",
+            "docker-compose.yml",
+            "vercel.json"
+          ],
+          "spec": "Start from the accepted architecture baseline, merge each accepted dependency SHA with a clean no-ff merge, stop on any conflict, and make assembly-only changes within integration-owned paths.",
+          "acceptance": [
+            "Every accepted dependency SHA is an exact second parent of a no-ff merge",
+            "The consent-to-handover-to-care demo path is reproducible",
+            "Representative failure and privacy boundaries pass",
+            "Release evidence distinguishes local validation from deployment or submission proof"
+          ],
+          "checks": [],
+          "agent": "codex"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,165 @@
+{
+  "schema_version": 1,
+  "project": "gethe-point",
+  "repo_selector": "path:C:/Users/DW/orca/projects/gethe-point",
+  "base_ref": "origin/main",
+  "fetch_before_launch": true,
+  "coordinator": {
+    "agent": "codex",
+    "setup": "run",
+    "worktree_prefix": "fleet-control"
+  },
+  "worker_defaults": {
+    "agent": "codex",
+    "setup": "run",
+    "worktree_mode": "new-top-level"
+  },
+  "branch_rules": {
+    "track_pattern": "^(?:[^/]+/)?trk-(?P<track>[a-z0-9_]+)-(?P<task>[a-z0-9-]+)$",
+    "control_pattern": "^(?:[^/]+/)?fleet-control(?:-|$)",
+    "base_branches": [
+      "main",
+      "master",
+      "develop"
+    ]
+  },
+  "global_forbidden": [
+    ".git/**",
+    ".env",
+    ".env.local",
+    ".env.production",
+    "**/.env",
+    "**/.env.local",
+    "**/.env.production",
+    ".npmrc",
+    "**/.npmrc",
+    ".pypirc",
+    "**/.pypirc",
+    "*.pem",
+    "*.key",
+    "*.p12",
+    "*.pfx",
+    "**/*.pem",
+    "**/*.key",
+    "**/*.p12",
+    "**/*.pfx",
+    "**/*credential*"
+  ],
+  "tracks": {
+    "control": {
+      "description": "Coordinator plans, run state, decisions, and cross-track handoffs; no product code",
+      "allow": [
+        ".agents/plans/**",
+        ".agents/runs/**",
+        ".agents/decisions/**",
+        ".agents/handoffs/**"
+      ],
+      "checks": []
+    },
+    "product": {
+      "description": "Product requirements and user-facing scope",
+      "allow": [
+        "产品需求文档_都记得_PRD.md",
+        "docs/product/**"
+      ],
+      "checks": []
+    },
+    "architecture": {
+      "description": "Shared contracts, schemas, API boundaries, and architecture decisions",
+      "allow": [
+        "contracts/**",
+        "schemas/**",
+        "docs/architecture/**",
+        "Tech-Spec.md",
+        "API_CONTRACT.md",
+        "FLEET_DEPLOYMENT_SPEC.md"
+      ],
+      "checks": []
+    },
+    "web": {
+      "description": "Role-specific web application and accessible UI components",
+      "allow": [
+        "apps/web/**",
+        "packages/ui/**"
+      ],
+      "checks": []
+    },
+    "api": {
+      "description": "External API and application-service boundary",
+      "allow": [
+        "services/api/**"
+      ],
+      "checks": []
+    },
+    "ai": {
+      "description": "Witness, responsibility-domain, handover, and boundary-agent implementations",
+      "allow": [
+        "services/ai/**"
+      ],
+      "checks": []
+    },
+    "domain": {
+      "description": "Consent, responsibility, task, handover, audit, and deterministic domain rules",
+      "allow": [
+        "services/domain/**"
+      ],
+      "checks": []
+    },
+    "care": {
+      "description": "Human-confirmed care rules and deterministic escalation state machine",
+      "allow": [
+        "services/care/**"
+      ],
+      "checks": []
+    },
+    "qa": {
+      "description": "Representative fixtures and end-to-end acceptance",
+      "allow": [
+        "tests/e2e/**",
+        "fixtures/**"
+      ],
+      "checks": []
+    },
+    "integration": {
+      "description": "Sole integrator for assembly, shared root build files, release, and deployment",
+      "allow": [
+        "apps/demo-shell/**",
+        "deploy/**",
+        "README.md",
+        "package.json",
+        "pnpm-workspace.yaml",
+        "pnpm-lock.yaml",
+        "package-lock.json",
+        "yarn.lock",
+        "pyproject.toml",
+        "uv.lock",
+        "requirements*.txt",
+        "Dockerfile",
+        ".dockerignore",
+        "docker-compose.yml",
+        "vercel.json"
+      ],
+      "checks": []
+    },
+    "automation": {
+      "description": "Fleet control plane, machine gates, prompts, governance, and CI",
+      "allow": [
+        "scripts/**",
+        ".githooks/**",
+        ".github/**",
+        ".agents/fleet.json",
+        ".agents/.gitignore",
+        ".agents/prompts/**",
+        "AGENTS.md",
+        "MEMORY.md",
+        "PRINCIPLES.md",
+        "TEST_REPORT.md",
+        "Makefile",
+        "orca.yaml"
+      ],
+      "checks": [
+        "python -B -m unittest discover -s scripts/tests -v"
+      ]
+    }
+  }
+}
