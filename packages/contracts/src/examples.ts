@@ -34,7 +34,9 @@ export const FIXTURE_TIMES = Object.freeze({
   expires: "2026-08-28T08:00:00+08:00",
   scheduled: "2026-08-27T20:00:00+08:00",
   deadline: "2026-08-27T20:01:00+08:00",
+  acknowledged: "2026-08-27T20:00:59+08:00",
   handled: "2026-08-27T20:03:00+08:00",
+  closed: "2026-08-27T20:04:00+08:00",
   periodEnd: "2026-08-28T00:00:00+08:00",
 } as const);
 
@@ -92,6 +94,11 @@ const spaceVisibility = { kind: "space" } as const;
 const subjectVisibility = {
   kind: "self",
   memberId: FIXTURE_IDS.subject,
+} as const;
+const careVisibility = {
+  kind: "care_related",
+  subjectId: FIXTURE_IDS.subject,
+  memberIds: [FIXTURE_IDS.subject, FIXTURE_IDS.primary, FIXTURE_IDS.partner],
 } as const;
 
 export const FIXTURE_SPACE = Object.freeze({
@@ -396,7 +403,7 @@ export const FIXTURE_ACKNOWLEDGED_CARE_EVENT = Object.freeze({
   ...FIXTURE_NOTIFIED_CARE_EVENT,
   version: 2,
   state: "acknowledged",
-  acknowledgedAt: FIXTURE_TIMES.deadline,
+  acknowledgedAt: FIXTURE_TIMES.acknowledged,
 } as const);
 
 export const FIXTURE_ESCALATED_CARE_EVENT = Object.freeze({
@@ -413,6 +420,34 @@ export const FIXTURE_HANDLED_CARE_EVENT = Object.freeze({
   version: 4,
   state: "handled",
   handledAt: FIXTURE_TIMES.handled,
+  resolution: "in_person_check_started",
+} as const);
+
+export const FIXTURE_CLOSED_CARE_EVENT = Object.freeze({
+  ...FIXTURE_HANDLED_CARE_EVENT,
+  version: 5,
+  state: "closed",
+  closedAt: FIXTURE_TIMES.closed,
+} as const);
+
+export const FIXTURE_UNHANDLED_CLOSED_CARE_EVENT = Object.freeze({
+  ...FIXTURE_NOTIFIED_CARE_EVENT,
+  version: 2,
+  state: "closed",
+  acknowledgementDeadline: null,
+  handledAt: null,
+  resolution: null,
+  closedAt: FIXTURE_TIMES.closed,
+} as const);
+
+export const FIXTURE_LEGACY_HANDLED_CARE_EVENT = Object.freeze({
+  ...FIXTURE_HANDLED_CARE_EVENT,
+  resolution: "legacy_unknown",
+} as const);
+
+export const FIXTURE_LEGACY_CLOSED_CARE_EVENT = Object.freeze({
+  ...FIXTURE_CLOSED_CARE_EVENT,
+  resolution: "legacy_unknown",
 } as const);
 
 export const FIXTURE_AUDIT_ENTRY = Object.freeze({
@@ -438,6 +473,32 @@ export const FIXTURE_AUDIT_ENTRY = Object.freeze({
   ],
   visibility: spaceVisibility,
   occurredAt: FIXTURE_TIMES.updated,
+  retention: "until_space_deleted",
+} as const);
+
+export const FIXTURE_CARE_RESOLUTION_AUDIT_ENTRY = Object.freeze({
+  id: FIXTURE_IDS.audit,
+  spaceId: FIXTURE_IDS.space,
+  actor: {
+    kind: "member",
+    memberId: FIXTURE_IDS.partner,
+    spaceId: FIXTURE_IDS.space,
+    role: "partner",
+  },
+  action: "care_event_transitioned",
+  targetType: "care_event",
+  targetId: FIXTURE_IDS.careEvent,
+  beforeVersion: 3,
+  afterVersion: 4,
+  changes: [
+    {
+      field: "resolution",
+      before: { kind: "resolution", value: null },
+      after: { kind: "resolution", value: "in_person_check_started" },
+    },
+  ],
+  visibility: careVisibility,
+  occurredAt: FIXTURE_TIMES.handled,
   retention: "until_space_deleted",
 } as const);
 
@@ -701,7 +762,6 @@ export const OPERATION_EXAMPLES = Object.freeze({
     request: {
       ...idempotentContext,
       careEventId: FIXTURE_IDS.careEvent,
-      acknowledgedAt: FIXTURE_TIMES.deadline,
       expectedVersion: 1,
     },
     result: {
@@ -715,7 +775,6 @@ export const OPERATION_EXAMPLES = Object.freeze({
       ...idempotentContext,
       careEventId: FIXTURE_IDS.careEvent,
       resolution: "in_person_check_started",
-      handledAt: FIXTURE_TIMES.handled,
       expectedVersion: 3,
     },
     result: { status: "handled", careEvent: FIXTURE_HANDLED_CARE_EVENT },
@@ -971,5 +1030,30 @@ export const FAIL_CLOSED_INPUT_EXAMPLES = Object.freeze({
   requestWithUnknownAuthorityField: {
     ...OPERATION_EXAMPLES.CreatePrivateMessage.request,
     actorId: FIXTURE_IDS.primary,
+  },
+  acknowledgementWithCallerTimestamp: {
+    ...OPERATION_EXAMPLES.AcknowledgeCareEvent.request,
+    acknowledgedAt: FIXTURE_TIMES.acknowledged,
+  },
+  handlingWithCallerTimestamp: {
+    ...OPERATION_EXAMPLES.HandleCareEvent.request,
+    handledAt: FIXTURE_TIMES.handled,
+  },
+  handlingMissingResolution: {
+    ...idempotentContext,
+    careEventId: FIXTURE_IDS.careEvent,
+    expectedVersion: 3,
+  },
+  handlingWithInvalidResolution: {
+    ...OPERATION_EXAMPLES.HandleCareEvent.request,
+    resolution: "free_form_resolution",
+  },
+  handlingWithLegacyResolution: {
+    ...OPERATION_EXAMPLES.HandleCareEvent.request,
+    resolution: "legacy_unknown",
+  },
+  timelyAcknowledgementAtDeadline: {
+    ...FIXTURE_ACKNOWLEDGED_CARE_EVENT,
+    acknowledgedAt: FIXTURE_TIMES.deadline,
   },
 } as const);

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { ActorRefSchema } from "./actors";
 import {
   CareEventStateSchema,
+  CareResolutionSchema,
   SharedVisibilitySchema,
   VisibilitySchema,
 } from "./entities";
@@ -32,7 +33,7 @@ export const AuditActionSchema = z.enum([
 ]);
 export type AuditAction = z.infer<typeof AuditActionSchema>;
 
-export const AuditedFieldSchema = z.enum([
+const NON_RESOLUTION_AUDITED_FIELDS = [
   "status",
   "ownerId",
   "reminderOwnerId",
@@ -46,20 +47,66 @@ export const AuditedFieldSchema = z.enum([
   "reviewState",
   "analysisConsent",
   "escalationLevel",
+] as const;
+
+const NonResolutionAuditedFieldSchema = z.enum(
+  NON_RESOLUTION_AUDITED_FIELDS,
+);
+
+export const AuditedFieldSchema = z.enum([
+  ...NON_RESOLUTION_AUDITED_FIELDS,
+  "resolution",
 ]);
+
+const AuditIdValueSchema = z.strictObject({
+  kind: z.literal("id"),
+  value: EntityIdSchema.nullable(),
+});
+const AuditStateValueSchema = z.strictObject({
+  kind: z.literal("state"),
+  value: ShortTextSchema.nullable(),
+});
+const AuditCountValueSchema = z.strictObject({
+  kind: z.literal("count"),
+  value: z.number().int().nonnegative(),
+});
+const AuditBooleanValueSchema = z.strictObject({
+  kind: z.literal("boolean"),
+  value: z.boolean(),
+});
+
+const NonResolutionAuditValueSchema = z.discriminatedUnion("kind", [
+  AuditIdValueSchema,
+  AuditStateValueSchema,
+  AuditCountValueSchema,
+  AuditBooleanValueSchema,
+]);
+
+export const AuditResolutionValueSchema = z.strictObject({
+  kind: z.literal("resolution"),
+  value: CareResolutionSchema.nullable(),
+});
 
 export const AuditValueSchema = z.discriminatedUnion("kind", [
-  z.strictObject({ kind: z.literal("id"), value: EntityIdSchema.nullable() }),
-  z.strictObject({ kind: z.literal("state"), value: ShortTextSchema.nullable() }),
-  z.strictObject({ kind: z.literal("count"), value: z.number().int().nonnegative() }),
-  z.strictObject({ kind: z.literal("boolean"), value: z.boolean() }),
+  AuditIdValueSchema,
+  AuditStateValueSchema,
+  AuditCountValueSchema,
+  AuditBooleanValueSchema,
+  AuditResolutionValueSchema,
 ]);
 
-export const AuditChangeSchema = z.strictObject({
-  field: AuditedFieldSchema,
-  before: AuditValueSchema,
-  after: AuditValueSchema,
-});
+export const AuditChangeSchema = z.union([
+  z.strictObject({
+    field: NonResolutionAuditedFieldSchema,
+    before: NonResolutionAuditValueSchema,
+    after: NonResolutionAuditValueSchema,
+  }),
+  z.strictObject({
+    field: z.literal("resolution"),
+    before: AuditResolutionValueSchema,
+    after: AuditResolutionValueSchema,
+  }),
+]);
 
 export const AuditEntrySchema = z.strictObject({
   id: EntityIdSchema,

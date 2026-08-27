@@ -20,6 +20,41 @@ export interface Clock {
   now(): Date;
 }
 
+/**
+ * Supplies the authoritative timestamp for care command execution.
+ *
+ * Adapters must validate their source value with TimestampSchema before
+ * returning it. Commands sample once and persist the returned string verbatim.
+ */
+export interface CareClock {
+  now(): Timestamp;
+}
+
+export const CARE_COMMAND_TIME_POLICY = Object.freeze({
+  commandNames: Object.freeze([
+    "AcknowledgeCareEvent",
+    "HandleCareEvent",
+  ] as const),
+  source: "CareClock.now",
+  adapterValidation: "TimestampSchema",
+  validationPrecondition: "before_return",
+  precisionGuarantee: "preserve_verbatim",
+  sample: "once_per_execution",
+  callerTimestampFields: Object.freeze([] as const),
+  authoritativeFor: Object.freeze([
+    "transition_decision",
+    "acknowledgement_deadline_comparison",
+    "persisted_transition_timestamp",
+    "idempotency_claim_timestamp",
+    "domain_event_timestamp",
+    "audit_timestamp",
+  ] as const),
+  acknowledgement: Object.freeze({
+    timelyWhen: "compareTimestamps(now, acknowledgementDeadline) === -1",
+    timedOutWhen: "compareTimestamps(now, acknowledgementDeadline) >= 0",
+  }),
+} as const);
+
 export const LLMDraftPurposeSchema = z.enum([
   "signal_draft",
   "domain_draft",

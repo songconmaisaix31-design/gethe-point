@@ -3,16 +3,25 @@ import { describe, expect, it } from "vitest";
 import packageManifest from "../package.json";
 import {
   ACCESSIBILITY_CONTRACT,
+  AcknowledgeCareEventRequestSchema,
+  AcknowledgedCareEventSchema,
   ADR_COMMAND_NAMES,
   ADR_QUERY_NAMES,
   AI_ATTEMPT_POLICY,
   ALL_OPERATION_CONTRACTS,
+  AuditChangeSchema,
+  AuditEntrySchema,
   AUTHORIZATION_MATRIX,
   AuthorizationActionSchema,
+  CARE_COMMAND_TIME_POLICY,
   CARE_STATES,
   CARE_TERMINAL_STATES,
   CARE_TRANSITION_TABLE,
+  CareEventSchema,
+  CareResolutionSchema,
+  ClosedCareEventSchema,
   COMMAND_CONTRACTS,
+  ConfirmHandoverFromResultSchema,
   ContractErrorSchema,
   DELETION_MATRIX,
   DecideConsentRequestSchema,
@@ -20,15 +29,25 @@ import {
   DomainEventSchema,
   FAIL_CLOSED_INPUT_EXAMPLES,
   FIXED_SCREEN_CONTRACTS,
+  FIXTURE_ACKNOWLEDGED_CARE_EVENT,
+  FIXTURE_CARE_RESOLUTION_AUDIT_ENTRY,
+  FIXTURE_CLOSED_CARE_EVENT,
+  FIXTURE_HANDLED_CARE_EVENT,
+  FIXTURE_LEGACY_CLOSED_CARE_EVENT,
+  FIXTURE_LEGACY_HANDLED_CARE_EVENT,
   FIXTURE_SCREENSHOT_MANIFEST,
   FIXTURE_TRUTH_LABELS,
+  FIXTURE_UNHANDLED_CLOSED_CARE_EVENT,
   FixedScreenContractSchema,
   HANDOVER_COMPLETENESS_COMMAND_NAMES,
   HANDOVER_STATES,
   HANDOVER_TERMINAL_STATES,
   HANDOVER_TRANSITION_TABLE,
   HandoverSchema,
-  ConfirmHandoverFromResultSchema,
+  HandleCareEventRequestSchema,
+  HandleCareEventResolutionSchema,
+  HandleCareEventResultSchema,
+  HandledCareEventSchema,
   NEEDS_HUMAN_REVIEW_EXAMPLE,
   NeedsHumanReviewSchema,
   OPERATION_EXAMPLES,
@@ -39,10 +58,15 @@ import {
   ScreenshotScenarioSchema,
   SharedSignalSchema,
   TaskSchema,
+  TimeRangeSchema,
+  TimestampSchema,
   UI_STATE_VOCABULARY,
   UI_TOKENS,
   ViewportSchema,
+  compareTimestamps,
   contractJsonSchemas,
+  type CareClock,
+  type Clock,
 } from "@we-remember/contracts";
 
 const pairKey = (from: string, to: string) => `${from}->${to}`;
@@ -123,6 +147,152 @@ describe("public operation source", () => {
     expect(packageManifest.name).toBe("@we-remember/contracts");
     expect(Object.keys(packageManifest.exports)).toEqual(["."]);
     expect(packageManifest.exports["."]).toBe("./src/index.ts");
+  });
+});
+
+describe("exact timestamp ordering", () => {
+  it("preserves the full TimestampSchema precision and offset domain", () => {
+    const longFractionPrefix = "0".repeat(256);
+    const acceptedTimestamps = [
+      "0000-01-01T00:00Z",
+      "0000-02-29T23:59:59.1+23:59",
+      "2025-12-31T23:15Z",
+      "2026-01-01T00:15:00+01:00",
+      "2026-08-27T20:01:00.000998Z",
+      "2026-08-27T20:01:00.000999Z",
+      "2026-08-27T20:01:00.123456789012345678901Z",
+      "2026-08-27T15:01-05:00",
+      "2026-08-28T04:01:00.000000000+08:00",
+      `2026-08-27T20:01:00.${longFractionPrefix}1Z`,
+    ];
+
+    for (const timestamp of acceptedTimestamps) {
+      expect(TimestampSchema.safeParse(timestamp).success, timestamp).toBe(true);
+    }
+
+    expect(
+      compareTimestamps(
+        "2026-08-27T20:01:00.000998Z",
+        "2026-08-27T20:01:00.000999Z",
+      ),
+    ).toBe(-1);
+    expect(
+      compareTimestamps(
+        "2026-08-27T20:01:00.123456789012345678901Z",
+        "2026-08-27T20:01:00.123456789012345678902Z",
+      ),
+    ).toBe(-1);
+    expect(
+      compareTimestamps(
+        `2026-08-27T20:01:00.${longFractionPrefix}1Z`,
+        `2026-08-27T20:01:00.${longFractionPrefix}2Z`,
+      ),
+    ).toBe(-1);
+    expect(
+      compareTimestamps(
+        "2024-02-29T23:59:59.999999999999999999Z",
+        "2024-03-01T00:00Z",
+      ),
+    ).toBe(-1);
+    expect(
+      compareTimestamps(
+        "0000-01-01T00:00+23:59",
+        "0000-01-01T00:00Z",
+      ),
+    ).toBe(-1);
+    expect(
+      compareTimestamps(
+        "0000-02-29T23:59:59.999999999999Z",
+        "0000-03-01T00:00Z",
+      ),
+    ).toBe(-1);
+  });
+
+  it("compares equivalent instants equally across syntax variants", () => {
+    const equivalentPairs = [
+      ["2026-08-27T20:01Z", "2026-08-27T20:01:00.000000000000Z"],
+      ["2026-08-27T20:01:00.1Z", "2026-08-27T20:01:00.100000000000000Z"],
+      ["2026-08-27T20:01Z", "2026-08-28T04:01:00.000+08:00"],
+      ["2026-08-27T20:01Z", "2026-08-27T15:01-05:00"],
+      ["0000-01-01T00:00Z", "0000-01-01T01:00+01:00"],
+      ["2026-01-01T00:15:00+01:00", "2025-12-31T23:15Z"],
+    ] as const;
+
+    for (const [left, right] of equivalentPairs) {
+      expect(compareTimestamps(left, right)).toBe(0);
+      expect(compareTimestamps(right, left)).toBe(0);
+    }
+  });
+
+  it("preserves antisymmetry and transitivity", () => {
+    const orderedTimestamps = [
+      "0000-01-01T00:00+23:59",
+      "0000-01-01T00:00Z",
+      "2024-02-29T23:59:59.999999999999999999Z",
+      "2024-03-01T00:00Z",
+      "2026-08-27T20:01:00.000998Z",
+      "2026-08-27T20:01:00.000999Z",
+    ] as const;
+
+    for (let leftIndex = 0; leftIndex < orderedTimestamps.length; leftIndex += 1) {
+      const left = orderedTimestamps[leftIndex];
+      if (left === undefined) {
+        throw new Error("Timestamp fixture index must exist");
+      }
+      expect(compareTimestamps(left, left)).toBe(0);
+
+      for (
+        let rightIndex = leftIndex + 1;
+        rightIndex < orderedTimestamps.length;
+        rightIndex += 1
+      ) {
+        const right = orderedTimestamps[rightIndex];
+        if (right === undefined) {
+          throw new Error("Timestamp fixture index must exist");
+        }
+        expect(compareTimestamps(left, right)).toBe(-1);
+        expect(compareTimestamps(right, left)).toBe(1);
+      }
+    }
+
+    for (let index = 0; index < orderedTimestamps.length - 2; index += 1) {
+      const first = orderedTimestamps[index];
+      const second = orderedTimestamps[index + 1];
+      const third = orderedTimestamps[index + 2];
+      if (first === undefined || second === undefined || third === undefined) {
+        throw new Error("Timestamp fixture triple must exist");
+      }
+      expect(compareTimestamps(first, second)).toBe(-1);
+      expect(compareTimestamps(second, third)).toBe(-1);
+      expect(compareTimestamps(first, third)).toBe(-1);
+    }
+  });
+
+  it("accepts genuinely positive precise ranges and rejects equal endpoints", () => {
+    expect(
+      TimeRangeSchema.safeParse({
+        startAt: "2026-08-27T20:01:00.0001Z",
+        endAt: "2026-08-27T20:01:00.0002Z",
+      }).success,
+    ).toBe(true);
+    expect(
+      TimeRangeSchema.safeParse({
+        startAt: "2026-08-27T20:01:00.000000000000000001Z",
+        endAt: "2026-08-27T20:01:00.000000000000000002Z",
+      }).success,
+    ).toBe(true);
+    expect(
+      TimeRangeSchema.safeParse({
+        startAt: "2026-08-27T20:01Z",
+        endAt: "2026-08-28T04:01:00.000000+08:00",
+      }).success,
+    ).toBe(false);
+    expect(
+      TimeRangeSchema.safeParse({
+        startAt: "2026-08-27T20:01:00.1Z",
+        endAt: "2026-08-27T20:01:00.100000Z",
+      }).success,
+    ).toBe(false);
   });
 });
 
@@ -218,6 +388,185 @@ describe("strict schemas and fail-closed examples", () => {
     ).toBe(false);
   });
 
+  it("uses one validated CareClock instant and rejects caller care timestamps", () => {
+    const generalClock = {
+      now: () => new Date(0),
+    } satisfies Clock;
+    const careClock = {
+      now: () => TimestampSchema.parse("2026-08-27T20:01:00.000998Z"),
+    } satisfies CareClock;
+    const deadline = TimestampSchema.parse("2026-08-27T20:01:00.000999Z");
+
+    expect(generalClock.now()).toBeInstanceOf(Date);
+    expect(careClock.now()).toBe("2026-08-27T20:01:00.000998Z");
+    expect(compareTimestamps(careClock.now(), deadline)).toBe(-1);
+    expect(
+      AcknowledgeCareEventRequestSchema.safeParse(
+        OPERATION_EXAMPLES.AcknowledgeCareEvent.request,
+      ).success,
+    ).toBe(true);
+    expect(
+      HandleCareEventRequestSchema.safeParse(
+        OPERATION_EXAMPLES.HandleCareEvent.request,
+      ).success,
+    ).toBe(true);
+    expect(
+      AcknowledgeCareEventRequestSchema.safeParse(
+        FAIL_CLOSED_INPUT_EXAMPLES.acknowledgementWithCallerTimestamp,
+      ).success,
+    ).toBe(false);
+    expect(
+      HandleCareEventRequestSchema.safeParse(
+        FAIL_CLOSED_INPUT_EXAMPLES.handlingWithCallerTimestamp,
+      ).success,
+    ).toBe(false);
+
+    const preciseTimelyAcknowledgement = {
+      ...FIXTURE_ACKNOWLEDGED_CARE_EVENT,
+      acknowledgementDeadline: deadline,
+      acknowledgedAt: careClock.now(),
+      timedOutAt: null,
+      escalationLevel: 0,
+      escalatedAt: null,
+    } as const;
+    expect(
+      AcknowledgedCareEventSchema.safeParse(preciseTimelyAcknowledgement).success,
+    ).toBe(true);
+    expect(
+      AcknowledgedCareEventSchema.safeParse({
+        ...preciseTimelyAcknowledgement,
+        acknowledgedAt: deadline,
+      }).success,
+    ).toBe(false);
+    expect(
+      AcknowledgedCareEventSchema.safeParse({
+        ...preciseTimelyAcknowledgement,
+        acknowledgedAt: "2026-08-27T20:01:00.001Z",
+      }).success,
+    ).toBe(false);
+
+    const explicitLateAcknowledgement = {
+      ...preciseTimelyAcknowledgement,
+      acknowledgedAt: "2026-08-27T20:01:00.001Z",
+      timedOutAt: deadline,
+      escalationLevel: 1,
+      escalatedAt: "2026-08-27T20:01:00.001Z",
+    } as const;
+    expect(
+      compareTimestamps(
+        explicitLateAcknowledgement.acknowledgedAt,
+        explicitLateAcknowledgement.acknowledgementDeadline,
+      ),
+    ).toBe(1);
+    expect(
+      AcknowledgedCareEventSchema.safeParse(explicitLateAcknowledgement).success,
+    ).toBe(true);
+    expect(
+      AcknowledgedCareEventSchema.safeParse({
+        ...explicitLateAcknowledgement,
+        escalationLevel: 0,
+        escalatedAt: null,
+      }).success,
+    ).toBe(false);
+
+    expect(CARE_COMMAND_TIME_POLICY).toMatchObject({
+      commandNames: ["AcknowledgeCareEvent", "HandleCareEvent"],
+      source: "CareClock.now",
+      adapterValidation: "TimestampSchema",
+      validationPrecondition: "before_return",
+      precisionGuarantee: "preserve_verbatim",
+      sample: "once_per_execution",
+      callerTimestampFields: [],
+      acknowledgement: {
+        timelyWhen: "compareTimestamps(now, acknowledgementDeadline) === -1",
+        timedOutWhen: "compareTimestamps(now, acknowledgementDeadline) >= 0",
+      },
+    });
+    expect(CARE_COMMAND_TIME_POLICY.authoritativeFor).toEqual(
+      expect.arrayContaining([
+        "transition_decision",
+        "acknowledgement_deadline_comparison",
+        "persisted_transition_timestamp",
+        "idempotency_claim_timestamp",
+        "domain_event_timestamp",
+        "audit_timestamp",
+      ]),
+    );
+  });
+
+  it("bounds persisted care resolution and keeps it content-free in audit", () => {
+    const schemaExamples = [
+      [HandledCareEventSchema, FIXTURE_HANDLED_CARE_EVENT],
+      [ClosedCareEventSchema, FIXTURE_CLOSED_CARE_EVENT],
+      [ClosedCareEventSchema, FIXTURE_UNHANDLED_CLOSED_CARE_EVENT],
+      [HandledCareEventSchema, FIXTURE_LEGACY_HANDLED_CARE_EVENT],
+      [ClosedCareEventSchema, FIXTURE_LEGACY_CLOSED_CARE_EVENT],
+      [AuditEntrySchema, FIXTURE_CARE_RESOLUTION_AUDIT_ENTRY],
+    ] as const;
+
+    for (const [schema, example] of schemaExamples) {
+      expect(schema.safeParse(example).success).toBe(true);
+    }
+    expect(CareEventSchema.safeParse(FIXTURE_CLOSED_CARE_EVENT).success).toBe(true);
+    expect(CareEventSchema.safeParse(FIXTURE_LEGACY_CLOSED_CARE_EVENT).success).toBe(
+      true,
+    );
+    expect(FIXTURE_CLOSED_CARE_EVENT.resolution).toBe(
+      FIXTURE_HANDLED_CARE_EVENT.resolution,
+    );
+    expect(CareResolutionSchema.safeParse("legacy_unknown").success).toBe(true);
+    expect(HandleCareEventResolutionSchema.safeParse("legacy_unknown").success).toBe(
+      false,
+    );
+    expect(
+      HandleCareEventRequestSchema.safeParse(
+        FAIL_CLOSED_INPUT_EXAMPLES.handlingMissingResolution,
+      ).success,
+    ).toBe(false);
+    expect(
+      HandleCareEventRequestSchema.safeParse(
+        FAIL_CLOSED_INPUT_EXAMPLES.handlingWithInvalidResolution,
+      ).success,
+    ).toBe(false);
+    expect(
+      HandleCareEventRequestSchema.safeParse(
+        FAIL_CLOSED_INPUT_EXAMPLES.handlingWithLegacyResolution,
+      ).success,
+    ).toBe(false);
+    expect(
+      HandleCareEventResultSchema.safeParse({
+        status: "handled",
+        careEvent: FIXTURE_LEGACY_HANDLED_CARE_EVENT,
+      }).success,
+    ).toBe(false);
+    expect(
+      ClosedCareEventSchema.safeParse({
+        ...FIXTURE_CLOSED_CARE_EVENT,
+        resolution: null,
+      }).success,
+    ).toBe(false);
+    expect(
+      ClosedCareEventSchema.safeParse({
+        ...FIXTURE_UNHANDLED_CLOSED_CARE_EVENT,
+        resolution: "confirmed_safe",
+      }).success,
+    ).toBe(false);
+    expect(
+      AuditChangeSchema.safeParse({
+        field: "resolution",
+        before: { kind: "resolution", value: null },
+        after: { kind: "state", value: "free-form care content" },
+      }).success,
+    ).toBe(false);
+    expect(
+      AuditChangeSchema.safeParse({
+        field: "resolution",
+        before: { kind: "resolution", value: null },
+        after: { kind: "resolution", value: "free_form_resolution" },
+      }).success,
+    ).toBe(false);
+  });
+
   it("validates safe errors and the bounded human-review fallback", () => {
     for (const error of Object.values(REPRESENTATIVE_ERROR_EXAMPLES)) {
       expect(ContractErrorSchema.safeParse(error).success).toBe(true);
@@ -302,6 +651,31 @@ describe("complete deterministic transition tables", () => {
         ({ from, to }) => from === "escalated" && to === "escalated",
       ),
     ).toMatchObject({ decision: "allowed", trigger: "TickCareScheduler" });
+    expect(
+      CARE_TRANSITION_TABLE.find(
+        ({ from, to }) => from === "notified" && to === "acknowledged",
+      ),
+    ).toMatchObject({
+      decision: "allowed",
+      trigger: "AcknowledgeCareEvent",
+      guard: "actor_is_subject_and_clock_is_strictly_before_deadline",
+    });
+    expect(
+      CARE_TRANSITION_TABLE.find(
+        ({ from, to }) => from === "escalated" && to === "acknowledged",
+      ),
+    ).toMatchObject({
+      decision: "allowed",
+      guard: "subject_acknowledges_after_escalation_as_explicitly_late",
+    });
+    expect(
+      CARE_TRANSITION_TABLE.find(
+        ({ from, to }) => from === "handled" && to === "closed",
+      ),
+    ).toMatchObject({
+      decision: "allowed",
+      guard: "handling_audit_is_persisted_and_resolution_is_preserved",
+    });
   });
 });
 

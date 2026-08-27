@@ -1,6 +1,6 @@
 # We Remember MVP API Contract
 
-Status: Frozen by `CONTRACT-001`
+Status: Corrected by `CONTRACT-CORR-004`
 
 Executable source: `packages/contracts/src/index.ts`
 
@@ -15,6 +15,8 @@ This document names the public operation types. The executable Zod schemas are a
 - Every mutation result is an explicit status variant. Missing information never becomes success.
 - `fixture_demo` actors are fictional inputs to the same authorization boundary; they are not production authentication.
 - Public consumers import from `@we-remember/contracts` only. There are no supported deep imports.
+- `compareTimestamps` orders any two values already accepted by `TimestampSchema` without `Date` parsing or precision loss. `TimeRangeSchema` and care deadline validation use that same comparator.
+- `AcknowledgeCareEvent` and `HandleCareEvent` reject caller timestamps. Each command samples `CareClock.now()` once after the adapter has validated its return value with `TimestampSchema`, then preserves that exact string for every authoritative time use without conversion.
 
 ## 2. Common public types
 
@@ -28,6 +30,9 @@ This document names the public operation types. The executable Zod schemas are a
 | `Domain` | Responsibility domain whose `ownerId` is the current active owner |
 | `Handover` | State-specific handover union with blocked and terminal invariants |
 | `CareRule` / `CareEvent` | Human-confirmed rule and deterministic event records |
+| `CareClock` | Care-only authoritative clock returning a `TimestampSchema`-validated, precision-preserving timestamp |
+| `CareResolution` | Bounded persisted handling outcome; `legacy_unknown` is migration-only history |
+| `compareTimestamps` | Exact `-1`, `0`, or `1` instant ordering for already-validated offset-aware timestamps |
 | `AuditEntry` | Content-free structured audit fact retained only for the space lifetime |
 | `IdempotencyKey` | Retry identity scoped by space, command, and actor |
 
@@ -51,8 +56,8 @@ The 18 commands named by ADR 0001 are required. `DeclineHandover` and `ExpireHan
 | `ExpireHandover` | `ExpireHandoverActor` (`handover_expiry_service`) | `ExpireHandoverRequest`: handover, observed time, expected version, idempotency key | `ExpireHandoverResult`: terminal expired handover | `ExpireHandoverError`: invalid request, forbidden/not found, transition denied/terminal, conflict, idempotency conflict |
 | `ConfirmCareRule` | `ConfirmCareRuleActor` (`MemberActor`) | `ConfirmCareRuleRequest`: draft rule, exact confirmed trigger/ack/escalation facts, expected version, idempotency key | `ConfirmCareRuleResult`: active care rule | `ConfirmCareRuleError`: invalid request, forbidden/not found, evidence missing, conflict, idempotency conflict |
 | `TickCareScheduler` | `TickCareSchedulerActor` (`care_scheduler`) | `TickCareSchedulerRequest`: observed time, bounded batch size, scheduler idempotency key | `TickCareSchedulerResult`: event/notification intents and replay marker | `TickCareSchedulerError`: invalid request, forbidden, care rule inactive, idempotency conflict, internal failure |
-| `AcknowledgeCareEvent` | `AcknowledgeCareEventActor` (`MemberActor`) | `AcknowledgeCareEventRequest`: event, acknowledged time, expected version, idempotency key | `AcknowledgeCareEventResult`: acknowledged event | `AcknowledgeCareEventError`: invalid request, forbidden/not found, transition denied/terminal, conflict, idempotency conflict |
-| `HandleCareEvent` | `HandleCareEventActor` (`MemberActor`) | `HandleCareEventRequest`: escalated event, safe resolution code, handled time, expected version, idempotency key | `HandleCareEventResult`: handled or closed event | `HandleCareEventError`: invalid request, forbidden/not found, transition denied/terminal, conflict, idempotency conflict |
+| `AcknowledgeCareEvent` | `AcknowledgeCareEventActor` (`MemberActor`) | `AcknowledgeCareEventRequest`: event, expected version, idempotency key; no caller time | `AcknowledgeCareEventResult`: acknowledged event stamped verbatim from `CareClock.now()` | `AcknowledgeCareEventError`: invalid request, forbidden/not found, transition denied/terminal, conflict, idempotency conflict |
+| `HandleCareEvent` | `HandleCareEventActor` (`MemberActor`) | `HandleCareEventRequest`: escalated event, selectable safe resolution, expected version, idempotency key; no caller time | `HandleCareEventResult`: handled event stamped verbatim from `CareClock.now()` | `HandleCareEventError`: invalid request, forbidden/not found, transition denied/terminal, conflict, idempotency conflict |
 | `DeleteEvidence` | `DeleteEvidenceActor` (`MemberActor`) | `DeleteEvidenceRequest`: evidence, expected version, idempotency key | `DeleteEvidenceResult`: deterministic invalidation receipt | `DeleteEvidenceError`: invalid request, forbidden/not found, conflict, idempotency conflict, internal failure |
 | `RevokeAnalysisConsent` | `RevokeAnalysisConsentActor` (`MemberActor`) | `RevokeAnalysisConsentRequest`: effective time, expected version, idempotency key | `RevokeAnalysisConsentResult`: future analysis disabled | `RevokeAnalysisConsentError`: invalid request, forbidden/not found, conflict, idempotency conflict |
 | `ExportMyData` | `ExportMyDataActor` (`MemberActor`) | `ExportMyDataRequest`: JSON format, requested time, idempotency key | `ExportMyDataResult`: actor-authorized export bundle | `ExportMyDataError`: invalid request, forbidden, export not authorized, idempotency conflict, internal failure |
@@ -105,7 +110,7 @@ Domain events contain IDs and structured state facts, not message or evidence co
 
 Each event has `eventId`, `eventType`, `spaceId`, `occurredAt`, `actor`, `correlationId`, nullable `causationId`, nullable `idempotencyKey`, and a type-specific payload. `space.deleted` contains only the ephemeral receipt ID and deletion time; it is not persisted after the cascade.
 
-Audit entries are in-space data. They include actor/target references, action, versions, structured changed field names, time, and visibility. They never contain private message text, raw evidence, model input/output, secret values, or arbitrary error payloads. Space deletion removes them with every other in-space record.
+Audit entries are in-space data. They include actor/target references, action, versions, structured changed field names, time, and visibility. A `resolution` change must use the dedicated bounded resolution audit value; the generic state/string value cannot be paired with that field. Audit changes never contain private message text, raw evidence, free-form care content, model input/output, secret values, or arbitrary error payloads. Space deletion removes them with every other in-space record.
 
 ## 7. Handover transition contract
 
@@ -127,14 +132,32 @@ Every unlisted pair is an explicit denied row in `HANDOVER_TRANSITION_TABLE`, in
 | From | Allowed destinations | Required guard |
 | --- | --- | --- |
 | `scheduled` | `notified`, `unresolved` | confirmed active rule and due time; unresolved only after a deterministic delivery/recipient terminal failure |
-| `notified` | `acknowledged`, `timed_out`, `closed`, `unresolved` | acknowledgement before timeout, timeout reached, no acknowledgement required, or retry policy exhausted |
+| `notified` | `acknowledged`, `timed_out`, `closed`, `unresolved` | authoritative `now` strictly before the deadline, authoritative `now` at or after the deadline, no acknowledgement required, or retry policy exhausted |
 | `timed_out` | `escalated`, `unresolved` | next confirmed escalation target exists, otherwise unresolved |
 | `escalated` | `escalated`, `acknowledged`, `handled`, `unresolved` | next level, late subject acknowledgement, authorized human handling, or terminal exhaustion |
 | `acknowledged` | `closed` | acknowledgement audit persisted |
-| `handled` | `closed` | handling audit persisted |
+| `handled` | `closed` | handling audit persisted and both `handledAt` and `resolution` preserved |
 | `closed`, `unresolved` | none | terminal |
 
 Every unlisted pair is denied. The `escalated -> escalated` row requires a strictly increasing escalation level and a new level-scoped idempotency key.
+
+### Exact timestamp ordering
+
+`compareTimestamps(left, right)` has the precondition that both inputs have already passed `TimestampSchema`; it returns `-1` when `left` is earlier, `0` when both strings represent the same instant, and `1` when `left` is later. It converts validated proleptic-Gregorian calendar and offset fields with exact integer arithmetic, then compares fractional-second digits directly. It does not use JavaScript `Date`, epoch milliseconds, rounding, truncation, fixed fractional precision, large exponentiation, or an external dependency. Equivalent instants remain equal across offsets, omitted seconds, and trailing fractional zeros, including calendar boundaries and year `0000`.
+
+`TimeRangeSchema` uses this comparator, so every range must contain a genuinely later instant even when the difference is below one millisecond or beyond nanosecond precision. Canonically equal endpoints are rejected even when written with different offsets or fractional precision.
+
+### Authoritative care command time
+
+The general-purpose `Clock.now(): Date` contract remains unchanged for existing non-care consumers. Care command adapters instead implement `CareClock.now(): Timestamp`. Before returning, an adapter must validate its source value with `TimestampSchema`; after that boundary, the command keeps the returned value verbatim and performs no `Date` construction, parsing, serialization, rounding, truncation, or fixed-precision conversion.
+
+`AcknowledgeCareEvent` and `HandleCareEvent` sample the injected `CareClock` exactly once per non-replayed execution. Caller-supplied `acknowledgedAt` and `handledAt` keys are unknown fields and fail strict request validation. The sampled timestamp is the sole value used for the transition decision, acknowledgement deadline comparison where applicable, persisted `acknowledgedAt` or `handledAt`, idempotency claim time, domain-event time, and audit `occurredAt`; a replay returns the originally persisted result and timestamp.
+
+A notified event can be acknowledged on time only when `compareTimestamps(now, acknowledgementDeadline) === -1`. Equality belongs to the timeout side: an equal or later instant cannot produce a timely acknowledgement and permits the deterministic `timed_out` transition. The existing `escalated -> acknowledged` path remains an explicitly late acknowledgement and is never reclassified as timely.
+
+### Persisted care resolution
+
+New handling requests may select only `confirmed_safe`, `in_person_check_started`, or `professional_help_contacted`. A handled event requires exactly one persisted resolution, and closing it must copy that resolution unchanged. `legacy_unknown` is a bounded compatibility value for migrated pre-correction handled or handled-then-closed rows; it is visible when reading history but is rejected by `HandleCareEventRequestSchema` and cannot be written by a new handling command. Closed events that were never handled carry `handledAt: null` and `resolution: null`.
 
 ## 9. Privacy operations
 
@@ -163,4 +186,4 @@ The export contains the actor's private messages/evidence plus shared records th
 
 ## 10. Schema examples
 
-`packages/contracts/src/examples.ts` exports fictional, stable examples for all commands and queries plus representative invalid/failure outcomes. `packages/contracts/tests/contracts.test.ts` parses every example through the operation registry. No example contains a real person, address, account, credential, medical diagnosis, or copied private content.
+`packages/contracts/src/examples.ts` exports fictional, stable examples for all commands and queries plus handled/closed persistence examples and representative invalid/failure outcomes. The examples cover valid acknowledgement, handling, and closure; rejection of caller acknowledgement/handling timestamps; missing and invalid resolution; and migrated `legacy_unknown` history. `packages/contracts/tests/contracts.test.ts` parses every operation example through the registry, every care/audit schema example through its public schema, and exact timestamp fixtures through `TimestampSchema` plus `compareTimestamps`. No example contains a real person, address, account, credential, medical diagnosis, or copied private content.
