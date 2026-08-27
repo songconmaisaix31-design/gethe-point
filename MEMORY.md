@@ -40,6 +40,8 @@
 - Preserve failed Worker worktrees as evidence and use an explicit validated `workspace_suffix` for retries. The second approved attempt uses suffix `v2`, producing names such as `trk-foundation-found-001-v2` without rewriting historical Orca state.
 - Current supervised Orca completion requires Dispatch-preamble sender context and a capability that must never be copied into repository automation. Workers run `worker_finish.py --verify-only` to produce a non-secret verified payload, then use the exact injected preamble command once to send `worker_done`.
 - Worker resource cleanup is operational bookkeeping, not product acceptance. Record `release_unknown` or other cleanup failures in acceptance evidence while preserving the independently verified task outcome and Run state.
+- In `run_a6e82cb7623f`, `FOUND-001` was accepted at remote SHA `bede795a127ef5baa48fc4bd01752c2f3c408c65`. The locked Node 24 / pnpm 11 harness, strict checks, native Sharp and Drizzle smoke tests, and full dependency audit passed; the execution policy prevented physical removal of `node_modules`, so clean-install evidence used both forced and ordinary frozen reinstalls without weakening the clean-HEAD gate.
+- Persist an Orca Task ID immediately after `task-create` and before `worker-start`. If launch fails, recover the ID from the task-create evidence receipt and reuse it; otherwise a retry can create duplicate logical work while the external Orca Task remains ready.
 
 ## Secret handling
 

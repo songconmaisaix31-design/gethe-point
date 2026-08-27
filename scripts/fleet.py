@@ -404,17 +404,25 @@ def dispatch_wave(root: Path, cfg: Mapping[str, Any], state: dict[str, Any], wav
     for tid in wave["tasks"]:
         task = state["tasks"][tid]
         task["base_ref"], task["base_sha"] = base_ref, base_sha
-        create = orca(
-            root,
-            ["orchestration", "task-create", "--task-title", f"[{tid}] {task['title']}", "--spec", render_spec(root, cfg, state, task)],
-            f"create task {tid}",
-            dry_run,
-        )
-        task_id = find_prefixed(create, "task_") or (f"task_dry_{tid.lower()}" if dry_run else None)
+        task_receipt_path = evidence / f"{tid}-task-create.json"
+        task_id = task.get("orca_task_id")
+        if not task_id and task_receipt_path.exists() and not dry_run:
+            task_id = find_prefixed(load_json(task_receipt_path), "task_")
         if not task_id:
-            raise FleetError(f"task-create receipt missing task_ ID for {tid}")
+            create = orca(
+                root,
+                ["orchestration", "task-create", "--task-title", f"[{tid}] {task['title']}", "--spec", render_spec(root, cfg, state, task)],
+                f"create task {tid}",
+                dry_run,
+            )
+            task_id = find_prefixed(create, "task_") or (f"task_dry_{tid.lower()}" if dry_run else None)
+            if not task_id:
+                raise FleetError(f"task-create receipt missing task_ ID for {tid}")
+            save_json(task_receipt_path, create)
         task["orca_task_id"] = task_id
-        save_json(evidence / f"{tid}-task-create.json", create)
+        # Persist the external Task identity before worker-start so an explicit
+        # launch failure can be retried without creating a duplicate Orca Task.
+        save_state(state_path, state)
         agent = task.get("agent") or defaults.get("agent") or "codex"
         setup = task.get("setup") or defaults.get("setup") or "run"
         mode = task.get("worktree_mode") or defaults.get("worktree_mode") or "new-top-level"

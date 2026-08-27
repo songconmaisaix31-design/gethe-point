@@ -10,7 +10,7 @@ SCRIPTS = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(SCRIPTS))
 
 from common import FleetError  # noqa: E402
-from fleet import build_state, dispatch_id_from_receipt, do_launch, settle_worker  # noqa: E402
+from fleet import build_state, dispatch_id_from_receipt, dispatch_wave, do_launch, settle_worker  # noqa: E402
 
 
 class DispatchReceiptTests(unittest.TestCase):
@@ -70,6 +70,92 @@ class WorkerSettlementTests(unittest.TestCase):
         self.assertFalse(receipt["ok"])
         self.assertEqual(receipt["dispatch_id"], "ctx_281af24e0d31")
         self.assertIn("tab_not_found", receipt["error"])
+
+
+class DispatchRecoveryTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.root = Path(self.temp.name)
+        self.run_dir = self.root / "run"
+        (self.run_dir / "evidence").mkdir(parents=True)
+        self.state_path = self.run_dir / "state.json"
+        self.wave = {
+            "id": "contract",
+            "tasks": ["CONTRACT-001"],
+            "status": "planned",
+            "depends_on": [],
+            "base": {"type": "ref", "value": "origin/foundation"},
+        }
+        self.state = {
+            "run_id": "run_test",
+            "objective": "test dispatch recovery",
+            "coordinator_branch": "fleet-control-test",
+            "initial_base_ref": "origin/main",
+            "initial_base_sha": "0" * 40,
+            "created_at": "2026-08-27T00:00:00Z",
+            "updated_at": "2026-08-27T00:00:00Z",
+            "run_dir": str(self.run_dir),
+            "repo_selector": "id:repo_test",
+            "waves": [self.wave],
+            "tasks": {
+                "CONTRACT-001": {
+                    "id": "CONTRACT-001",
+                    "title": "Freeze contracts",
+                    "track": "architecture",
+                    "workspace_name": "trk-architecture-contract-001-v2",
+                    "status": "planned",
+                    "orca_task_id": None,
+                    "dispatch_id": None,
+                    "branch": None,
+                }
+            },
+        }
+
+    def tearDown(self):
+        self.temp.cleanup()
+
+    @patch("fleet.render_spec", return_value="contract spec")
+    @patch("fleet.resolve_wave_base", return_value=("origin/foundation", "a" * 40))
+    def test_worker_start_failure_persists_task_id_and_retry_reuses_it(self, _base, _spec):
+        first_calls = []
+
+        def first_orca(_root, args, _label, _dry_run=False):
+            first_calls.append(args)
+            if args[:2] == ["repo", "set-base-ref"]:
+                return {"ok": True}
+            if args[:2] == ["orchestration", "task-create"]:
+                return {"result": {"taskId": "task_abc123"}}
+            raise FleetError("selector_not_found")
+
+        with patch("fleet.orca", side_effect=first_orca):
+            with self.assertRaisesRegex(FleetError, "selector_not_found"):
+                dispatch_wave(self.root, {}, self.state, self.wave, self.state_path, False)
+
+        persisted = json.loads(self.state_path.read_text(encoding="utf-8"))
+        self.assertEqual(persisted["tasks"]["CONTRACT-001"]["orca_task_id"], "task_abc123")
+        self.assertEqual(sum(call[:2] == ["orchestration", "task-create"] for call in first_calls), 1)
+
+        second_calls = []
+
+        def second_orca(_root, args, _label, _dry_run=False):
+            second_calls.append(args)
+            if args[:2] == ["repo", "set-base-ref"]:
+                return {"ok": True}
+            if args[:2] == ["orchestration", "worker-start"]:
+                return {
+                    "result": {
+                        "dispatchId": "ctx_abc123",
+                        "branch": "trk-architecture-contract-001-v2",
+                    }
+                }
+            raise AssertionError(f"unexpected Orca call: {args}")
+
+        with patch("fleet.orca", side_effect=second_orca):
+            dispatch_wave(self.root, {}, persisted, self.wave, self.state_path, False)
+
+        self.assertFalse(any(call[:2] == ["orchestration", "task-create"] for call in second_calls))
+        self.assertEqual(persisted["tasks"]["CONTRACT-001"]["dispatch_id"], "ctx_abc123")
+        self.assertEqual(persisted["tasks"]["CONTRACT-001"]["status"], "dispatched")
 
 
 class LaunchAuthorizationTests(unittest.TestCase):
