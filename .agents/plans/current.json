@@ -41,6 +41,7 @@
           "title": "Bootstrap the locked TypeScript workspace and shared developer harness",
           "track": "foundation",
           "write_paths": [
+            ".gitignore",
             "package.json",
             "pnpm-workspace.yaml",
             "pnpm-lock.yaml",
@@ -51,9 +52,10 @@
             "packages/config/**",
             "tools/**"
           ],
-          "spec": "Create a single-root pnpm workspace for Node, Next.js, React, strict TypeScript, PostgreSQL/Drizzle, Zod, Vitest, Playwright, and the minimum accessibility test support frozen in ADR 0001. Lock every planned external dependency now; later feature tracks must use only these dependencies. Define root scripts for focused track checks, full checks, build, fixture E2E, visual checks, and disposable database verification. Add only build/test configuration and a smoke test; do not implement product behavior or UI.",
+          "spec": "Create a single-root pnpm workspace for Node, Next.js, React, strict TypeScript, PostgreSQL/Drizzle, Zod, Vitest, Playwright, and the minimum accessibility test support frozen in ADR 0001. Lock every planned external dependency now; later feature tracks must use only these dependencies. Add a reproducible root .gitignore for generated dependency, build, test, coverage, and local runtime artifacts. Define root scripts for focused track checks, full checks, build, fixture E2E, visual checks, and disposable database verification. Add only build/test configuration and a smoke test; do not implement product behavior or UI.",
           "acceptance": [
             "A clean checkout installs with pnpm install --frozen-lockfile",
+            "Generated dependency, build, test, coverage, and local runtime artifacts remain ignored after checks",
             "Strict TypeScript and lint settings are shared without any or unsafe eval defaults",
             "Every future task check named in this plan exists as a root script or documented command",
             "The dependency list is minimal, justified, and contains no direct AI SDK requirement",

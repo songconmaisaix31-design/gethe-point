@@ -87,6 +87,13 @@ class PlanTests(unittest.TestCase):
         self.assertEqual(self.plan["base_ref"], self.cfg["base_ref"])
         self.assertEqual(self.plan["waves"][0]["base"]["value"], self.cfg["base_ref"])
 
+    def test_foundation_owns_reproducible_root_gitignore(self):
+        foundation = self.cfg["tracks"]["foundation"]
+        found_task = self.plan["waves"][0]["tasks"][0]
+
+        self.assertIn(".gitignore", foundation["allow"])
+        self.assertIn(".gitignore", found_task["write_paths"])
+
     def test_parallel_overlap_is_rejected(self):
         plan = json.loads(json.dumps(self.plan))
         parallel_wave = next(wave for wave in plan["waves"] if wave["id"] == "parallel-core")

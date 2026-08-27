@@ -155,7 +155,7 @@ Do not silently cut consent, authorization, all five responsibility fields, neut
 
 | Risk | Control |
 | --- | --- |
-| Parallel lockfile conflicts | One root manifest and lockfile owned only by `foundation` |
+| Parallel lockfile conflicts or dirty generated artifacts | One root manifest, lockfile, and reproducible `.gitignore` owned only by `foundation` |
 | Private content leakage | Self-only raw evidence, minimum redacted shared data, actor authorization tests, no content logging |
 | AI creates consequential state | Validated draft-only provider with one retry and human fallback |
 | Handover partially applies | One database transaction for owner, reminders, and audit |

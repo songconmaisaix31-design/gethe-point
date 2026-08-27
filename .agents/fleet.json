@@ -67,6 +67,7 @@
     "foundation": {
       "description": "Root workspace, locked dependencies, shared build configuration, and local developer harness",
       "allow": [
+        ".gitignore",
         "package.json",
         "pnpm-workspace.yaml",
         "pnpm-lock.yaml",

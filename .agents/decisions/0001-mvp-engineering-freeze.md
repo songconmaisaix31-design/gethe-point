@@ -87,7 +87,7 @@ accepted | declined | expired
 
 ## Architecture
 
-Use one locked `pnpm` workspace with a single root dependency manifest. Feature tracks do not add dependencies or mutate the lockfile. This prevents parallel lockfile conflicts and makes every worker reproducible from the same accepted base.
+Use one locked `pnpm` workspace with a single root dependency manifest and a committed root `.gitignore` for generated dependency, build, test, coverage, and local runtime artifacts. Feature tracks do not add dependencies or mutate the lockfile. This prevents parallel lockfile conflicts and makes every worker reproducible from the same accepted base without relying on local Git excludes.
 
 The selected stack is:
 

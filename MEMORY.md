@@ -36,6 +36,7 @@
 - The implementation uses a single root `pnpm` dependency manifest and lockfile owned only by the `foundation` track. Feature tracks use locked dependencies and non-overlapping paths; new dependencies require a separate foundation task.
 - Fixture mode is the acceptance baseline. Demo role switching is not production authentication, raw `agent_dm` evidence remains self-only, consent is per signal, handover acceptance is terminal and atomic, care execution is deterministic, and space deletion removes all in-space product and audit content.
 - Orca 1.4.188 returns supervised Dispatch IDs as `ctx_*` in `result.dispatchId` and also returns an effect named `dispatch_input`. Fleet must read the exact key and validate the ID shape; generic `dispatch_` prefix scanning can corrupt state by selecting the effect name.
+- The first `FOUND-001` attempt in `run_5644dc3389a9` exposed that a root `.gitignore` is a required foundation artifact: a frozen pnpm install creates `node_modules/` and checks create build/test artifacts. Keep `.gitignore` in the foundation allowlist and task scope; never rely on local Git exclude to fake a clean checkout.
 
 ## Secret handling
 
