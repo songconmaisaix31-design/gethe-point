@@ -64,7 +64,7 @@ AMENDMENT_FIELDS = {
     "resolutions",
 }
 NEW_WAVE_FIELDS = {"id", "description", "depends_on", "base", "tasks"}
-NEW_TASK_FIELDS = {
+NEW_TASK_FIELD_ORDER = (
     "id",
     "title",
     "track",
@@ -77,9 +77,12 @@ NEW_TASK_FIELDS = {
     "worktree_mode",
     "model",
     "effort",
-}
-WAVE_PATCH_FIELDS = {"id", "description", "depends_on", "base"}
-TASK_PATCH_FIELDS = {"id", "title", "spec", "acceptance", "checks", "write_paths"}
+)
+NEW_TASK_FIELDS = set(NEW_TASK_FIELD_ORDER)
+WAVE_PATCH_FIELD_ORDER = ("description", "depends_on", "base")
+WAVE_PATCH_FIELDS = {"id", *WAVE_PATCH_FIELD_ORDER}
+TASK_PATCH_FIELD_ORDER = ("title", "spec", "acceptance", "checks", "write_paths")
+TASK_PATCH_FIELDS = {"id", *TASK_PATCH_FIELD_ORDER}
 UNDISPATCHED_TASK_FIELDS = (
     "orca_task_id",
     "dispatch_id",
@@ -773,7 +776,7 @@ def materialize_amendment(
         if len(patch) == 1:
             raise FleetError(f"wave update {wid} has no contract changes")
         target = next(wave for wave in candidate["waves"] if wave["id"] == wid)
-        for field in WAVE_PATCH_FIELDS - {"id"}:
+        for field in WAVE_PATCH_FIELD_ORDER:
             if field in patch:
                 target[field] = copy.deepcopy(patch[field])
         updated_wave_ids.append(wid)
@@ -794,7 +797,7 @@ def materialize_amendment(
             raise FleetError(f"existing task {tid} is not downstream of any resolved source")
         if len(patch) == 1:
             raise FleetError(f"task update {tid} has no contract changes")
-        for field in TASK_PATCH_FIELDS - {"id"}:
+        for field in TASK_PATCH_FIELD_ORDER:
             if field in patch:
                 candidate["tasks"][tid][field] = copy.deepcopy(patch[field])
         updated_task_ids.append(tid)
@@ -835,6 +838,36 @@ AMENDMENT_CHANGE_KEYS = {
     "requested_changes",
 }
 AMENDMENT_REQUEST_KEYS = {"append_waves", "update_waves", "update_tasks", "resolutions"}
+AMENDMENT_RECORD_FIELDS = {
+    "id",
+    "source",
+    "source_sha256",
+    "parent_plan_sha256",
+    "state_before_sha256",
+    "automation",
+    "applied_at",
+    "chain",
+    "owned_contract",
+    "changes",
+    "journal",
+    "receipt",
+    "status",
+}
+AMENDMENT_CHAIN_FIELDS = {"ordinal", "previous"}
+AMENDMENT_PREVIOUS_FIELDS = {"amendment_id", "journal", "source_sha256", "journal_sha256"}
+OWNED_CONTRACT_FIELDS = {
+    "wave_start_index",
+    "appended_waves",
+    "appended_tasks",
+    "updated_waves",
+    "updated_tasks",
+}
+TASK_CONTRACT_FIELD_ORDER = (*NEW_TASK_FIELD_ORDER, "wave", "workspace_name")
+TASK_CONTRACT_FIELDS = set(TASK_CONTRACT_FIELD_ORDER)
+AMENDMENT_ARTIFACT_NAME = re.compile(
+    r"^amendment-(?P<amendment_id>[A-Za-z0-9](?:[A-Za-z0-9_-]{0,63}))-"
+    r"(?P<source_prefix>[0-9a-f]{12})(?P<journal>\.journal)?\.json$"
+)
 
 
 def bytes_sha256(data: bytes) -> str:
@@ -845,6 +878,70 @@ def amendment_artifact_paths(state_path: Path, aid: str, source_hash: str) -> tu
     stem = f"amendment-{aid}-{source_hash[:12]}"
     evidence = state_path.parent / "evidence"
     return evidence / f"{stem}.journal.json", evidence / f"{stem}.json", state_path.parent / "STATUS.md"
+
+
+def amendment_artifact_namespace(state_path: Path) -> dict[str, tuple[Path | None, Path | None]]:
+    """Inventory the complete exact Fleet amendment artifact namespace."""
+    evidence = state_path.parent / "evidence"
+    if not evidence.exists():
+        return {}
+    if not evidence.is_dir():
+        raise FleetError(f"amendment evidence path is not a directory: {evidence}")
+
+    artifacts: dict[str, dict[str, list[tuple[str, Path]]]] = {}
+    casefold_ids: dict[str, str] = {}
+    for path in sorted(evidence.iterdir(), key=lambda item: (item.name.casefold(), item.name)):
+        match = AMENDMENT_ARTIFACT_NAME.fullmatch(path.name)
+        if match is None:
+            continue
+        if not path.is_file():
+            raise FleetError(f"malformed amendment artifact is not a file: {path}")
+        artifact_id = match.group("amendment_id")
+        folded = artifact_id.casefold()
+        prior_id = casefold_ids.get(folded)
+        if prior_id is not None and prior_id != artifact_id:
+            raise FleetError(f"amendment artifact id casefold collision: {prior_id}, {artifact_id}")
+        casefold_ids[folded] = artifact_id
+        bucket = artifacts.setdefault(artifact_id, {"journals": [], "receipts": []})
+        artifact = (match.group("source_prefix"), path)
+        bucket["journals" if match.group("journal") else "receipts"].append(artifact)
+
+    inventory: dict[str, tuple[Path | None, Path | None]] = {}
+    for aid, bucket in artifacts.items():
+        journals = sorted(bucket["journals"], key=lambda item: item[1].name)
+        receipts = sorted(bucket["receipts"], key=lambda item: item[1].name)
+        if len(journals) > 1:
+            raise FleetError(
+                f"duplicate amendment journals for {aid}: " + ", ".join(str(item[1]) for item in journals)
+            )
+        if len(receipts) > 1:
+            raise FleetError(
+                f"duplicate amendment receipts for {aid}: " + ", ".join(str(item[1]) for item in receipts)
+            )
+        if journals and receipts and journals[0][0] != receipts[0][0]:
+            raise FleetError(f"conflicting amendment journal and receipt hashes for {aid}")
+        inventory[aid] = (
+            journals[0][1] if journals else None,
+            receipts[0][1] if receipts else None,
+        )
+    return inventory
+
+
+def amendment_artifact_inventory(
+    state_path: Path,
+    aid: str,
+    *,
+    namespace: Mapping[str, tuple[Path | None, Path | None]] | None = None,
+) -> tuple[Path | None, Path | None]:
+    """Select one validated ID without permitting case-insensitive aliasing."""
+    inventory = amendment_artifact_namespace(state_path) if namespace is None else namespace
+    collision = next(
+        (artifact_id for artifact_id in inventory if artifact_id != aid and artifact_id.casefold() == aid.casefold()),
+        None,
+    )
+    if collision is not None:
+        raise FleetError(f"amendment artifact id casefold collision: {aid}, {collision}")
+    return inventory.get(aid, (None, None))
 
 
 def amendment_receipt_from_journal(journal: Mapping[str, Any]) -> dict[str, Any]:
@@ -867,6 +964,8 @@ def amendment_receipt_from_journal(journal: Mapping[str, Any]) -> dict[str, Any]
         "amendment_source": journal["amendment_source"],
         "amendment_sha256": journal["amendment_sha256"],
         "automation": copy.deepcopy(journal["automation"]),
+        "chain": copy.deepcopy(journal["chain"]),
+        "owned_contract": copy.deepcopy(journal["owned_contract"]),
         "state_after_sha256": state_identity["after_sha256"],
         "journal": journal["journal_path"],
         "status": expected_status["path"],
@@ -883,10 +982,55 @@ def amendment_record_from_journal(journal: Mapping[str, Any]) -> dict[str, Any]:
         "state_before_sha256": journal["state"]["before_sha256"],
         "automation": copy.deepcopy(journal["automation"]),
         "applied_at": journal["applied_at"],
+        "chain": copy.deepcopy(journal["chain"]),
+        "owned_contract": copy.deepcopy(journal["owned_contract"]),
         "changes": copy.deepcopy(journal["changes"]),
         "journal": journal["journal_path"],
         "receipt": journal["expected_receipt"]["path"],
         "status": journal["expected_status"]["path"],
+    }
+
+
+def owned_contract_from_candidate(
+    candidate: Mapping[str, Any], changes: Mapping[str, Any]
+) -> dict[str, Any]:
+    """Capture the exact post-materialization contract owned by one amendment."""
+    wave_by_id = {str(wave["id"]): wave for wave in candidate["waves"]}
+    appended_wave_ids = changes["appended_waves"]
+    wave_start_index = len(candidate["waves"]) - len(appended_wave_ids)
+    if [wave["id"] for wave in candidate["waves"][wave_start_index:]] != appended_wave_ids:
+        raise FleetError("internal appended wave order conflicts")
+
+    appended_waves = [
+        {
+            "id": wave_by_id[wave_id]["id"],
+            "description": copy.deepcopy(wave_by_id[wave_id]["description"]),
+            "depends_on": copy.deepcopy(wave_by_id[wave_id]["depends_on"]),
+            "base": copy.deepcopy(wave_by_id[wave_id]["base"]),
+            "tasks": copy.deepcopy(wave_by_id[wave_id]["tasks"]),
+        }
+        for wave_id in appended_wave_ids
+    ]
+    appended_tasks = []
+    for task_id in changes["appended_tasks"]:
+        task = candidate["tasks"][task_id]
+        appended_tasks.append(
+            {
+                "id": task_id,
+                "contract": {
+                    field: copy.deepcopy(task[field])
+                    for field in TASK_CONTRACT_FIELD_ORDER
+                    if field in task
+                },
+            }
+        )
+    requested = changes["requested_changes"]
+    return {
+        "wave_start_index": wave_start_index,
+        "appended_waves": appended_waves,
+        "appended_tasks": appended_tasks,
+        "updated_waves": copy.deepcopy(requested["update_waves"]),
+        "updated_tasks": copy.deepcopy(requested["update_tasks"]),
     }
 
 
@@ -901,8 +1045,10 @@ def prepare_amendment_transaction(
     parent_plan_hash: str,
     cfg: Mapping[str, Any],
     applied_at: str,
+    chain: Mapping[str, Any],
 ) -> dict[str, Any]:
     candidate, changes = materialize_amendment(state, amendment, cfg, applied_at)
+    owned_contract = owned_contract_from_candidate(candidate, changes)
     aid = str(amendment["amendment_id"])
     journal_path, receipt_path, status_path = amendment_artifact_paths(state_path, aid, amendment_hash)
     record = {
@@ -913,6 +1059,8 @@ def prepare_amendment_transaction(
         "state_before_sha256": state_before_hash,
         "automation": copy.deepcopy(amendment["automation"]),
         "applied_at": applied_at,
+        "chain": copy.deepcopy(chain),
+        "owned_contract": copy.deepcopy(owned_contract),
         "changes": copy.deepcopy(changes),
         "journal": str(journal_path),
         "receipt": str(receipt_path),
@@ -939,6 +1087,8 @@ def prepare_amendment_transaction(
         },
         "applied_at": applied_at,
         "automation": copy.deepcopy(amendment["automation"]),
+        "chain": copy.deepcopy(chain),
+        "owned_contract": copy.deepcopy(owned_contract),
         "changes": copy.deepcopy(changes),
         "expected_status": {
             "path": str(status_path),
@@ -985,6 +1135,181 @@ def _full_sha256(value: Any, label: str) -> str:
     return value
 
 
+def _automation_identity(value: Any, label: str) -> Mapping[str, Any]:
+    automation = _exact_fields(value, {"branch", "sha"}, label)
+    if not isinstance(automation["branch"], str) or not automation["branch"].strip():
+        raise FleetError(f"{label} branch conflicts")
+    if not isinstance(automation["sha"], str) or re.fullmatch(r"[0-9a-fA-F]{40}", automation["sha"]) is None:
+        raise FleetError(f"{label} SHA conflicts")
+    return automation
+
+
+def _journal_object_list(value: Any, label: str) -> list[Mapping[str, Any]]:
+    if not isinstance(value, list) or not all(isinstance(item, Mapping) for item in value):
+        raise FleetError(f"{label} must be an object list")
+    return value
+
+
+def validate_journal_changes(value: Any) -> Mapping[str, Any]:
+    """Validate that immutable summaries exactly describe their requested patches."""
+    changes = _exact_fields(value, AMENDMENT_CHANGE_KEYS, "journal change summary")
+    requested = _exact_fields(changes["requested_changes"], AMENDMENT_REQUEST_KEYS, "journal requested changes")
+    append_waves = _journal_object_list(requested["append_waves"], "journal append_waves")
+    update_waves = _journal_object_list(requested["update_waves"], "journal update_waves")
+    update_tasks = _journal_object_list(requested["update_tasks"], "journal update_tasks")
+    resolutions = _journal_object_list(requested["resolutions"], "journal resolutions")
+    if not append_waves:
+        raise FleetError("journal append_waves must contain at least one wave")
+
+    appended_wave_ids: list[str] = []
+    appended_task_ids: list[str] = []
+    for wave in append_waves:
+        if set(wave) - NEW_WAVE_FIELDS:
+            raise FleetError("journal appended wave fields conflict")
+        wave_id = wave.get("id")
+        if not isinstance(wave_id, str) or not wave_id or wave_id in appended_wave_ids:
+            raise FleetError("journal appended wave identity conflicts")
+        tasks = _journal_object_list(wave.get("tasks"), f"journal appended wave {wave_id} tasks")
+        if not tasks:
+            raise FleetError(f"journal appended wave {wave_id} tasks must not be empty")
+        appended_wave_ids.append(wave_id)
+        for task in tasks:
+            if set(task) - NEW_TASK_FIELDS:
+                raise FleetError("journal appended task fields conflict")
+            task_id = task.get("id")
+            if not isinstance(task_id, str) or task_id in appended_task_ids:
+                raise FleetError("journal appended task identity conflicts")
+            appended_task_ids.append(task_id)
+
+    updated_wave_ids: list[str] = []
+    for item in update_waves:
+        if set(item) - WAVE_PATCH_FIELDS or len(item) < 2:
+            raise FleetError("journal existing-wave patch fields conflict")
+        wave_id = item.get("id")
+        if not isinstance(wave_id, str) or wave_id in updated_wave_ids:
+            raise FleetError("journal existing-wave patch identity conflicts")
+        updated_wave_ids.append(wave_id)
+
+    updated_task_ids: list[str] = []
+    for item in update_tasks:
+        if set(item) - TASK_PATCH_FIELDS or len(item) < 2:
+            raise FleetError("journal existing-task patch fields conflict")
+        task_id = item.get("id")
+        if not isinstance(task_id, str) or task_id in updated_task_ids:
+            raise FleetError("journal existing-task patch identity conflicts")
+        updated_task_ids.append(task_id)
+
+    resolution_summaries: list[dict[str, str]] = []
+    resolution_sources: set[str] = set()
+    for item in resolutions:
+        if set(item) - {"task", "corrected_by", "superseded_by"}:
+            raise FleetError("journal resolution fields conflict")
+        source = item.get("task")
+        relations = [name for name in ("corrected_by", "superseded_by") if name in item]
+        if not isinstance(source, str) or source in resolution_sources or len(relations) != 1:
+            raise FleetError("journal resolution identity conflicts")
+        relation = relations[0]
+        replacement = item.get(relation)
+        if not isinstance(replacement, str):
+            raise FleetError("journal resolution replacement conflicts")
+        resolution_sources.add(source)
+        resolution_summaries.append({"task": source, relation: replacement})
+
+    expected = {
+        "appended_waves": appended_wave_ids,
+        "appended_tasks": appended_task_ids,
+        "updated_waves": updated_wave_ids,
+        "updated_tasks": updated_task_ids,
+        "resolutions": resolution_summaries,
+    }
+    for field, expected_value in expected.items():
+        if changes[field] != expected_value:
+            raise FleetError(f"journal change summary {field} conflicts with requested changes")
+    return changes
+
+
+def validate_amendment_chain(value: Any) -> Mapping[str, Any]:
+    chain = _exact_fields(value, AMENDMENT_CHAIN_FIELDS, "amendment chain")
+    ordinal = chain["ordinal"]
+    if not isinstance(ordinal, int) or isinstance(ordinal, bool) or ordinal < 0:
+        raise FleetError("amendment chain ordinal conflicts")
+    previous = chain["previous"]
+    if previous is None:
+        return chain
+    previous = _exact_fields(previous, AMENDMENT_PREVIOUS_FIELDS, "previous amendment journal identity")
+    previous_id = previous["amendment_id"]
+    if not isinstance(previous_id, str) or re.fullmatch(r"[A-Za-z0-9](?:[A-Za-z0-9_-]{0,63})", previous_id) is None:
+        raise FleetError("previous amendment journal id conflicts")
+    if not isinstance(previous["journal"], str) or not previous["journal"]:
+        raise FleetError("previous amendment journal path conflicts")
+    _full_sha256(previous["source_sha256"], "previous amendment source hash")
+    _full_sha256(previous["journal_sha256"], "previous amendment journal byte hash")
+    return chain
+
+
+def validate_owned_contract(value: Any, changes: Mapping[str, Any]) -> Mapping[str, Any]:
+    owned = _exact_fields(value, OWNED_CONTRACT_FIELDS, "journal owned contract")
+    start = owned["wave_start_index"]
+    if not isinstance(start, int) or isinstance(start, bool) or start < 0:
+        raise FleetError("journal owned contract wave_start_index conflicts")
+    appended_waves = _journal_object_list(owned["appended_waves"], "owned appended waves")
+    appended_tasks = _journal_object_list(owned["appended_tasks"], "owned appended tasks")
+    updated_waves = _journal_object_list(owned["updated_waves"], "owned updated waves")
+    updated_tasks = _journal_object_list(owned["updated_tasks"], "owned updated tasks")
+    requested = changes["requested_changes"]
+
+    expected_waves: list[dict[str, Any]] = []
+    expected_task_sources: dict[str, tuple[str, Mapping[str, Any]]] = {}
+    expected_task_order: list[str] = []
+    for raw_wave in requested["append_waves"]:
+        wave_id = str(raw_wave["id"])
+        task_ids = [str(raw_task["id"]) for raw_task in raw_wave["tasks"]]
+        expected_waves.append(
+            {
+                "id": wave_id,
+                "description": copy.deepcopy(raw_wave.get("description", "")),
+                "depends_on": copy.deepcopy(raw_wave.get("depends_on", [])),
+                "base": copy.deepcopy(raw_wave.get("base", {})),
+                "tasks": task_ids,
+            }
+        )
+        for raw_task in raw_wave["tasks"]:
+            task_id = str(raw_task["id"])
+            expected_task_sources[task_id] = (wave_id, raw_task)
+            expected_task_order.append(task_id)
+    if appended_waves != expected_waves or [wave["id"] for wave in appended_waves] != changes["appended_waves"]:
+        raise FleetError("journal owned appended wave snapshot conflicts")
+
+    task_ids: list[str] = []
+    for item in appended_tasks:
+        item = _exact_fields(item, {"id", "contract"}, "owned appended task")
+        task_id = item["id"]
+        if not isinstance(task_id, str) or task_id not in expected_task_sources:
+            raise FleetError("journal owned appended task identity conflicts")
+        contract = item["contract"]
+        if not isinstance(contract, Mapping) or set(contract) - TASK_CONTRACT_FIELDS:
+            raise FleetError(f"journal owned appended task contract fields conflict: {task_id}")
+        wave_id, raw_task = expected_task_sources[task_id]
+        expected_fields = set(raw_task) | {"wave", "workspace_name"}
+        if set(contract) != expected_fields:
+            raise FleetError(f"journal owned appended task presence conflicts: {task_id}")
+        if any(contract[field] != raw_task[field] for field in raw_task):
+            raise FleetError(f"journal owned appended task value conflicts: {task_id}")
+        if contract.get("id") != task_id or contract.get("wave") != wave_id:
+            raise FleetError(f"journal owned appended task derived identity conflicts: {task_id}")
+        if not isinstance(contract.get("workspace_name"), str) or not contract["workspace_name"]:
+            raise FleetError(f"journal owned appended task workspace conflicts: {task_id}")
+        task_ids.append(task_id)
+    if task_ids != expected_task_order or task_ids != changes["appended_tasks"]:
+        raise FleetError("journal owned appended task order conflicts")
+
+    if updated_waves != requested["update_waves"] or [item["id"] for item in updated_waves] != changes["updated_waves"]:
+        raise FleetError("journal owned existing-wave patches conflict")
+    if updated_tasks != requested["update_tasks"] or [item["id"] for item in updated_tasks] != changes["updated_tasks"]:
+        raise FleetError("journal owned existing-task patches conflict")
+    return owned
+
+
 def validate_amendment_journal(
     journal: Any,
     *,
@@ -1005,7 +1330,8 @@ def validate_amendment_journal(
         {
             "schema_version", "kind", "journal_path", "amendment_id", "run_id",
             "amendment_source", "amendment_sha256", "parent_plan", "state",
-            "applied_at", "automation", "changes", "expected_status", "expected_receipt",
+            "applied_at", "automation", "chain", "owned_contract", "changes",
+            "expected_status", "expected_receipt",
         },
         "amendment journal",
     )
@@ -1017,7 +1343,8 @@ def validate_amendment_journal(
         raise FleetError("amendment journal identity conflicts")
     if journal["amendment_sha256"] != amendment_hash:
         raise FleetError("amendment journal source hash conflicts")
-    if journal["automation"] != automation:
+    journal_automation = _automation_identity(journal["automation"], "amendment journal automation")
+    if journal_automation != automation:
         raise FleetError("amendment journal automation identity conflicts")
     if not isinstance(journal["amendment_source"], str) or not journal["amendment_source"]:
         raise FleetError("amendment journal source path conflicts")
@@ -1037,13 +1364,9 @@ def validate_amendment_journal(
         raise FleetError("amendment journal state precondition conflicts")
     _full_sha256(state_identity["after_sha256"], "journal state after hash")
 
-    changes = _exact_fields(journal["changes"], AMENDMENT_CHANGE_KEYS, "journal change summary")
-    for field in AMENDMENT_CHANGE_KEYS - {"requested_changes"}:
-        if not isinstance(changes[field], list):
-            raise FleetError(f"journal change summary {field} must be a list")
-    requested = _exact_fields(changes["requested_changes"], AMENDMENT_REQUEST_KEYS, "journal requested changes")
-    if not all(isinstance(requested[field], list) for field in AMENDMENT_REQUEST_KEYS):
-        raise FleetError("journal requested changes must be object lists")
+    changes = validate_journal_changes(journal["changes"])
+    validate_amendment_chain(journal["chain"])
+    validate_owned_contract(journal["owned_contract"], changes)
 
     expected_status = _exact_fields(
         journal["expected_status"], {"path", "sha256", "size", "state_sha256"}, "journal STATUS identity"
@@ -1070,26 +1393,187 @@ def validate_amendment_journal(
     return receipt_data
 
 
-def validate_applied_amendment_state(state: Mapping[str, Any], journal: Mapping[str, Any]) -> None:
-    """Prove that the committed state still contains every amendment identity."""
-    changes = journal["changes"]
-    wave_ids = [wave.get("id") for wave in state.get("waves", []) if isinstance(wave, Mapping)]
-    for wave_id in changes["appended_waves"]:
-        if wave_ids.count(wave_id) != 1:
-            raise FleetError(f"applied amendment wave identity is missing or duplicated: {wave_id}")
-    tasks = state.get("tasks")
-    if not isinstance(tasks, Mapping):
-        raise FleetError("applied amendment state tasks are invalid")
-    for task_id in [*changes["appended_tasks"], *changes["updated_tasks"]]:
-        if task_id not in tasks:
-            raise FleetError(f"applied amendment task identity is missing: {task_id}")
-    for wave_id in changes["updated_waves"]:
-        if wave_id not in wave_ids:
-            raise FleetError(f"applied amendment updated wave identity is missing: {wave_id}")
+def load_validated_amendment_journal(
+    *,
+    state_path: Path,
+    run_id: str,
+    plan_path: Path,
+    parent_plan_hash: str,
+    aid: str,
+    journal_path: Path,
+    receipt_path: Path | None,
+    expected_state_before_hash: str | None = None,
+    expected_automation: Mapping[str, Any] | None = None,
+) -> tuple[Mapping[str, Any], bytes, str]:
+    snapshot = load_json_snapshot(journal_path)
+    journal = snapshot.value
+    if snapshot.data != json_bytes(journal):
+        raise FleetError(f"applied amendment journal bytes conflict: {journal_path}")
+    if not isinstance(journal, Mapping):
+        raise FleetError(f"amendment journal must be an object: {journal_path}")
+
+    source_hash = _full_sha256(journal.get("amendment_sha256"), "amendment journal source hash")
+    state_identity = journal.get("state")
+    if not isinstance(state_identity, Mapping):
+        raise FleetError("amendment journal state fields conflict")
+    journal_before_hash = _full_sha256(state_identity.get("before_sha256"), "journal state before hash")
+    journal_automation = _automation_identity(journal.get("automation"), "amendment journal automation")
+    expected_journal, expected_receipt, status_path = amendment_artifact_paths(state_path, aid, source_hash)
+    if journal_path != expected_journal:
+        raise FleetError(f"amendment journal filename conflicts with its immutable source hash: {journal_path}")
+    if receipt_path is not None and receipt_path != expected_receipt:
+        raise FleetError(f"amendment receipt filename conflicts with its journal: {receipt_path}")
+
+    receipt_data = validate_amendment_journal(
+        journal,
+        state_path=state_path,
+        run_id=run_id,
+        aid=aid,
+        amendment_hash=source_hash,
+        expected_state_before_hash=expected_state_before_hash or journal_before_hash,
+        automation=expected_automation or journal_automation,
+        plan_path=plan_path,
+        parent_plan_hash=parent_plan_hash,
+        journal_path=expected_journal,
+        receipt_path=expected_receipt,
+        status_path=status_path,
+    )
+    if receipt_path is not None:
+        receipt_snapshot = load_json_snapshot(receipt_path)
+        if receipt_snapshot.data != receipt_data:
+            raise FleetError(f"amendment receipt content conflicts: {receipt_path}")
+    return journal, receipt_data, snapshot.sha256
+
+
+def previous_journal_identity(journal: Mapping[str, Any], journal_sha256: str) -> dict[str, Any]:
+    return {
+        "amendment_id": journal["amendment_id"],
+        "journal": journal["journal_path"],
+        "source_sha256": journal["amendment_sha256"],
+        "journal_sha256": journal_sha256,
+    }
+
+
+def next_amendment_chain(history: list[tuple[Mapping[str, Any], str]]) -> dict[str, Any]:
+    previous = previous_journal_identity(*history[-1]) if history else None
+    return {"ordinal": len(history), "previous": previous}
+
+
+def validate_amendment_history(
+    state: Mapping[str, Any],
+    *,
+    state_path: Path,
+    plan_path: Path,
+    parent_plan_hash: str,
+    replay_id: str,
+    artifact_namespace: Mapping[str, tuple[Path | None, Path | None]],
+) -> list[tuple[Mapping[str, Any], str]]:
+    records = state.get("amendments", [])
+    if not isinstance(records, list) or not all(isinstance(record, Mapping) for record in records):
+        raise FleetError("state amendments must be an object list")
+
+    ids: list[str] = []
+    casefold_ids: dict[str, str] = {}
+    for raw_record in records:
+        record = _exact_fields(raw_record, AMENDMENT_RECORD_FIELDS, "state amendment record")
+        record_id = record["id"]
+        if not isinstance(record_id, str) or re.fullmatch(r"[A-Za-z0-9](?:[A-Za-z0-9_-]{0,63})", record_id) is None:
+            raise FleetError("state amendment record id conflicts")
+        if record_id in ids:
+            raise FleetError(f"state contains duplicate amendment records for {record_id}")
+        folded = record_id.casefold()
+        prior_id = casefold_ids.get(folded)
+        if prior_id is not None and prior_id != record_id:
+            raise FleetError(f"state amendment id casefold collision: {prior_id}, {record_id}")
+        casefold_ids[folded] = record_id
+        ids.append(record_id)
+
+    state_collision = next(
+        (record_id for record_id in ids if record_id != replay_id and record_id.casefold() == replay_id.casefold()),
+        None,
+    )
+    if state_collision is not None:
+        raise FleetError(f"state amendment id casefold collision: {state_collision}, {replay_id}")
+
+    for record_id in ids:
+        amendment_artifact_inventory(state_path, record_id, namespace=artifact_namespace)
+    replay_artifacts = amendment_artifact_inventory(state_path, replay_id, namespace=artifact_namespace)
+    represented_ids = set(ids)
+    if replay_id not in represented_ids and any(replay_artifacts):
+        represented_ids.add(replay_id)
+    orphan_ids = sorted(set(artifact_namespace) - represented_ids)
+    if orphan_ids:
+        orphan_paths = [
+            str(path)
+            for orphan_id in orphan_ids
+            for path in artifact_namespace[orphan_id]
+            if path is not None
+        ]
+        raise FleetError("orphaned amendment artifact namespace: " + ", ".join(orphan_paths))
+
+    target_index = ids.index(replay_id) if replay_id in ids else None
+    history: list[tuple[Mapping[str, Any], str]] = []
+    expected_previous: Mapping[str, Any] | None = None
+    for index, raw_record in enumerate(records):
+        record = _exact_fields(raw_record, AMENDMENT_RECORD_FIELDS, "state amendment record")
+        record_id = str(record["id"])
+        context = "later amendment" if target_index is not None and index > target_index else "applied amendment"
+        source_hash = _full_sha256(record["source_sha256"], f"{context} source hash")
+        _full_sha256(record["state_before_sha256"], f"{context} state-before hash")
+        _full_sha256(record["parent_plan_sha256"], f"{context} parent-plan hash")
+        _automation_identity(record["automation"], f"{context} automation")
+
+        journal_artifact, receipt_artifact = amendment_artifact_inventory(
+            state_path,
+            record_id,
+            namespace=artifact_namespace,
+        )
+        if journal_artifact is None:
+            orphan = f"; orphaned amendment receipt: {receipt_artifact}" if receipt_artifact is not None else ""
+            raise FleetError(f"{context} journal is missing: {record_id}{orphan}")
+        expected_journal, expected_receipt, _ = amendment_artifact_paths(state_path, record_id, source_hash)
+        if journal_artifact != expected_journal:
+            raise FleetError(f"{context} journal conflicts with state record: {record_id}")
+        if receipt_artifact is not None and receipt_artifact != expected_receipt:
+            raise FleetError(f"{context} receipt conflicts with state record: {record_id}")
+
+        journal, _, journal_sha256 = load_validated_amendment_journal(
+            state_path=state_path,
+            run_id=str(state["run_id"]),
+            plan_path=plan_path,
+            parent_plan_hash=parent_plan_hash,
+            aid=record_id,
+            journal_path=journal_artifact,
+            receipt_path=receipt_artifact,
+        )
+        expected_chain = {"ordinal": index, "previous": expected_previous}
+        if journal["chain"] != expected_chain:
+            raise FleetError(f"amendment journal chain conflicts at {record_id}")
+        if record != amendment_record_from_journal(journal):
+            if record_id == replay_id:
+                raise FleetError(f"state amendment record conflicts with journal: {record_id}")
+            raise FleetError(f"{context} record conflicts with journal: {record_id}")
+        validate_amendment_resolutions(state, journal)
+        history.append((journal, journal_sha256))
+        expected_previous = previous_journal_identity(journal, journal_sha256)
+
+    journals = [journal for journal, _ in history]
+    for index, journal in enumerate(journals):
+        validate_applied_amendment_state(state, journal, journals[index + 1 :])
+    if journals:
+        waves = state.get("waves")
+        last_owned = journals[-1]["owned_contract"]
+        expected_wave_count = last_owned["wave_start_index"] + len(last_owned["appended_waves"])
+        if not isinstance(waves, list) or len(waves) != expected_wave_count:
+            raise FleetError("amendment history does not own the current appended wave suffix")
+    return history
+
+
+def validate_amendment_resolutions(state: Mapping[str, Any], journal: Mapping[str, Any]) -> None:
     resolutions = state.get("resolutions")
     if not isinstance(resolutions, Mapping):
         raise FleetError("applied amendment resolutions are invalid")
-    for summary in changes["resolutions"]:
+    for summary in journal["changes"]["resolutions"]:
         source = summary.get("task") if isinstance(summary, Mapping) else None
         relations = [name for name in ("corrected_by", "superseded_by") if isinstance(summary, Mapping) and name in summary]
         if not isinstance(source, str) or len(relations) != 1:
@@ -1102,6 +1586,97 @@ def validate_applied_amendment_state(state: Mapping[str, Any], journal: Mapping[
         }
         if resolutions.get(source) != expected:
             raise FleetError(f"applied amendment resolution conflicts: {source}")
+
+
+def validate_applied_amendment_state(
+    state: Mapping[str, Any],
+    journal: Mapping[str, Any],
+    later_journals: list[Mapping[str, Any]],
+) -> None:
+    """Verify every contract field owned by this journal, with explicit later overlays."""
+    waves = state.get("waves")
+    tasks = state.get("tasks")
+    if not isinstance(waves, list) or not all(isinstance(wave, Mapping) for wave in waves):
+        raise FleetError("applied amendment state waves are invalid")
+    if not isinstance(tasks, Mapping):
+        raise FleetError("applied amendment state tasks are invalid")
+    wave_by_id: dict[str, Mapping[str, Any]] = {}
+    for wave in waves:
+        wave_id = wave.get("id")
+        if not isinstance(wave_id, str) or wave_id in wave_by_id:
+            raise FleetError(f"applied amendment wave identity is missing or duplicated: {wave_id}")
+        wave_by_id[wave_id] = wave
+
+    owned = journal["owned_contract"]
+    appended_waves = owned["appended_waves"]
+    appended_wave_ids = [wave["id"] for wave in appended_waves]
+    start = owned["wave_start_index"]
+    if [wave["id"] for wave in waves[start : start + len(appended_waves)]] != appended_wave_ids:
+        raise FleetError(f"applied amendment appended wave order conflicts: {journal['amendment_id']}")
+
+    missing = object()
+    expected_waves = {
+        str(wave["id"]): copy.deepcopy(dict(wave))
+        for wave in appended_waves
+    }
+    expected_tasks: dict[str, dict[str, Any]] = {}
+    for item in owned["appended_tasks"]:
+        task_id = str(item["id"])
+        snapshot = item["contract"]
+        expected_tasks[task_id] = {
+            field: copy.deepcopy(snapshot[field]) if field in snapshot else missing
+            for field in TASK_CONTRACT_FIELD_ORDER
+        }
+
+    for patch in owned["updated_waves"]:
+        expected_waves[str(patch["id"])] = {
+            field: copy.deepcopy(patch[field])
+            for field in WAVE_PATCH_FIELD_ORDER
+            if field in patch
+        }
+    for patch in owned["updated_tasks"]:
+        expected_tasks[str(patch["id"])] = {
+            field: copy.deepcopy(patch[field])
+            for field in TASK_PATCH_FIELD_ORDER
+            if field in patch
+        }
+
+    for later in later_journals:
+        later_owned = later["owned_contract"]
+        for patch in later_owned["updated_waves"]:
+            wave_id = str(patch["id"])
+            if wave_id not in expected_waves:
+                continue
+            for field in WAVE_PATCH_FIELD_ORDER:
+                if field in patch and field in expected_waves[wave_id]:
+                    expected_waves[wave_id][field] = copy.deepcopy(patch[field])
+        for patch in later_owned["updated_tasks"]:
+            task_id = str(patch["id"])
+            if task_id not in expected_tasks:
+                continue
+            for field in TASK_PATCH_FIELD_ORDER:
+                if field in patch and field in expected_tasks[task_id]:
+                    expected_tasks[task_id][field] = copy.deepcopy(patch[field])
+
+    for wave_id, contract in expected_waves.items():
+        wave = wave_by_id.get(wave_id)
+        if wave is None:
+            raise FleetError(f"applied amendment wave identity is missing or duplicated: {wave_id}")
+        for field, expected in contract.items():
+            if field not in wave or wave[field] != expected:
+                raise FleetError(f"applied amendment wave contract conflicts: {wave_id}.{field}")
+
+    for task_id, contract in expected_tasks.items():
+        task = tasks.get(task_id)
+        if not isinstance(task, Mapping):
+            raise FleetError(f"applied amendment task identity is missing: {task_id}")
+        for field, expected in contract.items():
+            if expected is missing:
+                if field in task:
+                    raise FleetError(f"applied amendment task contract conflicts: {task_id}.{field}")
+            elif field not in task or task[field] != expected:
+                raise FleetError(f"applied amendment task contract conflicts: {task_id}.{field}")
+
     topological_waves(state)
 
 
@@ -1181,22 +1756,38 @@ def _do_amend_locked(_root: Path, cfg: Mapping[str, Any], args: argparse.Namespa
     journal_path, receipt_path, status_path = amendment_artifact_paths(state_path, aid, amendment_hash)
 
     records = state.get("amendments", [])
-    if not isinstance(records, list) or not all(isinstance(record, dict) for record in records):
+    if not isinstance(records, list) or not all(isinstance(record, Mapping) for record in records):
         raise FleetError("state amendments must be an object list")
     matches = [record for record in records if record.get("id") == aid]
     if len(matches) > 1:
         raise FleetError(f"state contains duplicate amendment records for {aid}")
     existing = matches[0] if matches else None
 
+    artifact_namespace = amendment_artifact_namespace(state_path)
+    journal_artifact, receipt_artifact = amendment_artifact_inventory(
+        state_path,
+        aid,
+        namespace=artifact_namespace,
+    )
+    if receipt_artifact is not None and journal_artifact is None:
+        context = "applied amendment" if existing is not None else "amendment"
+        raise FleetError(f"{context} journal is missing; orphaned amendment receipt: {receipt_artifact}")
+    history = validate_amendment_history(
+        state,
+        state_path=state_path,
+        plan_path=plan_path,
+        parent_plan_hash=parent_plan_hash,
+        replay_id=aid,
+        artifact_namespace=artifact_namespace,
+    )
+
     if existing is not None:
         if existing.get("source_sha256") != amendment_hash:
             raise FleetError(f"amendment id {aid} was already applied with different content")
-        if not journal_path.exists():
+        if journal_artifact is None:
             raise FleetError(f"applied amendment journal is missing: {journal_path}")
-        journal_snapshot = load_json_snapshot(journal_path)
-        journal = journal_snapshot.value
-        if journal_snapshot.data != json_bytes(journal):
-            raise FleetError(f"applied amendment journal bytes conflict: {journal_path}")
+        target_index = next(index for index, record in enumerate(records) if record.get("id") == aid)
+        journal = history[target_index][0]
         receipt_data = validate_amendment_journal(
             journal,
             state_path=state_path,
@@ -1213,7 +1804,8 @@ def _do_amend_locked(_root: Path, cfg: Mapping[str, Any], args: argparse.Namespa
         )
         if existing != amendment_record_from_journal(journal):
             raise FleetError(f"state amendment record conflicts with journal: {aid}")
-        validate_applied_amendment_state(state, journal)
+        later_journals = [later for later, _ in history[target_index + 1 :]]
+        validate_applied_amendment_state(state, journal, later_journals)
         current_status = status_bytes(state)
         if state_snapshot.sha256 == journal["state"]["after_sha256"]:
             expected_status = journal["expected_status"]
@@ -1225,25 +1817,22 @@ def _do_amend_locked(_root: Path, cfg: Mapping[str, Any], args: argparse.Namespa
         print(json.dumps(result, ensure_ascii=False, indent=2) if args.json else f"amendment already applied: {aid}")
         return 0
 
-    if journal_path.exists():
-        journal_snapshot = load_json_snapshot(journal_path)
-        journal = journal_snapshot.value
-        if journal_snapshot.data != json_bytes(journal):
-            raise FleetError(f"amendment journal bytes conflict: {journal_path}")
-        validate_amendment_journal(
-            journal,
+    if journal_artifact is not None:
+        journal, _, _ = load_validated_amendment_journal(
             state_path=state_path,
             run_id=str(state["run_id"]),
-            aid=aid,
-            amendment_hash=amendment_hash,
-            expected_state_before_hash=str(amendment["state_sha256"]),
-            automation=amendment["automation"],
             plan_path=plan_path,
             parent_plan_hash=parent_plan_hash,
-            journal_path=journal_path,
-            receipt_path=receipt_path,
-            status_path=status_path,
+            aid=aid,
+            journal_path=journal_artifact,
+            receipt_path=receipt_artifact,
+            expected_state_before_hash=str(amendment["state_sha256"]),
+            expected_automation=amendment["automation"],
         )
+        if journal["amendment_sha256"] != amendment_hash:
+            raise FleetError(f"amendment id {aid} has a different immutable artifact identity")
+        if journal["chain"] != next_amendment_chain(history):
+            raise FleetError(f"recoverable amendment journal chain conflicts: {aid}")
         if state_snapshot.sha256 != journal["state"]["before_sha256"]:
             raise FleetError("journal exists but state matches neither a recoverable before-state nor an applied record")
         transaction = prepare_amendment_transaction(
@@ -1257,14 +1846,13 @@ def _do_amend_locked(_root: Path, cfg: Mapping[str, Any], args: argparse.Namespa
             parent_plan_hash,
             cfg,
             str(journal["applied_at"]),
+            journal["chain"],
         )
         if journal != transaction["journal"]:
             raise FleetError("amendment journal content conflicts with deterministic replay")
-        if receipt_path.exists():
+        if receipt_artifact is not None:
             raise FleetError("amendment receipt exists before state replacement")
     else:
-        if receipt_path.exists():
-            raise FleetError(f"amendment receipt exists without a journal: {receipt_path}")
         if state_snapshot.sha256.lower() != str(amendment["state_sha256"]).lower():
             raise FleetError("state SHA-256 precondition failed")
         transaction = prepare_amendment_transaction(
@@ -1278,6 +1866,7 @@ def _do_amend_locked(_root: Path, cfg: Mapping[str, Any], args: argparse.Namespa
             parent_plan_hash,
             cfg,
             now(),
+            next_amendment_chain(history),
         )
         journal = transaction["journal"]
 
@@ -1292,7 +1881,7 @@ def _do_amend_locked(_root: Path, cfg: Mapping[str, Any], args: argparse.Namespa
         print(json.dumps(result, ensure_ascii=False, indent=2) if args.json else f"amendment dry-run valid: {aid}")
         return 0
 
-    if not journal_path.exists():
+    if journal_artifact is None:
         publish_amendment_journal(journal_path, transaction["journal_data"])
     committed_journal = load_json_snapshot(journal_path)
     if committed_journal.data != transaction["journal_data"] or committed_journal.value != journal:

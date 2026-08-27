@@ -3,6 +3,8 @@ import copy
 import io
 import json
 import multiprocessing
+import os
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -23,6 +25,41 @@ from fleet import (  # noqa: E402
     do_finalize,
     status_markdown,
 )
+
+
+AMENDMENT_SUBPROCESS = r"""
+import argparse
+import json
+import os
+import sys
+from pathlib import Path
+
+scripts = Path(sys.argv[1])
+sys.path.insert(0, str(scripts))
+import fleet
+
+root = Path(sys.argv[2])
+state_path = Path(sys.argv[3])
+amendment_path = Path(sys.argv[4])
+cfg = json.loads(Path(sys.argv[5]).read_text(encoding="utf-8"))
+mode = sys.argv[6]
+if mode == "crash":
+    publish = fleet.publish_amendment_journal
+
+    def publish_then_crash(path, data):
+        publish(path, data)
+        os._exit(86)
+
+    fleet.publish_amendment_journal = publish_then_crash
+
+args = argparse.Namespace(
+    state=state_path,
+    amendment=amendment_path,
+    dry_run=False,
+    json=True,
+)
+raise SystemExit(fleet.do_amend(root, cfg, args))
+"""
 
 
 def _accept_failed_process(state_path: str, task_id: str, barrier, results) -> None:
@@ -239,6 +276,68 @@ class AmendmentTests(unittest.TestCase):
             json=True,
         )
 
+    def apply_amendment(self, amendment: dict | None = None) -> dict:
+        if amendment is not None:
+            self.write_amendment(amendment)
+        with patch("builtins.print"):
+            self.assertEqual(do_amend(self.root, self.cfg, self.args(dry_run=False)), 0)
+        return json.loads(self.state_path.read_text(encoding="utf-8"))
+
+    def later_amendment(self, *, sequence: int, update_prior_contract: bool) -> dict:
+        task_id = f"DATA-CORR-{sequence:03d}"
+        amendment = {
+            "schema_version": 1,
+            "amendment_id": f"repair-core-{sequence:03d}",
+            "description": f"Append follow-up repair {sequence}.",
+            "plan_status": "approved",
+            "launch_authorized": True,
+            "run_id": self.state["run_id"],
+            "parent_plan_sha256": sha256_file(self.plan_path),
+            "state_sha256": sha256_file(self.state_path),
+            "automation": {
+                "branch": f"trk-automation-auto-repair-{sequence:03d}-v2",
+                "sha": format(sequence, "x") * 40,
+            },
+            "workspace_suffix": f"repair-v{sequence}",
+            "append_waves": [
+                {
+                    "id": f"repair-data-{sequence}",
+                    "description": f"Follow-up repair {sequence}",
+                    "depends_on": ["DATA-001"],
+                    "base": {"type": "task", "task": "DATA-001"},
+                    "tasks": [
+                        {
+                            "id": task_id,
+                            "title": f"Follow-up data repair {sequence}",
+                            "track": "data",
+                            "write_paths": [f"packages/db/repair-{sequence}/**"],
+                            "spec": f"Apply follow-up data repair {sequence}.",
+                            "acceptance": [f"Verify follow-up repair {sequence}."],
+                            "checks": ["pnpm run check:data"],
+                        }
+                    ],
+                }
+            ],
+            "update_waves": [],
+            "update_tasks": [],
+            "resolutions": [],
+        }
+        if update_prior_contract:
+            amendment["update_waves"] = [
+                {
+                    "id": "repair-experience",
+                    "description": "Replacement experience repair with validated follow-up.",
+                }
+            ]
+            amendment["update_tasks"] = [
+                {
+                    "id": "EXPR-REPAIR-001",
+                    "spec": "Repair the rejected experience Attempt with validated follow-up.",
+                }
+            ]
+            amendment["resolutions"] = [{"task": "DATA-001", "corrected_by": task_id}]
+        return amendment
+
     def assert_rejected_without_mutation(self, pattern: str) -> None:
         before = self.state_path.read_bytes()
         with (
@@ -422,6 +521,109 @@ class AmendmentTests(unittest.TestCase):
         with self.assertRaisesRegex(FleetError, "already applied with different content"):
             do_amend(self.root, self.cfg, self.args(dry_run=False))
 
+    def test_journal_claim_blocks_changed_source_after_publication_failure(self):
+        before = self.state_path.read_bytes()
+        publish = fleet_module.publish_amendment_journal
+
+        def publish_then_fail(path: Path, data: bytes) -> None:
+            publish(path, data)
+            raise RuntimeError("after journal")
+
+        with (
+            patch("fleet.publish_amendment_journal", side_effect=publish_then_fail),
+            patch("builtins.print"),
+            self.assertRaisesRegex(RuntimeError, "after journal"),
+        ):
+            do_amend(self.root, self.cfg, self.args(dry_run=False))
+
+        evidence_before = sorted(path.name for path in (self.run_dir / "evidence").iterdir())
+        amendment = json.loads(self.amendment_path.read_text(encoding="utf-8"))
+        amendment["description"] = "Changed after the immutable journal was published."
+        self.write_amendment(amendment)
+
+        with (
+            patch("fleet.publish_amendment_journal") as publish_journal,
+            patch("fleet.replace_amendment_state") as replace_state,
+            patch("fleet.publish_amendment_receipt") as publish_receipt,
+            patch("fleet.publish_amendment_status") as publish_status,
+            patch("fleet.orca") as orca,
+            patch("builtins.print") as output,
+            self.assertRaisesRegex(FleetError, "immutable artifact identity|different content"),
+        ):
+            do_amend(self.root, self.cfg, self.args(dry_run=False))
+
+        self.assertEqual(self.state_path.read_bytes(), before)
+        self.assertEqual(
+            sorted(path.name for path in (self.run_dir / "evidence").iterdir()),
+            evidence_before,
+        )
+        publish_journal.assert_not_called()
+        replace_state.assert_not_called()
+        publish_receipt.assert_not_called()
+        publish_status.assert_not_called()
+        orca.assert_not_called()
+        output.assert_not_called()
+
+    def test_duplicate_journals_for_one_id_fail_closed(self):
+        publish = fleet_module.publish_amendment_journal
+
+        def publish_then_fail(path: Path, data: bytes) -> None:
+            publish(path, data)
+            raise RuntimeError("after journal")
+
+        with (
+            patch("fleet.publish_amendment_journal", side_effect=publish_then_fail),
+            patch("builtins.print"),
+            self.assertRaisesRegex(RuntimeError, "after journal"),
+        ):
+            do_amend(self.root, self.cfg, self.args(dry_run=False))
+
+        evidence = self.run_dir / "evidence"
+        original = next(evidence.glob("*.journal.json"))
+        duplicate = evidence / "amendment-repair-core-001-ffffffffffff.journal.json"
+        duplicate.write_bytes(original.read_bytes())
+
+        with patch("builtins.print") as output, self.assertRaisesRegex(FleetError, "duplicate amendment journals"):
+            do_amend(self.root, self.cfg, self.args(dry_run=False))
+        output.assert_not_called()
+
+    def test_cross_hash_receipt_for_one_id_fails_closed(self):
+        evidence = self.run_dir / "evidence"
+        evidence.mkdir()
+        receipt = evidence / "amendment-repair-core-001-ffffffffffff.json"
+        save_json(receipt, {"schema_version": 1, "kind": "fleet_amendment_receipt"})
+
+        before = self.state_path.read_bytes()
+        with patch("builtins.print") as output, self.assertRaisesRegex(FleetError, "orphaned amendment receipt"):
+            do_amend(self.root, self.cfg, self.args(dry_run=False))
+        self.assertEqual(self.state_path.read_bytes(), before)
+        self.assertEqual(list(evidence.iterdir()), [receipt])
+        output.assert_not_called()
+
+    def test_casefold_artifact_id_collision_fails_closed(self):
+        evidence = self.run_dir / "evidence"
+        evidence.mkdir()
+        collision = evidence / "amendment-Repair-core-001-ffffffffffff.journal.json"
+        collision.write_text("immutable collision\n", encoding="utf-8")
+
+        self.assert_rejected_without_mutation("casefold.*collision")
+        self.assertEqual(collision.read_text(encoding="utf-8"), "immutable collision\n")
+
+    def test_unrelated_evidence_is_not_consumed_as_an_amendment_artifact(self):
+        evidence = self.run_dir / "evidence"
+        evidence.mkdir()
+        unrelated = [
+            evidence / "amendment-repair-core-001-not-a-fleet-artifact.json",
+            evidence / "amendment-repair-core-001-ffffffffffff.journal.json.backup",
+            evidence / "acceptance-repair-core-001-ffffffffffff.json",
+        ]
+        for path in unrelated:
+            path.write_text("unrelated\n", encoding="utf-8")
+
+        self.apply_amendment()
+        for path in unrelated:
+            self.assertEqual(path.read_text(encoding="utf-8"), "unrelated\n")
+
     def test_failed_source_cannot_use_corrected_by(self):
         amendment = self.amendment()
         amendment["resolutions"] = [{"task": "EXPR-001", "corrected_by": "EXPR-REPAIR-001"}]
@@ -505,6 +707,63 @@ class AmendmentTests(unittest.TestCase):
         state = json.loads(self.state_path.read_text(encoding="utf-8"))
         self.assertEqual(len(state["amendments"]), 1)
         self.assertEqual(len([wave for wave in state["waves"] if wave["id"] == "repair-experience"]), 1)
+
+    def test_cross_hash_seed_processes_replay_one_journal_deterministically(self):
+        self.state["waves"][2].pop("description")
+        self.state["waves"][2].pop("base")
+        self.state["tasks"]["INT-001"].pop("acceptance")
+        self.state["tasks"]["INT-001"].pop("checks")
+        save_json(self.state_path, self.state)
+        amendment = self.amendment()
+        amendment["update_waves"][0]["description"] = "Deterministic integration contract."
+        amendment["update_tasks"][0]["acceptance"] = ["Verify deterministic replay."]
+        amendment["update_tasks"][0]["checks"] = ["python -B -m unittest"]
+        self.write_amendment(amendment)
+        cfg_path = self.root / "fleet.json"
+        save_json(cfg_path, self.cfg)
+        before = self.state_path.read_bytes()
+
+        def run_process(seed: str, mode: str) -> subprocess.CompletedProcess[str]:
+            environment = os.environ.copy()
+            environment["PYTHONHASHSEED"] = seed
+            return subprocess.run(
+                [
+                    sys.executable,
+                    "-B",
+                    "-c",
+                    AMENDMENT_SUBPROCESS,
+                    str(SCRIPTS),
+                    str(self.root),
+                    str(self.state_path),
+                    str(self.amendment_path),
+                    str(cfg_path),
+                    mode,
+                ],
+                cwd=SCRIPTS.parent,
+                env=environment,
+                capture_output=True,
+                text=True,
+                timeout=30,
+                check=False,
+            )
+
+        crashed = run_process("1", "crash")
+        self.assertEqual(crashed.returncode, 86, crashed.stderr or crashed.stdout)
+        self.assertEqual(self.state_path.read_bytes(), before)
+        journals = list((self.run_dir / "evidence").glob("*.journal.json"))
+        self.assertEqual(len(journals), 1)
+        journal_before = journals[0].read_bytes()
+
+        replayed = run_process("2", "replay")
+        self.assertEqual(replayed.returncode, 0, replayed.stderr or replayed.stdout)
+        self.assertEqual(journals[0].read_bytes(), journal_before)
+        state = json.loads(self.state_path.read_text(encoding="utf-8"))
+        self.assertEqual(len(state["amendments"]), 1)
+        self.assertTrue(Path(state["amendments"][0]["receipt"]).exists())
+        self.assertEqual(
+            state["tasks"]["INT-001"]["acceptance"],
+            ["Verify deterministic replay."],
+        )
 
     def test_replay_after_state_replacement_repairs_derived_artifacts(self):
         replace = fleet_module.replace_amendment_state
@@ -627,6 +886,233 @@ class AmendmentTests(unittest.TestCase):
         save_json(receipt_path, receipt)
 
         with patch("builtins.print") as output, self.assertRaisesRegex(FleetError, "receipt content conflicts"):
+            do_amend(self.root, self.cfg, self.args(dry_run=False))
+        output.assert_not_called()
+
+    def test_changed_appended_wave_contract_never_reports_already_applied(self):
+        state = self.apply_amendment()
+        wave = next(wave for wave in state["waves"] if wave["id"] == "repair-experience")
+        wave["description"] = "Forged appended wave contract."
+        save_json(self.state_path, state)
+
+        with patch("builtins.print") as output, self.assertRaisesRegex(FleetError, "wave contract conflicts"):
+            do_amend(self.root, self.cfg, self.args(dry_run=False))
+        output.assert_not_called()
+
+    def test_changed_appended_task_contract_never_reports_already_applied(self):
+        state = self.apply_amendment()
+        state["tasks"]["EXPR-REPAIR-001"]["spec"] = "Forged appended Task contract."
+        save_json(self.state_path, state)
+
+        with patch("builtins.print") as output, self.assertRaisesRegex(FleetError, "task contract conflicts"):
+            do_amend(self.root, self.cfg, self.args(dry_run=False))
+        output.assert_not_called()
+
+    def test_owned_contract_snapshot_captures_derived_task_identity(self):
+        state = self.apply_amendment()
+        record = state["amendments"][0]
+        journal = json.loads(Path(record["journal"]).read_text(encoding="utf-8"))
+        task_snapshot = journal["owned_contract"]["appended_tasks"][0]["contract"]
+        self.assertEqual(task_snapshot["wave"], "repair-experience")
+        self.assertEqual(task_snapshot["workspace_name"], "trk-experience-expr-repair-001-repair-v1")
+        self.assertEqual(record["owned_contract"], journal["owned_contract"])
+
+        state["tasks"]["EXPR-REPAIR-001"]["workspace_name"] = "forged-workspace"
+        save_json(self.state_path, state)
+        with patch("builtins.print") as output, self.assertRaisesRegex(FleetError, "task contract conflicts"):
+            do_amend(self.root, self.cfg, self.args(dry_run=False))
+        output.assert_not_called()
+
+    def test_malformed_owned_contract_snapshot_never_reports_already_applied(self):
+        state = self.apply_amendment()
+        journal_path = Path(state["amendments"][0]["journal"])
+        journal = json.loads(journal_path.read_text(encoding="utf-8"))
+        del journal["owned_contract"]["appended_tasks"][0]["contract"]["workspace_name"]
+        save_json(journal_path, journal)
+
+        with patch("builtins.print") as output, self.assertRaisesRegex(FleetError, "task presence conflicts"):
+            do_amend(self.root, self.cfg, self.args(dry_run=False))
+        output.assert_not_called()
+
+    def test_appended_wave_order_is_owned_by_immutable_snapshot(self):
+        amendment = self.amendment()
+        amendment["append_waves"].append(
+            {
+                "id": "repair-data-follow-up",
+                "description": "Append a second ordered repair wave.",
+                "depends_on": ["EXPR-REPAIR-001"],
+                "base": {"type": "task", "task": "EXPR-REPAIR-001"},
+                "tasks": [
+                    {
+                        "id": "DATA-REPAIR-001",
+                        "title": "Repair ordered data follow-up",
+                        "track": "data",
+                        "write_paths": ["packages/db/repair-follow-up/**"],
+                        "spec": "Verify appended wave ordering.",
+                    }
+                ],
+            }
+        )
+        state = self.apply_amendment(amendment)
+        state["waves"][-2], state["waves"][-1] = state["waves"][-1], state["waves"][-2]
+        save_json(self.state_path, state)
+
+        with patch("builtins.print") as output, self.assertRaisesRegex(FleetError, "appended wave order conflicts"):
+            do_amend(self.root, self.cfg, self.args(dry_run=False))
+        output.assert_not_called()
+
+    def test_changed_updated_wave_contract_never_reports_already_applied(self):
+        state = self.apply_amendment()
+        wave = next(wave for wave in state["waves"] if wave["id"] == "alpha")
+        wave["base"] = {"type": "task", "task": "EXPR-REPAIR-001"}
+        save_json(self.state_path, state)
+
+        with patch("builtins.print") as output, self.assertRaisesRegex(FleetError, "wave contract conflicts"):
+            do_amend(self.root, self.cfg, self.args(dry_run=False))
+        output.assert_not_called()
+
+    def test_changed_updated_task_contract_never_reports_already_applied(self):
+        state = self.apply_amendment()
+        state["tasks"]["INT-001"]["spec"] = "Forged existing Task patch."
+        save_json(self.state_path, state)
+
+        with patch("builtins.print") as output, self.assertRaisesRegex(FleetError, "task contract conflicts"):
+            do_amend(self.root, self.cfg, self.args(dry_run=False))
+        output.assert_not_called()
+
+    def test_valid_later_amendment_can_explicitly_overlay_owned_contract(self):
+        original = self.amendment()
+        self.apply_amendment(original)
+        later = self.later_amendment(sequence=2, update_prior_contract=True)
+        state = self.apply_amendment(later)
+        first_record, later_record = state["amendments"]
+        later_journal = json.loads(Path(later_record["journal"]).read_text(encoding="utf-8"))
+        self.assertEqual(later_record["chain"], later_journal["chain"])
+        self.assertEqual(later_record["chain"]["ordinal"], 1)
+        self.assertEqual(
+            later_record["chain"]["previous"],
+            {
+                "amendment_id": first_record["id"],
+                "journal": first_record["journal"],
+                "source_sha256": first_record["source_sha256"],
+                "journal_sha256": sha256_file(Path(first_record["journal"])),
+            },
+        )
+        self.write_amendment(original)
+
+        with patch("builtins.print") as output:
+            self.assertEqual(do_amend(self.root, self.cfg, self.args(dry_run=False)), 0)
+
+        result = json.loads(output.call_args.args[0])
+        repaired_wave = next(wave for wave in state["waves"] if wave["id"] == "repair-experience")
+        self.assertTrue(result["already_applied"])
+        self.assertEqual(
+            repaired_wave["description"],
+            later["update_waves"][0]["description"],
+        )
+        self.assertEqual(
+            state["tasks"]["EXPR-REPAIR-001"]["spec"],
+            later["update_tasks"][0]["spec"],
+        )
+
+    def test_missing_later_journal_cannot_excuse_changed_contract(self):
+        original = self.amendment()
+        self.apply_amendment(original)
+        later = self.later_amendment(sequence=2, update_prior_contract=True)
+        state = self.apply_amendment(later)
+        Path(state["amendments"][1]["journal"]).unlink()
+        self.write_amendment(original)
+
+        with patch("builtins.print") as output, self.assertRaisesRegex(FleetError, "later amendment journal is missing"):
+            do_amend(self.root, self.cfg, self.args(dry_run=False))
+        output.assert_not_called()
+
+    def test_corrupt_later_journal_cannot_excuse_changed_contract(self):
+        original = self.amendment()
+        self.apply_amendment(original)
+        later = self.later_amendment(sequence=2, update_prior_contract=True)
+        state = self.apply_amendment(later)
+        Path(state["amendments"][1]["journal"]).write_text("{corrupt\n", encoding="utf-8")
+        self.write_amendment(original)
+
+        with patch("builtins.print") as output, self.assertRaisesRegex(FleetError, "invalid JSON"):
+            do_amend(self.root, self.cfg, self.args(dry_run=False))
+        output.assert_not_called()
+
+    def test_mismatched_later_record_cannot_excuse_changed_contract(self):
+        original = self.amendment()
+        self.apply_amendment(original)
+        later = self.later_amendment(sequence=2, update_prior_contract=True)
+        state = self.apply_amendment(later)
+        state["amendments"][1]["automation"]["sha"] = "f" * 40
+        save_json(self.state_path, state)
+        self.write_amendment(original)
+
+        with patch("builtins.print") as output, self.assertRaisesRegex(FleetError, "later amendment record conflicts"):
+            do_amend(self.root, self.cfg, self.args(dry_run=False))
+        output.assert_not_called()
+
+    def test_deleted_later_record_cannot_excuse_changed_contract(self):
+        original = self.amendment()
+        self.apply_amendment(original)
+        self.apply_amendment(self.later_amendment(sequence=2, update_prior_contract=True))
+        state = json.loads(self.state_path.read_text(encoding="utf-8"))
+        state["amendments"].pop()
+        save_json(self.state_path, state)
+        self.write_amendment(original)
+
+        with patch("builtins.print") as output, self.assertRaisesRegex(
+            FleetError,
+            "orphaned amendment artifact namespace",
+        ):
+            do_amend(self.root, self.cfg, self.args(dry_run=False))
+        output.assert_not_called()
+
+    def test_orphan_artifacts_detect_deleted_tail_and_state_effects(self):
+        original = self.amendment()
+        self.apply_amendment(original)
+        later = self.later_amendment(sequence=2, update_prior_contract=False)
+        state = self.apply_amendment(later)
+        deleted = state["amendments"].pop()
+        state["waves"].pop()
+        state["tasks"].pop(later["append_waves"][0]["tasks"][0]["id"])
+        save_json(self.state_path, state)
+        self.write_amendment(original)
+
+        with patch("builtins.print") as output, self.assertRaisesRegex(
+            FleetError,
+            "orphaned amendment artifact namespace",
+        ):
+            do_amend(self.root, self.cfg, self.args(dry_run=False))
+        self.assertTrue(Path(deleted["journal"]).exists())
+        self.assertTrue(Path(deleted["receipt"]).exists())
+        output.assert_not_called()
+
+    def test_deleted_middle_record_breaks_previous_journal_chain(self):
+        original = self.amendment()
+        self.apply_amendment(original)
+        self.apply_amendment(self.later_amendment(sequence=2, update_prior_contract=True))
+        state = self.apply_amendment(self.later_amendment(sequence=3, update_prior_contract=False))
+        deleted = state["amendments"].pop(1)
+        Path(deleted["journal"]).unlink()
+        Path(deleted["receipt"]).unlink()
+        save_json(self.state_path, state)
+        self.write_amendment(original)
+
+        with patch("builtins.print") as output, self.assertRaisesRegex(FleetError, "journal chain conflicts"):
+            do_amend(self.root, self.cfg, self.args(dry_run=False))
+        output.assert_not_called()
+
+    def test_reordered_later_records_cannot_excuse_changed_contract(self):
+        original = self.amendment()
+        self.apply_amendment(original)
+        self.apply_amendment(self.later_amendment(sequence=2, update_prior_contract=True))
+        state = self.apply_amendment(self.later_amendment(sequence=3, update_prior_contract=False))
+        state["amendments"][1], state["amendments"][2] = state["amendments"][2], state["amendments"][1]
+        save_json(self.state_path, state)
+        self.write_amendment(original)
+
+        with patch("builtins.print") as output, self.assertRaisesRegex(FleetError, "journal chain conflicts"):
             do_amend(self.root, self.cfg, self.args(dry_run=False))
         output.assert_not_called()
 
