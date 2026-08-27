@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">We Remember</title>
+  <rect width="512" height="512" rx="112" fill="#5A3E2B"/>
+  <path d="M144 150h224v212H144z" fill="#FAF7F2"/>
+  <path d="M185 213h142M185 256h142M185 299h92" fill="none" stroke="#5A3E2B" stroke-linecap="round" stroke-width="24"/>
+</svg>
