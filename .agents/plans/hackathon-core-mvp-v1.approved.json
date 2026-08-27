@@ -1,0 +1,249 @@
+{
+  "schema_version": 1,
+  "plan_id": "hackathon-core-mvp-v1",
+  "plan_status": "approved",
+  "launch_authorized": true,
+  "workspace_suffix": "mvp-v1",
+  "planning_date": "2026-08-28",
+  "objective": "Deliver a credential-free We Remember hackathon Fixture MVP that proves consented private sharing, persisted five-stage responsibility, blocked two-party handover, and atomic owner and reminder transfer",
+  "base_ref": "origin/trk-handover-hand-001-v2",
+  "planning_basis": {
+    "scope_decision": ".agents/decisions/0003-hackathon-core-mvp-scope.md",
+    "accepted_handover_sha": "59e4bcb98be9d21432a92d02e7d01962bc4451cb",
+    "workspace_lock_reference_sha": "217d9a3b421e8eef628483f349346eea981a435c",
+    "visual_reference_commit": "df9b5b3787715c9582aafcc3a936fa6afe3918c4",
+    "prototype_blob": "7be8089e87f10e4622c98753c577b0f7ef9ff55c",
+    "style_options_blob": "0d6a3c99357b3bd0e668bacc4782a3d366ce76c7",
+    "preserved_kit_plan": ".agents/plans/OVERALL_DEVELOPMENT_PLAN.md",
+    "preserved_kit_run": "run_a6e82cb7623f"
+  },
+  "constraints": [
+    "This Run is a local fictional Fixture demo and must not require credentials, external model calls, production identity, public deployment, or private real-world data.",
+    "One isolated foundation task starts from accepted HAND-001 and applies only the proven workspace-lock importer correction; four product tasks then run in parallel from that accepted shared base.",
+    "Private Fixture messages remain self-only until explicit same-speaker consent; authorization, consent, handover, reporting, and persistence are deterministic.",
+    "Unsupported free-form or live-provider behavior fails closed and is post-MVP rather than being simulated as production-ready.",
+    "The accepted HAND-001 SHA is an ancestor of every product task; this Run does not rebuild or merge an unapproved handover state machine.",
+    "The frontend reads origin/main visual reference code at exact commit df9b5b3787715c9582aafcc3a936fa6afe3918c4 without merging root prototype files or adding remote runtime assets.",
+    "Complete Unicode, sub-millisecond time, care, deletion/export, exhaustive failure, full visual-matrix, live-model, deployment, and release gates remain post-MVP.",
+    "Fixture, Local Demo, Public Runtime, Deployment, Release, and Official Acceptance evidence levels must never be conflated."
+  ],
+  "waves": [
+    {
+      "id": "hackathon-foundation",
+      "description": "Create one installable shared base that already contains the accepted handover capability.",
+      "depends_on": [],
+      "base": {
+        "type": "ref",
+        "value": "origin/trk-handover-hand-001-v2"
+      },
+      "tasks": [
+        {
+          "id": "MVP-BASE-001",
+          "title": "Adopt accepted handover and repair workspace lock importers",
+          "track": "foundation",
+          "write_paths": [
+            "pnpm-lock.yaml"
+          ],
+          "spec": "Start from exact accepted HAND-001 SHA 59e4bcb98be9d21432a92d02e7d01962bc4451cb. Preserve its handover implementation unchanged. Add only the missing empty importers for packages/contracts and packages/db in pnpm-lock.yaml, matching the already-proven FOUND-BASELOCK-001 correction at 217d9a3b421e8eef628483f349346eea981a435c. Do not change manifests, dependencies, product code, contracts, database code, or Fleet automation.",
+          "acceptance": [
+            "The exact starting SHA is 59e4bcb98be9d21432a92d02e7d01962bc4451cb and accepted HAND-001 remains an ancestor",
+            "Only pnpm-lock.yaml changes, adding the packages/contracts and packages/db workspace importer entries",
+            "Frozen credential-free installation succeeds without rewriting the lockfile",
+            "Foundation checks pass and the pushed branch is clean"
+          ],
+          "checks": [
+            "pnpm install --frozen-lockfile --ignore-scripts",
+            "pnpm run check:foundation"
+          ],
+          "agent": "codex",
+          "setup": "skip"
+        }
+      ]
+    },
+    {
+      "id": "hackathon-parallel-core",
+      "description": "Build the four smallest independent product slices needed by the core hackathon journey.",
+      "depends_on": [
+        "MVP-BASE-001"
+      ],
+      "base": {
+        "type": "task",
+        "task": "MVP-BASE-001"
+      },
+      "tasks": [
+        {
+          "id": "MVP-CONV-001",
+          "title": "Build fixture-only private sharing and consent",
+          "track": "conversation",
+          "write_paths": [
+            "modules/conversation/**",
+            "modules/ai-witness/**",
+            "modules/boundary/**"
+          ],
+          "spec": "Implement a fresh credential-free Fixture flow through public module ports: create one self-only private message, produce a bounded deterministic signal draft, and let only the same active speaker explicitly share it to an allowed visibility. Do not call an external provider or accept caller-controlled prompt metadata. Unsupported free-form provider behavior must return blocked or needs_human_review. Recheck actor, space, evidence ownership, consent, and visibility before the shared write. Private-message reads remain self-only even when another role guesses an identifier. Keep raw private content out of shared rows, reports, logs, and errors.",
+          "acceptance": [
+            "The task starts from the exact accepted MVP-BASE-001 SHA, contains HAND-001 as an ancestor, and contains no failed Attempt ancestor",
+            "The canonical fictional private message produces a deterministic bounded draft through public conversation ports without network access or credentials",
+            "Before explicit same-speaker sharing, shared signal count remains zero",
+            "Discard, missing consent, inactive actor, wrong actor, or wrong space returns denied or blocked and persists zero shared writes",
+            "Another role that guesses a private-message identifier cannot read or share it and receives no raw content",
+            "Successful consent creates one visibility-scoped derived signal with provenance but no raw private content",
+            "Duplicate confirmation creates at most one shared signal",
+            "Logs and errors contain identifiers and outcomes only"
+          ],
+          "checks": [
+            "pnpm install --frozen-lockfile --ignore-scripts",
+            "pnpm run check:conversation"
+          ],
+          "agent": "codex",
+          "setup": "skip"
+        },
+        {
+          "id": "MVP-RESP-001",
+          "title": "Build persisted five-stage responsibility reporting",
+          "track": "responsibility",
+          "write_paths": [
+            "modules/responsibility/**",
+            "modules/ai-domain/**"
+          ],
+          "spec": "Implement a fresh deterministic responsibility capability through public module ports. Consume only consented shared signals, create the canonical Fixture responsibility domain and task, persist discoveredBy, deadlineKeptBy, scheduledBy, executedBy, and followedUpBy as first-class values, and generate a neutral report directly from those facts. Do not use an LLM for the MVP report or infer ownership from prose at report time. Exclude discussion-only, missing-evidence, denied, and needs-review inputs.",
+          "acceptance": [
+            "The task starts from the exact accepted MVP-BASE-001 SHA, contains HAND-001 as an ancestor, and contains no failed Attempt ancestor",
+            "The canonical consented signal creates one Fixture responsibility domain and task through public ports",
+            "All five responsibility-stage owners are explicit persisted command data rather than report-time inference",
+            "The report is deterministic, neutral, and contains no blame, score, ranking, diagnosis, or model-generated narrative",
+            "Discussion-only, missing-evidence, denied, and needs-review inputs do not appear in the report",
+            "Invalid actor, space, or source data yields zero responsibility or report mutation"
+          ],
+          "checks": [
+            "pnpm install --frozen-lockfile --ignore-scripts",
+            "pnpm run check:responsibility"
+          ],
+          "agent": "codex",
+          "setup": "skip"
+        },
+        {
+          "id": "MVP-EXPR-001",
+          "title": "Build the core three-role Fixture experience",
+          "track": "experience",
+          "write_paths": [
+            "apps/web/next-env.d.ts",
+            "apps/web/next.config.*",
+            "apps/web/tsconfig.json",
+            "apps/web/public/**",
+            "apps/web/src/app/(ui)/**",
+            "apps/web/src/app/globals.css",
+            "apps/web/src/app/layout.tsx",
+            "apps/web/src/app/page.tsx",
+            "apps/web/src/components/**",
+            "apps/web/src/features/**",
+            "apps/web/tests/**"
+          ],
+          "spec": "Build the static Chinese Web Fixture experience first against a typed local client seam, using only the code references prototype.html and style-options.html from origin/main exact commit df9b5b3787715c9582aafcc3a936fa6afe3918c4. Use finalized Style A paper tokens: #F4F1EA background, #FFFFFF surfaces, #1F1C17 text, #33513F primary, #8A5A3B accent, #9C4E22 warning, restrained borders and shadows, near-square corners, serif display headings, and larger accessible subject typography. Do not load Google Fonts or any remote runtime asset; use system font fallbacks. Adapt rather than copy the reference: avoid wide shallow strips, bound content width, give core cards 16-20px vertical padding and meaningful vertical depth, and separate title, body, evidence, state, and action zones. At 1440x900 show a compact scenario rail and three phone-proportioned synchronized role surfaces; at 390x844 show one role surface. Cover only the core journey: subject share decision, primary neutral five-stage report, blocked handover, visible 补齐上次检查结果 action, awaiting_confirmations, each confirmation, and final workload release. The UI triggers only server-owned canonical scenario actions and provides no arbitrary private-text, actor, or space input. Show Fixture, Local Demo, and Not Production Acceptance labels persistently. Do not add live authentication, external model calls, broad settings, care, deletion, export, or nonessential animation.",
+          "acceptance": [
+            "The subject can complete the canonical share decision at 390x844 with one visible primary action",
+            "The primary and partner desktop views show the report, blocked reason, 补齐上次检查结果, awaiting_confirmations, each confirmation, and final owner and reminder change at 1440x900",
+            "The implementation uses the exact Style A semantic colors and paper hierarchy from the fixed reference code without remote fonts, images, or runtime dependencies",
+            "Responsibility, consent, report, and handover cards are vertically structured rather than stretched into flat full-width strips; core cards keep 16-20px vertical padding and distinct title, content, state, and action regions",
+            "The demo's primary actions have no blocking overlap, clipping, or hidden text at the two target viewports",
+            "The typed client seam supports loading, the core success path, and one recoverable integration error without embedding backend logic",
+            "Fixture, Local Demo, and Not Production Acceptance labels remain visible on every core screen",
+            "UI copy is Chinese, neutral, non-diagnostic, and contains no production-auth or live-data claim"
+          ],
+          "checks": [
+            "pnpm install --frozen-lockfile --ignore-scripts",
+            "pnpm run check:experience"
+          ],
+          "agent": "codex",
+          "setup": "skip"
+        },
+        {
+          "id": "MVP-QA-001",
+          "title": "Create the canonical core Fixture and focused acceptance",
+          "track": "qa",
+          "write_paths": [
+            "packages/testkit/**",
+            "fixtures/**",
+            "tests/e2e/**",
+            "playwright.config.*"
+          ],
+          "spec": "Create one canonical fictional three-role Fixture graph for the core journey and focused Playwright acceptance tagged @mvp-core. The Fixture contains one private message, one consented derived signal, one responsibility domain with all five stage owners, one handover blocked by a missing previous examination result, a visible SupplyHandoverInfo action, two confirmations, and one future reminder that moves with the owner. Author one happy-path browser specification plus no-consent, blocked, one-sided-confirmation, wrong-role private-message probing, and unknown-scenario tampering negative cases. Run the subject step at 390x844 and the compact rail plus three phone-proportioned role surfaces at 1440x900. Assert the fixed Style A tokens, card vertical padding and minimum meaningful depth for the core responsibility and handover containers, without introducing a full visual matrix. The tests may target the documented integration seam and are executed only after MVP-INT-001 merges the product slices.",
+          "acceptance": [
+            "All people, messages, identifiers, health references, and events are visibly fictional and internally consistent",
+            "One canonical graph is the sole source for UI, module, database, and browser Fixture values",
+            "The @mvp-core happy path covers consent, report, blocked handover, visible missing-result supply, awaiting_confirmations, both confirmations, owner and reminder transfer, and reload persistence",
+            "Focused negative cases prove no-consent yields zero shared writes, blocked handover leaves owner unchanged, and one-sided confirmation cannot accept",
+            "Supplying the previous examination result moves blocked to awaiting_confirmations while owner and reminder remain unchanged",
+            "A partner Fixture session that guesses the subject message identifier cannot read or share it; the response contains no raw text and shared rows remain zero",
+            "An unknown or tampered scenario is blocked with zero writes because actor, space, content, and scenario come from the server-owned Fixture graph",
+            "The subject step runs at 390x844 and the compact scenario rail plus three phone-proportioned role surfaces run at 1440x900 with visible primary actions and no blocking overlap or clipping",
+            "Core responsibility and handover containers retain the Style A hierarchy, 16-20px vertical padding, and meaningful vertical depth rather than rendering as wide shallow strips",
+            "Browser assertions require persistent Fixture, Local Demo, and Not Production Acceptance labels",
+            "The worker check validates Fixture structure and testkit behavior without requiring unfinished integration routes"
+          ],
+          "checks": [
+            "pnpm install --frozen-lockfile --ignore-scripts",
+            "pnpm run check:qa-core"
+          ],
+          "agent": "codex",
+          "setup": "skip"
+        }
+      ]
+    },
+    {
+      "id": "hackathon-integration",
+      "description": "Merge the four accepted product slices on the shared HAND-001 foundation into one real local Fixture application.",
+      "depends_on": [
+        "MVP-BASE-001",
+        "MVP-CONV-001",
+        "MVP-RESP-001",
+        "MVP-EXPR-001",
+        "MVP-QA-001"
+      ],
+      "base": {
+        "type": "task",
+        "task": "MVP-BASE-001"
+      },
+      "tasks": [
+        {
+          "id": "MVP-INT-001",
+          "title": "Integrate the real core Fixture journey",
+          "track": "integration",
+          "write_paths": [
+            "apps/web/src/app/api/**",
+            "apps/web/src/auth/**",
+            "apps/web/src/integration/**",
+            "apps/web/src/server/**",
+            "apps/web/middleware.ts",
+            "docs/demo/**",
+            "README.md"
+          ],
+          "spec": "Start from the exact accepted MVP-BASE-001 SHA and verify accepted HAND-001 SHA 59e4bcb98be9d21432a92d02e7d01962bc4451cb is already an ancestor. Fetch and cleanly merge --no-ff only the exact accepted remote SHAs for MVP-CONV-001, MVP-RESP-001, MVP-EXPR-001, and MVP-QA-001. Abort on conflict or unexpected ancestry. Add only integration-owned Fixture session, public command/query composition, database adapters, routes, and demo documentation. Derive actor, space, content, and scenario only from a server-owned canonical Fixture session and allowlist; request bodies cannot select identities or submit private text, and unknown or tampered scenarios fail closed with zero writes. Wire the canonical journey through the real Next.js UI, public handlers, and PostgreSQL, including SupplyHandoverInfo before either confirmation. Keep provider behavior deterministic and credential-free. Do not patch product modules sideways or claim production readiness.",
+          "acceptance": [
+            "HAND-001 is an ancestor of the exact MVP-BASE-001 integration base; each of the four accepted product SHAs is an exact second parent of a clean no-ff merge and no failed Attempt is an ancestor",
+            "The canonical private message has zero shared rows before consent and creates one derived shared signal after same-speaker consent",
+            "Through the real handlers, another Fixture role cannot read or share a guessed private-message identifier; the response contains no raw text and shared rows remain zero",
+            "Unknown or tampered scenario requests cannot select actor, space, or content and persist zero writes",
+            "The report reads the persisted five-stage fields through real query handlers",
+            "Missing information and one-sided confirmation keep the handover blocked with owner and reminder unchanged",
+            "The visible 补齐上次检查结果 action invokes SupplyHandoverInfo, moves blocked to awaiting_confirmations, and leaves owner and reminder unchanged",
+            "After both confirmations, owner and future reminder move atomically and both role views retain the new state after reload",
+            "The flow runs through the real Next.js runtime and disposable PostgreSQL rather than disconnected static mocks",
+            "The @mvp-core browser run exercises the subject step at 390x844 and the compact rail plus three phone-proportioned role surfaces at 1440x900 with visible primary actions, vertically structured core cards, and no blocking overlap or clipping",
+            "Fixture, Local Demo, and Not Production Acceptance labels remain visible and documentation makes no live-model, production-auth, deployment, release, or official-acceptance claim",
+            "No-consent, blocked, and one-sided negative browser cases pass with zero forbidden mutation"
+          ],
+          "checks": [
+            "pnpm install --frozen-lockfile",
+            "pnpm run check",
+            "pnpm run db:verify",
+            "pnpm run build",
+            "pnpm exec playwright test --grep @mvp-core"
+          ],
+          "agent": "codex",
+          "setup": "skip"
+        }
+      ]
+    }
+  ]
+}
