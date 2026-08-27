@@ -2279,35 +2279,71 @@ def do_advance(root: Path, cfg: Mapping[str, Any], args: argparse.Namespace) -> 
 
 
 def resolution_view(state: Mapping[str, Any], task_id: str) -> dict[str, Any] | None:
+    """Resolve to the accepted terminal while preserving the source edge contract."""
     resolutions = state.get("resolutions", {})
     if not isinstance(resolutions, Mapping):
+        return {"accepted": False, "error": "state resolutions must be an object"}
+    tasks = state.get("tasks")
+    if not isinstance(tasks, Mapping):
+        return {"accepted": False, "error": "state tasks must be an object"}
+    if task_id not in resolutions:
         return None
-    resolution = resolutions.get(task_id)
-    if not isinstance(resolution, Mapping):
-        return None
-    relations = [name for name in ("corrected_by", "superseded_by") if name in resolution]
-    if len(relations) != 1 or not isinstance(resolution.get(relations[0]), str):
+
+    current_id = task_id
+    visited = {task_id}
+    first_relation: str | None = None
+    first_amendment_id: Any = None
+    while True:
+        resolution = resolutions.get(current_id)
+        if not isinstance(resolution, Mapping):
+            return {"accepted": False, "error": "resolution edge must be an object"}
+        relations = [name for name in ("corrected_by", "superseded_by") if name in resolution]
+        if len(relations) != 1:
+            return {
+                "accepted": False,
+                "error": "resolution must contain exactly one relationship",
+            }
+        relation = relations[0]
+        replacement_id = resolution.get(relation)
+        if not isinstance(replacement_id, str) or not replacement_id:
+            return {"accepted": False, "error": "resolution target must be a non-empty string"}
+
+        source = tasks.get(current_id)
+        if not isinstance(source, Mapping):
+            return {"accepted": False, "error": f"resolution references missing task: {current_id}"}
+        expected_status = "completed" if relation == "corrected_by" else "failed"
+        if source.get("status") != expected_status:
+            return {
+                "accepted": False,
+                "error": f"{relation} source {current_id} must be {expected_status}",
+            }
+        if first_relation is None:
+            first_relation = relation
+            first_amendment_id = resolution.get("amendment_id")
+
+        if replacement_id in visited:
+            return {"accepted": False, "error": "resolution chain contains a cycle"}
+        visited.add(replacement_id)
+        replacement = tasks.get(replacement_id)
+        if not isinstance(replacement, Mapping):
+            return {"accepted": False, "error": f"resolution references missing task: {replacement_id}"}
+        if replacement_id in resolutions:
+            current_id = replacement_id
+            continue
+
+        replacement_sha = replacement.get("head_sha")
+        accepted = (
+            replacement.get("status") == "completed"
+            and isinstance(replacement_sha, str)
+            and re.fullmatch(r"[0-9a-fA-F]{40}", replacement_sha) is not None
+        )
         return {
-            "accepted": False,
-            "error": "resolution must contain exactly one relationship",
+            "relation": first_relation,
+            "replacement_task": replacement_id,
+            "replacement_sha": replacement_sha,
+            "accepted": accepted,
+            "amendment_id": first_amendment_id,
         }
-    relation = relations[0]
-    replacement_id = str(resolution[relation])
-    replacement = state.get("tasks", {}).get(replacement_id)
-    replacement_sha = replacement.get("head_sha") if isinstance(replacement, Mapping) else None
-    accepted = (
-        isinstance(replacement, Mapping)
-        and replacement.get("status") == "completed"
-        and isinstance(replacement_sha, str)
-        and re.fullmatch(r"[0-9a-fA-F]{40}", replacement_sha) is not None
-    )
-    return {
-        "relation": relation,
-        "replacement_task": replacement_id,
-        "replacement_sha": replacement_sha,
-        "accepted": accepted,
-        "amendment_id": resolution.get("amendment_id"),
-    }
 
 
 def effective_task_status(state: Mapping[str, Any], task_id: str) -> str:
@@ -2328,6 +2364,12 @@ def effective_wave_status(state: Mapping[str, Any], wave: Mapping[str, Any]) -> 
 
 
 def status_view(state: Mapping[str, Any]) -> dict[str, Any]:
+    tasks = state.get("tasks")
+    if not isinstance(tasks, Mapping):
+        raise FleetError("state tasks must be an object")
+    resolutions = state.get("resolutions", {})
+    if not isinstance(resolutions, Mapping):
+        raise FleetError("state resolutions must be an object")
     view = copy.deepcopy(dict(state))
     unresolved_failures: list[str] = []
     resolved_failures: list[dict[str, Any]] = []
@@ -2346,9 +2388,9 @@ def status_view(state: Mapping[str, Any]) -> dict[str, Any]:
         wave["effective_status"] = effective_wave_status(state, source)
     unresolved_resolutions = [
         task_id
-        for task_id in state.get("resolutions", {})
+        for task_id in resolutions
         if not (resolution_view(state, task_id) or {}).get("accepted")
-    ] if isinstance(state.get("resolutions", {}), Mapping) else []
+    ]
     view["unresolved_failures"] = unresolved_failures
     view["resolved_failures"] = resolved_failures
     view["unresolved_resolutions"] = unresolved_resolutions
