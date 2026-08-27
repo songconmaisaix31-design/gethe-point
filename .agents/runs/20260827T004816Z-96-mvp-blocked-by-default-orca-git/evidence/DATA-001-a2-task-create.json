@@ -1,0 +1,30 @@
+{
+  "id": "2ceb408e-dae5-44f9-8f40-4980057adeab",
+  "ok": true,
+  "result": {
+    "task": {
+      "id": "task_901149216cb7",
+      "parent_id": null,
+      "created_by_terminal_handle": "term_e9818968-fa20-4ea2-8ca3-970672121227",
+      "task_title": "[DATA-001] 先落数据库首个 migration 与五阶段归属字段",
+      "display_name": "[DATA-001] 先落数据库首个 migration 与五阶段归属字段",
+      "spec": "# Logical task DATA-001\n\nTitle: 先落数据库首个 migration 与五阶段归属字段\nTrack: foundation\nOrca Run: run_262bccf7adb3\nFrozen BASE_REF: origin/songconmaisaix31-design/we-remember-fleet-kit\nFrozen BASE_SHA: ecc7d5cbc32bc606cf568cd508038476689c4154\nAttempt: 2 / 3\nRequired worktree mode: new-top-level\nExpected dedicated workspace/branch: trk-foundation-data-001--262bccf7adb3-a2\nTask contract hash: 9f17a9c0aa3c652253af495557c2fb7f4d0cef2002d914c4b0a1ecca3e3e2f37\n\n## Isolation contract\n\n- You are a child Agent. The coordinator/main Agent must not implement any part of this task.\n- This Dispatch owns exactly one linked Git worktree, one branch and one mutable context.\n- Never reuse another task's worktree or ask the coordinator to patch product code.\n- A repair is a new attempt in a new worktree; do not resurrect a released/failed workspace.\n\n## Specification\n\n在创建任何应用、API、UI 或业务模块前，建立 PostgreSQL/Supabase 的首个可执行 migration 与数据库验证工具。一次性定义 User、Space、Member、Conversation、ConversationMember、Message、Evidence、ConsentDecision、Signal、Domain、Task、Handover、NotificationJob、NotificationDelivery、CareRule、CareEvent、AuditLog、LlmRun；Task.discoveredBy、deadlineKeptBy、scheduledBy、executedBy、followedUpBy 必须直接成为数据库列，禁止用 JSON blob、视图或事后推导替代。包含 visibility、双方确认、证据失效、CareEvent 幂等所需约束和最小 RLS。验证必须把 migration 真正应用到一次性 PostgreSQL 实例并查询系统目录，不得只做 SQL 文本匹配。此任务不得创建 apps/** 或报告/看护业务实现。\n\n## Acceptance\n\n- 首个产品实现 Task，且所有后续 Wave 都传递依赖 DATA-001\n- migration 可从空 PostgreSQL 实例执行成功并重复进行 schema 校验\n- 数据库系统目录证明 Task 存在 discoveredBy/deadlineKeptBy/scheduledBy/executedBy/followedUpBy 五个一等列\n- 同一 careRuleId + scheduledFor 有数据库唯一约束\n- visibility、双方确认、证据失效和审计所需字段与约束已落库\n- 分支不包含 apps/**、API、UI、自由报告文案或任何 LLM 调用实现\n\n## Exact write paths\n\n- `packages/db/**`\n- `supabase/**`\n\n## Required checks\n\n- `python -B packages/db/tests/verify_initial_migration.py`\n\n## Dependency evidence\n\n- None\n\n## Mandatory first commands\n\n```bash\npython scripts/gate.py init \\\n  --track foundation \\\n  --task DATA-001 \\\n  --base ecc7d5cbc32bc606cf568cd508038476689c4154 \\\n  --run-id run_262bccf7adb3 \\\n  --attempt 2 \\\n  --workspace-name \"trk-foundation-data-001--262bccf7adb3-a2\" \\\n  --contract-hash 9f17a9c0aa3c652253af495557c2fb7f4d0cef2002d914c4b0a1ecca3e3e2f37 \\\n  --write-path \"packages/db/**\" \\\n  --write-path \"supabase/**\" \\\n  --check \"python -B packages/db/tests/verify_initial_migration.py\"\npython scripts/gate.py check --preflight\n```\n\nThe Orca worker preamble contains the actual task_... and dispatch_... IDs. Use those exact IDs in worker_finish.py.\nWhen reporting completion, include the exact attempt, workspace name and contract hash from this prompt.\n\n---\n\n# Directory-Owner Worker — One Task, One Worktree\n\n你是由总控派发的目录轨 Worker 子 Agent。当前 Dispatch 独占一个 linked Git worktree、一个 Branch、一个逻辑 Task 和一个可变上下文。你不是总控，也不是集成者。\n\n## 必须先做\n\nTask Prompt 会给出 `RUN_ID`、`TRACK`、`LOGICAL_TASK_ID`、`ATTEMPT`、`BASE_SHA`、`WORKSPACE_NAME`、`CONTRACT_HASH`、`WRITE_PATHS` 和检查命令。\n\n先阅读产品 PRD、开发规划、工程冻结决策和当前 Task Prompt，再原样执行 Prompt 中生成的：\n\n```bash\npython scripts/gate.py init ...\npython scripts/gate.py check --preflight\n```\n\n门禁会验证：当前目录确实是 linked worktree、Branch 与分配的 Workspace 完全一致、Attempt 和 Contract Hash 有效、HEAD 等于冻结 BASE_SHA。任何一项失败都停止并 escalation，不要自行切分支修复环境。\n\n## 工作边界\n\n- 只修改当前 Task 的 `WRITE_PATHS`；可以读取全仓库，但读取不代表写权。\n- 禁止 `git switch`、`git checkout`、merge、rebase、force push、hard reset。\n- 禁止进入或复用其他 Agent 的 worktree。\n- 禁止让另一个写代码的子 Agent 共用当前 worktree；需要进一步拆分时向总控升级，由总控创建新的 Task/Worktree。\n- 禁止修改其他轨道、公共契约、根依赖、锁文件、部署和 CI，除非它们明确位于当前 `WRITE_PATHS`。\n- 禁止全仓格式化、无关重构和“顺手修复”。\n- 跨轨需求只发送 `question` / `escalation`，不要让总控代改。\n- 优先复用冻结契约、Fixture、SDK 和成熟开源组件。\n\n## 提交节奏\n\n每个可验证增量：\n\n```bash\npython scripts/gate.py check --run-checks\ngit add <owned-paths>\ngit commit -m \"feat(<track>): <summary> [<LOGICAL_TASK_ID>]\"\ngit push -u origin HEAD\n```\n\n已推送历史只追加修复或 `git revert`；禁止 amend、rebase、force push。\n\n## 完成协议\n\n成功前必须同时满足：\n\n- 验收项全部实现；\n- 范围门禁通过；\n- 必需检查通过；\n- 工作区干净；\n- 每个本轨提交包含 `[LOGICAL_TASK_ID]`；\n- Branch 已设置 upstream；\n- 本地 HEAD 与远端 upstream 完全一致。\n\n然后只发送一次：\n\n```bash\npython scripts/worker_finish.py \\\n  --logical-task <LOGICAL_TASK_ID> \\\n  --task-id <ORCA_TASK_ID> \\\n  --dispatch-id <ORCA_DISPATCH_ID> \\\n  --base <BASE_SHA> \\\n  --outcome succeeded \\\n  --summary \"完成内容与验证结果\" \\\n  --risks \"none 或剩余限制\"\n```\n\n脚本会自动把 Run、Attempt、Workspace、Branch、Contract Hash、SHA、检查列表和 Proof Hash 编成结构化 JSON，保护总控上下文不被大段日志污染。\n\n无法完成也必须调用一次 `worker_finish.py --outcome failed`，摘要说明根因和下一 Attempt 应修正什么。发送 `worker_done` 后立即停止修改；旧 worktree 不会被复用，修复会由总控创建全新的 Attempt。\n\n## 《都记得》产品安全不变量\n\n任何实现不得绕过数据库五阶段一等列、逐条同意、visibility、blocked 双确认、交接原子迁移、CareRule 人审激活、确定性看护状态机、人工模板报告和 Evidence 删除失效。看护确认后的状态机与报告 renderer 都不得依赖或调用 LLM。遇到契约缺口必须 escalation，不得在本轨发明兼容字段。\n",
+      "status": "ready",
+      "deps": "[]",
+      "result": null,
+      "created_at": "2026-08-27 00:56:12",
+      "completed_at": null,
+      "run_id": "run_262bccf7adb3",
+      "created_by_pane_key": "432e2dda-e6e4-48cc-b220-8f33f2ede23b:43ac2915-6089-42a2-9cc1-60e4fa641489",
+      "created_by_process_incarnation": "14e93d48-5336-4dbf-a84d-88325f8f3d77::C:/Users/DW/orca/workspaces/gethe-point/fleet-control-execute-the-we-remember-20260827t004358z@@31959a72:e8972418-0748-4882-ac3c-bc9d84b8559b",
+      "created_by_run_generation": 1
+    },
+    "mutation": {
+      "requestId": "233e7a08-faad-42e8-8391-44f413bbb48e",
+      "replayed": false
+    }
+  },
+  "_meta": {
+    "runtimeId": "5d2bdb04-39e3-4c32-b1b3-2e10b1a8a885"
+  }
+}

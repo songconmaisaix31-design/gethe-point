@@ -1,0 +1,642 @@
+{
+  "schema_version": 1,
+  "objective": "在 96 小时内交付《都记得》黑客松 MVP：以逐条同意为边界，从家庭对话识别隐形责任，生成五阶段责任报告，完成 blocked-by-default 的整块责任交接，并用确定性看护升级链证明交接后责任真正转移；保留完整 Orca/Git 审查证据链。",
+  "plan_status": "active",
+  "launch_authorized": true,
+  "product_agent_boundaries": [
+    {
+      "id": "witness",
+      "track": "conversation",
+      "outputs": [
+        "SignalDraft",
+        "EvidenceDraft",
+        "CareRuleDraft"
+      ]
+    },
+    {
+      "id": "responsibility",
+      "track": "responsibility",
+      "outputs": [
+        "DomainDraft",
+        "TaskAttributionDraft"
+      ]
+    },
+    {
+      "id": "handover",
+      "track": "handover",
+      "outputs": [
+        "HandoverDraft",
+        "MissingInfoDraft"
+      ]
+    },
+    {
+      "id": "boundary",
+      "track": "conversation",
+      "outputs": [
+        "Allow",
+        "Block",
+        "NeedsHumanReview"
+      ]
+    }
+  ],
+  "deterministic_boundaries": {
+    "care_escalation": {
+      "llm_calls": "forbidden"
+    },
+    "report_renderer": {
+      "mode": "human-authored-template-substitution",
+      "llm_calls": "forbidden"
+    }
+  },
+  "base_ref": "origin/songconmaisaix31-design/we-remember-fleet-kit",
+  "execution": {
+    "mode": "child-agents-only",
+    "worktree_per_task": true,
+    "reuse_worker": false,
+    "coordinator_role": "control-only",
+    "completion_task": "INT-002"
+  },
+  "waves": [
+    {
+      "id": "database-foundation",
+      "description": "在任何应用、接口或 UI 代码之前，先把完整核心数据库 migration 与 Task 五阶段字段落入可执行数据库",
+      "depends_on": [],
+      "base": {
+        "type": "ref",
+        "value": "origin/songconmaisaix31-design/we-remember-fleet-kit"
+      },
+      "tasks": [
+        {
+          "id": "DATA-001",
+          "title": "先落数据库首个 migration 与五阶段归属字段",
+          "track": "foundation",
+          "write_paths": [
+            "packages/db/**",
+            "supabase/**"
+          ],
+          "spec": "在创建任何应用、API、UI 或业务模块前，建立 PostgreSQL/Supabase 的首个可执行 migration 与数据库验证工具。一次性定义 User、Space、Member、Conversation、ConversationMember、Message、Evidence、ConsentDecision、Signal、Domain、Task、Handover、NotificationJob、NotificationDelivery、CareRule、CareEvent、AuditLog、LlmRun；Task.discoveredBy、deadlineKeptBy、scheduledBy、executedBy、followedUpBy 必须直接成为数据库列，禁止用 JSON blob、视图或事后推导替代。包含 visibility、双方确认、证据失效、CareEvent 幂等所需约束和最小 RLS。验证必须把 migration 真正应用到一次性 PostgreSQL 实例并查询系统目录，不得只做 SQL 文本匹配。此任务不得创建 apps/** 或报告/看护业务实现。",
+          "acceptance": [
+            "首个产品实现 Task，且所有后续 Wave 都传递依赖 DATA-001",
+            "migration 可从空 PostgreSQL 实例执行成功并重复进行 schema 校验",
+            "数据库系统目录证明 Task 存在 discoveredBy/deadlineKeptBy/scheduledBy/executedBy/followedUpBy 五个一等列",
+            "同一 careRuleId + scheduledFor 有数据库唯一约束",
+            "visibility、双方确认、证据失效和审计所需字段与约束已落库",
+            "分支不包含 apps/**、API、UI、自由报告文案或任何 LLM 调用实现"
+          ],
+          "checks": [
+            "python -B packages/db/tests/verify_initial_migration.py"
+          ],
+          "agent": "codex"
+        }
+      ]
+    },
+    {
+      "id": "bootstrap",
+      "description": "先建立所有 Worker 共享的可运行工程骨架；此时不写任何业务功能",
+      "depends_on": [
+        "DATA-001"
+      ],
+      "base": {
+        "type": "task",
+        "task": "DATA-001"
+      },
+      "tasks": [
+        {
+          "id": "FOUND-001",
+          "title": "建立单仓工程骨架与共享质量脚本",
+          "track": "foundation",
+          "write_paths": [
+            "package.json",
+            "pnpm-workspace.yaml",
+            "pnpm-lock.yaml",
+            "turbo.json",
+            "tsconfig.base.json",
+            ".npmrc",
+            ".env.example",
+            "apps/web/package.json",
+            "apps/web/next.config.mjs",
+            "apps/web/tsconfig.json",
+            "apps/web/postcss.config.mjs",
+            "apps/web/vitest.config.ts",
+            "packages/config/**",
+            "packages/ui/**"
+          ],
+          "spec": "在 DATA-001 已验证的数据库基线之上，使用 pnpm workspace 建立 Next.js + TypeScript 工程骨架、统一 TS/ESLint/Vitest/Playwright 调用入口、共享 UI 基础组件与低饱和暖中性设计令牌。只搭地基，不创建家庭业务模块，也不得修改 packages/db/** 或 supabase/**。根脚本必须提供 install、lint、typecheck、test、build、e2e:fixture；环境变量只写 .env.example，禁止提交任何密钥。",
+          "acceptance": [
+            "pnpm install --frozen-lockfile 可通过",
+            "根目录存在 lint/typecheck/test/build/e2e:fixture 脚本",
+            "@we-remember/ui 和 @we-remember/config 可被 Web 包引用",
+            "设计令牌覆盖颜色、字号、间距、圆角、阴影与 reduced-motion",
+            "没有实现 Space、Conversation、Handover 或 Care 业务逻辑"
+          ],
+          "checks": [
+            "pnpm install --frozen-lockfile",
+            "pnpm --filter @we-remember/ui test",
+            "pnpm --filter @we-remember/web typecheck"
+          ],
+          "agent": "codex"
+        }
+      ]
+    },
+    {
+      "id": "contract-freeze",
+      "description": "冻结公共数据、状态机、权限和 Fixture 契约，产出所有并行轨道的唯一 BASE_SHA",
+      "depends_on": [
+        "FOUND-001"
+      ],
+      "base": {
+        "type": "task",
+        "task": "FOUND-001"
+      },
+      "tasks": [
+        {
+          "id": "FOUND-002",
+          "title": "冻结公共契约与安全约束",
+          "track": "foundation",
+          "write_paths": [
+            "packages/contracts/**"
+          ],
+          "spec": "严格消费 DATA-001 已落库且不可回退的数据库事实，依据 docs/product/PRD.md 与 .agents/decisions/0001-mvp-engineering-freeze.md 定义机器可读公共契约。用 Zod/JSON Schema 暴露 DTO、枚举、错误码、事件与 Repository Port；Task 五阶段字段必须与数据库列一一对应；私聊默认 self；Handover 接受条件、CareEvent 幂等键、证据删除失效状态必须可由测试验证。本任务不得修改 packages/db/** 或 supabase/**；如数据库事实不足，必须阻塞并建立新的 database foundation Epoch。",
+          "acceptance": [
+            "所有结构化 LLM 输出均有 JSON Schema 和成功/失败样例",
+            "Task 显式包含 discoveredBy/deadlineKeptBy/scheduledBy/executedBy/followedUpBy",
+            "missingInfo 非空或双方确认不全时不能形成 accepted 交接",
+            "同一 careRuleId + scheduledFor 不能生成两个事件",
+            "agent_dm 原文与共享结论在模型和权限上分离",
+            "公共契约与 DATA-001 的数据库系统目录快照一致",
+            "契约 README 明确空值、visibility、错误码和版本策略"
+          ],
+          "checks": [
+            "pnpm --filter @we-remember/contracts test",
+            "pnpm --filter @we-remember/db test",
+            "pnpm --filter @we-remember/db typecheck"
+          ],
+          "agent": "codex"
+        }
+      ]
+    },
+    {
+      "id": "parallel-core",
+      "description": "所有领域 Worker 从 FOUND-002 的远端 SHA 出发，按目录所有权并行完成纵向切片",
+      "depends_on": [
+        "FOUND-002"
+      ],
+      "base": {
+        "type": "task",
+        "task": "FOUND-002"
+      },
+      "tasks": [
+        {
+          "id": "EXPR-001",
+          "title": "实现家庭空间、角色首页与无障碍体验",
+          "track": "experience",
+          "write_paths": [
+            "apps/web/src/modules/space/**",
+            "apps/web/src/modules/home/**",
+            "apps/web/src/components/layout/**"
+          ],
+          "spec": "严格消费冻结契约，实现一个家庭空间、三名演示成员、加入授权、capacityState 展示、Demo 角色切换器和三种首页模块。primary 首页显示责任地图与‘只有你在记得’条目；partner 首页显示本人责任域与待确认交接；subject 首页以大字号聊天入口和一次点击回应为中心。通过 public.ts 暴露模块，不创建 App Router 页面，不修改共享 UI 包。",
+          "acceptance": [
+            "三种角色切换后只显示各自可见的入口和数据",
+            "subject 正文 >=20px、标题 >=26px、点击区 >=60x60px",
+            "不依赖颜色单独传达状态并支持 reduced-motion",
+            "模块在 Fixture 模式可独立渲染加载、空、错误和正常状态",
+            "不把聊天框做成 primary/partner 的首页中心"
+          ],
+          "checks": [
+            "pnpm --filter @we-remember/web test -- --run src/modules/space src/modules/home",
+            "pnpm --filter @we-remember/web typecheck"
+          ],
+          "agent": "codex"
+        },
+        {
+          "id": "CONV-001",
+          "title": "实现对话输入、见证识别与逐条同意门",
+          "track": "conversation",
+          "write_paths": [
+            "apps/web/src/modules/conversation/**",
+            "packages/ai-witness/**",
+            "packages/boundary/**"
+          ],
+          "spec": "实现 agent_dm 与最小 family_group 输入面、消息和结构化卡片。见证适配器只产生 SignalDraft、EvidenceDraft 与可选 CareRuleDraft，使用 LLMProvider、最小上下文、promptVersion、JSON Schema 校验、一次重试和人工确认降级；CareRuleDraft 永远不能自行激活。BoundaryGuard 以确定性权限判断控制私聊到家庭库的写入；支持 share_space、share_members、keep_private。高风险语义分类失败或命中时默认阻断，不创建普通任务。任何未授权私聊不得进入责任模块的查询结果。",
+          "acceptance": [
+            "‘腿又疼了’可产生仅本人可见的候选信号和同意卡",
+            "keep_private 后不创建共享 Signal 且不计入任何报告",
+            "share_members 仅目标成员可通过服务接口读取",
+            "两条纯讨论 Fixture 不创建 Task 候选",
+            "看护自然语言只产生未激活 CareRuleDraft，后续状态机不接收 LLMProvider",
+            "LLM 二次 Schema 失败进入 needs_human_review 而非猜测",
+            "权限校验发生在服务端策略层而不只是隐藏按钮"
+          ],
+          "checks": [
+            "pnpm --filter @we-remember/ai-witness test",
+            "pnpm --filter @we-remember/boundary test",
+            "pnpm --filter @we-remember/web test -- --run src/modules/conversation"
+          ],
+          "agent": "codex"
+        },
+        {
+          "id": "RESP-001",
+          "title": "实现责任域聚合、五阶段度量与中性报告",
+          "track": "responsibility",
+          "write_paths": [
+            "apps/web/src/modules/responsibility/**",
+            "packages/responsibility/**",
+            "packages/ai-domain/**"
+          ],
+          "spec": "从已确认且当前成员可见的 Signal 聚合 Domain/Task。AI 只给出领域归属和五阶段草稿，确定性服务负责保存、修正、审计与统计。责任集中度报告必须直接读取 Task 五阶段字段；renderer 只能消费确定性指标、版本化人工模板和白名单变量，执行字面变量替换。报告路径禁止导入或调用 LLMProvider，缺少变量、未知变量或未知模板必须 fail closed。支持无主责任域、仅执行参与、证据入口和低置信度待观察池；文案不做评分、排名、人格或关系判断。",
+          "acceptance": [
+            "四条复查相关信号聚合为一个‘近期健康照护’责任域",
+            "五阶段任一字段修改后统计结果确定性变化",
+            "未授权、已删除或 evidence_missing 的记录不参与报告",
+            "报告含协调集中度、无主责任域数与仅执行参与",
+            "每个结论能返回最小证据指针和 promptVersion",
+            "相同输入与模板版本产生字节一致文案，且依赖边界测试证明 renderer 的 LLM 调用数为零",
+            "缺少变量、未知变量或未知模板被拒绝，不允许模型补写",
+            "输出中不存在贡献分、红榜、懒惰评价或对错判断"
+          ],
+          "checks": [
+            "pnpm --filter @we-remember/responsibility test",
+            "pnpm --filter @we-remember/ai-domain test",
+            "pnpm --filter @we-remember/web test -- --run src/modules/responsibility"
+          ],
+          "agent": "codex"
+        },
+        {
+          "id": "HAND-001",
+          "title": "实现 blocked 交接与所有权原子迁移",
+          "track": "handover",
+          "write_paths": [
+            "apps/web/src/modules/handover/**",
+            "packages/handover/**",
+            "packages/ai-handover/**"
+          ],
+          "spec": "实现交接包生成、missingInfo、draft/proposed/pending_info/pending_ack/accepted/declined/expired 状态和双方确认。AI 只生成交接包草稿与缺失项；服务层以 blocked-by-default 校验。accepted 必须在同一数据库事务中更新 Handover、Domain.ownerId、未来 NotificationJob 接收人和 AuditLog；失败时全部回滚。accepted 是交接记录终态，责任域当前 owner 表示已生效。",
+          "acceptance": [
+            "缺上次检查结果时 UI 与服务均返回 blocked",
+            "提出方或接手方任一未确认时 owner 不改变",
+            "补齐信息并双方确认后 owner 与未来提醒只迁移一次",
+            "原责任人不再收到该责任域未来催办提醒",
+            "并发重复确认不会生成双重迁移或重复审计记录",
+            "交接记录不可物理删除，只可归档或显示历史"
+          ],
+          "checks": [
+            "pnpm --filter @we-remember/handover test",
+            "pnpm --filter @we-remember/ai-handover test",
+            "pnpm --filter @we-remember/web test -- --run src/modules/handover"
+          ],
+          "agent": "codex"
+        },
+        {
+          "id": "CARE-001",
+          "title": "实现人审激活的看护确定性状态机",
+          "track": "care",
+          "write_paths": [
+            "apps/web/src/modules/care/**",
+            "packages/care/**"
+          ],
+          "spec": "消费见证 Agent 已通过 JSON Schema 的 CareRuleDraft，并要求人确认；本轨不实现自然语言抽取。confirmedBy 为空时禁止激活或排程。实现可注入 Clock、持久化 scheduler tick、scheduled/notified/acked/ack_timeout/escalated/handled/closed/unresolved 状态机、幂等通知和演示时间加速。提醒首先发给 subject；超时后按 escalationChain 升级。packages/care 与运行时升级路径不得依赖、导入或调用 LLMProvider 或任何 AI 包。",
+          "acceptance": [
+            "未人工确认的规则不会创建 CareEvent",
+            "相同规则与 scheduledFor 最多生成一个事件",
+            "重复 tick、刷新或服务重启不重复通知和升级",
+            "subject 一次点击可 ack 并闭环",
+            "60 秒 Demo 模式可完整演示 L1/L2 升级",
+            "依赖边界和调用计数测试证明确认、排程、tick、ack、升级、处理与关闭全程 LLM 调用数为零",
+            "最后无人处理时进入 unresolved 且保留事件历史"
+          ],
+          "checks": [
+            "pnpm --filter @we-remember/care test",
+            "pnpm --filter @we-remember/web test -- --run src/modules/care"
+          ],
+          "agent": "codex"
+        },
+        {
+          "id": "PRIV-001",
+          "title": "实现可见性与数据控制闭环",
+          "track": "privacy",
+          "write_paths": [
+            "apps/web/src/modules/privacy/**",
+            "packages/privacy/**"
+          ],
+          "spec": "实现统一 VisibilityPolicy 与查询过滤，支持 space、care_related、members、self。提供证据溯源、单条证据删除、撤回未来分析授权、个人数据导出和二次确认删除家庭空间。MVP 删除证据后将关联 Signal/Task 标记 evidence_missing/needs_review，并从报告排除；不自动撤销已完成交接。所有操作写 AuditLog。",
+          "acceptance": [
+            "不同角色对同一资源的读取矩阵有服务层测试",
+            "删除 Evidence 后关联结论失效并停止参与报告",
+            "撤回授权只阻止未来信号生成，不伪造删除历史",
+            "个人导出不包含其他成员私有原文",
+            "空间删除需要二次确认且完成级联清理",
+            "隐私设置不承诺尚未实现的全部端内存储"
+          ],
+          "checks": [
+            "pnpm --filter @we-remember/privacy test",
+            "pnpm --filter @we-remember/web test -- --run src/modules/privacy"
+          ],
+          "agent": "codex"
+        },
+        {
+          "id": "QA-001",
+          "title": "建立黄金家庭 Fixture 与跨模块验收骨架",
+          "track": "qa",
+          "write_paths": [
+            "fixtures/**",
+            "tests/e2e/**",
+            "packages/testkit/**",
+            "docs/demo/**"
+          ],
+          "spec": "建立固定 ID 的妈妈、爸爸、奶奶三成员家庭，至少 3 个责任域、8 条有效信号和 2 条‘只是讨论’干扰句；包含一条缺检查报告的 blocked 交接、一组版本化人工报告模板和一条 60 秒看护升级链。提供 Fixture loader、契约校验、LLM 调用计数器、故障注入、Playwright 页面对象与 4 分钟演示 Runbook。此轨只写测试与数据，不修改业务实现。",
+          "acceptance": [
+            "Fixture 通过 contracts JSON Schema",
+            "所有角色、证据、信号、领域、任务、交接和看护 ID 固定可复现",
+            "至少两个干扰句明确预期为非任务",
+            "E2E 骨架覆盖同意门、报告、blocked、双方确认、提醒转移和看护升级",
+            "报告模板有固定版本、白名单变量和稳定快照；看护确认后与报告渲染期间 LLM 调用期望均为零",
+            "失败报告能标出责任轨道而不是直接修业务代码",
+            "提供一键 reset 与演示时间推进的测试调用约定"
+          ],
+          "checks": [
+            "pnpm --filter @we-remember/testkit test",
+            "pnpm exec playwright test --list"
+          ],
+          "agent": "codex"
+        }
+      ]
+    },
+    {
+      "id": "alpha-integration",
+      "description": "唯一集成轨精确合并所有已验收领域 SHA，组装第一条可演示纵向链路",
+      "depends_on": [
+        "FOUND-002",
+        "EXPR-001",
+        "CONV-001",
+        "RESP-001",
+        "HAND-001",
+        "CARE-001",
+        "PRIV-001",
+        "QA-001"
+      ],
+      "base": {
+        "type": "task",
+        "task": "FOUND-002"
+      },
+      "tasks": [
+        {
+          "id": "INT-001",
+          "title": "组装 Alpha、打通黄金路径并暴露集成缺口",
+          "track": "integration",
+          "write_paths": [
+            "apps/web/src/app/**",
+            "apps/web/src/integration/**",
+            "deploy/**",
+            "docs/release/**",
+            "README.md"
+          ],
+          "spec": "从 FOUND-002 冻结基线建立，逐个精确 no-ff 合并所有已验收领域 SHA；冲突立即 abort 并升级。仅在 integration 所有目录创建 App Router 页面、模块适配器、依赖注入、Demo 控制台、部署配置和 Alpha 说明。打通：奶奶私聊→逐条同意→责任报告→blocked 交接→补信息与双方确认→owner/提醒转移→看护无回应升级→闭环。支持 Fixture 模式，并允许见证步骤切换为真实 LLM；关键展示不得依赖现场模型成功。",
+          "acceptance": [
+            "所有依赖以精确双亲 no-ff merge 保留历史",
+            "本地一条命令启动 Fixture Demo",
+            "三角色完整黄金路径可点击完成",
+            "Demo reset、角色切换、本周触发、60 秒时间加速可用",
+            "关闭模型后，人工模板报告与确认后的看护升级链仍可完整运行",
+            "全量 lint/typecheck/unit/build 通过",
+            "集成缺口记录在 docs/release/ALPHA_GAPS.md，不越权修改领域目录"
+          ],
+          "checks": [
+            "pnpm lint",
+            "pnpm typecheck",
+            "pnpm test",
+            "pnpm build",
+            "pnpm e2e:fixture"
+          ],
+          "agent": "codex"
+        }
+      ]
+    },
+    {
+      "id": "risk-hardening",
+      "description": "所有风险轨从已组装的 INT-001 基线出发，修复自己目录内的集成问题并补齐高风险测试",
+      "depends_on": [
+        "INT-001"
+      ],
+      "base": {
+        "type": "task",
+        "task": "INT-001"
+      },
+      "tasks": [
+        {
+          "id": "EXPR-002",
+          "title": "收口三角色视觉、状态与无障碍",
+          "track": "experience",
+          "write_paths": [
+            "apps/web/src/modules/space/**",
+            "apps/web/src/modules/home/**",
+            "apps/web/src/components/layout/**"
+          ],
+          "spec": "基于 INT-001 集成结果修正本轨问题：三角色首页信息层级、责任交接后的即时视觉变化、subject 一次点击回应、加载/空/错误/离线状态与键盘可达性。只修改 experience 所有目录。",
+          "acceptance": [
+            "妈妈首页在交接完成后对应‘只有你在记得’条目立即消失",
+            "爸爸首页出现新责任域和下一步",
+            "奶奶可在单屏内完成提醒回应",
+            "关键页面通过 axe 或等价无障碍检查",
+            "移动端 360px 与桌面演示宽度均无阻断性布局问题"
+          ],
+          "checks": [
+            "pnpm --filter @we-remember/web test -- --run src/modules/space src/modules/home",
+            "pnpm --filter @we-remember/web typecheck"
+          ],
+          "agent": "codex"
+        },
+        {
+          "id": "CONV-002",
+          "title": "加固同意门、模型降级与越权负路径",
+          "track": "conversation",
+          "write_paths": [
+            "apps/web/src/modules/conversation/**",
+            "packages/ai-witness/**",
+            "packages/boundary/**"
+          ],
+          "spec": "基于 INT-001 加固最危险路径：未授权查询、指定成员可见、拒绝共享、重复点击、LLM 超时、非法 JSON、提示词版本回溯、高风险内容阻断。确保失败时不泄露、不默认成功。",
+          "acceptance": [
+            "未授权内容通过直接 API 请求仍不可见",
+            "重复同意只产生一次共享写入",
+            "LLM 超时或二次 Schema 失败可继续 Demo 且标记人工确认",
+            "高风险内容不创建普通 Signal/Task",
+            "日志中不记录完整敏感原文或密钥"
+          ],
+          "checks": [
+            "pnpm --filter @we-remember/ai-witness test",
+            "pnpm --filter @we-remember/boundary test"
+          ],
+          "agent": "codex"
+        },
+        {
+          "id": "RESP-002",
+          "title": "校准责任统计、证据与中性叙述",
+          "track": "responsibility",
+          "write_paths": [
+            "apps/web/src/modules/responsibility/**",
+            "packages/responsibility/**",
+            "packages/ai-domain/**"
+          ],
+          "spec": "基于 INT-001 对黄金 Fixture 做逐条对账，校准五阶段统计、低置信度池、证据删除排除、用户修正审计和版本化人工中性模板。禁止为了适配 Demo 在 UI 层硬编码统计数字；报告只允许白名单变量替换，任何报告渲染路径都不得调用模型。",
+          "acceptance": [
+            "黄金 Fixture 的五阶段表与预期快照一致",
+            "删除或改归属后统计即时、确定性重算",
+            "报告数字可追溯到 Task 字段与 Evidence 指针",
+            "所有文案通过禁止词/评分回归测试",
+            "人工模板快照稳定，报告渲染期间 LLM 调用计数恒为零",
+            "无主责任域和仅执行参与计算有边界测试"
+          ],
+          "checks": [
+            "pnpm --filter @we-remember/responsibility test",
+            "pnpm --filter @we-remember/ai-domain test"
+          ],
+          "agent": "codex"
+        },
+        {
+          "id": "HAND-002",
+          "title": "验证交接事务、并发与提醒迁移不变量",
+          "track": "handover",
+          "write_paths": [
+            "apps/web/src/modules/handover/**",
+            "packages/handover/**",
+            "packages/ai-handover/**"
+          ],
+          "spec": "基于 INT-001 增加数据库事务与并发负路径：信息缺失、单方确认、重复确认、过期、拒绝、通知迁移失败和审计失败。任何子步骤失败必须保持旧 owner 与旧提醒关系。",
+          "acceptance": [
+            "blocked 状态下所有权在所有故障注入中保持不变",
+            "accepted 事务任一步失败会完整回滚",
+            "同一交接最多产生一次 owner 迁移和一次主审计事件",
+            "仅未来提醒迁移，历史通知记录保持原接收人",
+            "交接 API 对非法状态跳转返回稳定错误码"
+          ],
+          "checks": [
+            "pnpm --filter @we-remember/handover test"
+          ],
+          "agent": "codex"
+        },
+        {
+          "id": "CARE-002",
+          "title": "验证看护调度的幂等、恢复与未解决留痕",
+          "track": "care",
+          "write_paths": [
+            "apps/web/src/modules/care/**",
+            "packages/care/**"
+          ],
+          "spec": "基于 INT-001 进行重复 tick、并发 scheduler、服务重启、迟到 ack、升级期间处理、最后无人处理和 Demo 时钟切换测试。所有外部通知使用幂等键；演示加速不得改变生产状态语义。用依赖边界和失败注入证明整个看护状态机在模型不可用或未配置时仍可完整运行。",
+          "acceptance": [
+            "重复/并发 tick 不产生重复 NotificationDelivery",
+            "服务重启后从持久化状态继续",
+            "迟到 ack 与升级竞争有确定性结果",
+            "unresolved 永不被静默覆盖",
+            "DemoClock 与 SystemClock 通过同一状态机测试套件",
+            "模型未配置或故障时，确认后的看护链仍完整运行且 LLM 调用数为零"
+          ],
+          "checks": [
+            "pnpm --filter @we-remember/care test"
+          ],
+          "agent": "codex"
+        },
+        {
+          "id": "PRIV-002",
+          "title": "完成权限矩阵、删除联动与隐私文案校验",
+          "track": "privacy",
+          "write_paths": [
+            "apps/web/src/modules/privacy/**",
+            "packages/privacy/**"
+          ],
+          "spec": "基于 INT-001 覆盖 primary/partner/subject 对 self/space/care_related/members 资源的完整矩阵，验证 Evidence 删除的引用失效、数据导出边界和空间删除。对外文案必须区分已实现的私有服务器存储与未来端内方案。",
+          "acceptance": [
+            "权限矩阵的允许与拒绝分支全部有自动测试",
+            "删除 Evidence 后无悬空可见结论",
+            "导出和删除操作均有 AuditLog",
+            "UI 不使用‘全部本地’等超出实现的承诺",
+            "空间删除不残留可查询的共享数据"
+          ],
+          "checks": [
+            "pnpm --filter @we-remember/privacy test"
+          ],
+          "agent": "codex"
+        },
+        {
+          "id": "QA-002",
+          "title": "跑通四分钟 E2E、失败路径和备用演示",
+          "track": "qa",
+          "write_paths": [
+            "fixtures/**",
+            "tests/e2e/**",
+            "packages/testkit/**",
+            "docs/demo/**"
+          ],
+          "spec": "在 INT-001 基线运行并完善完整 Playwright 黄金路径、权限负路径、blocked 负路径、CareEvent 幂等路径、确定性报告模板路径与一键 reset。模型关闭时重复运行报告渲染和确认后的看护升级，断言 LLM 调用计数为零。形成逐秒演示 Runbook、人工兜底步骤、故障截图采集和赛前冒烟清单；发现业务缺陷只发 Handoff，不越轨修复。",
+          "acceptance": [
+            "黄金路径从三角色切换到看护闭环全自动通过",
+            "至少覆盖一次 LLM 失败降级和一次通知重复调用",
+            "模型关闭时报告仍由人工模板生成，看护链仍闭环，且两个路径的 LLM 调用计数均为零",
+            "Demo reset 连续执行三次结果一致",
+            "Runbook 可在四分钟内完成且每一步有预期画面",
+            "失败报告包含责任轨道、复现步骤与证据"
+          ],
+          "checks": [
+            "pnpm e2e:fixture",
+            "pnpm exec playwright test tests/e2e/negative --reporter=list"
+          ],
+          "agent": "codex"
+        }
+      ]
+    },
+    {
+      "id": "release-integration",
+      "description": "唯一集成轨合并全部加固 SHA，完成发布候选和审查证据",
+      "depends_on": [
+        "INT-001",
+        "EXPR-002",
+        "CONV-002",
+        "RESP-002",
+        "HAND-002",
+        "CARE-002",
+        "PRIV-002",
+        "QA-002"
+      ],
+      "base": {
+        "type": "task",
+        "task": "INT-001"
+      },
+      "tasks": [
+        {
+          "id": "INT-002",
+          "title": "生成黑客松 Release Candidate",
+          "track": "integration",
+          "write_paths": [
+            "apps/web/src/app/**",
+            "apps/web/src/integration/**",
+            "deploy/**",
+            "docs/release/**",
+            "README.md"
+          ],
+          "spec": "从 INT-001 基线建立，精确 no-ff 合并全部已验收加固 SHA。只做集成目录内的最终适配、部署、演示模式保护、版本信息和发布说明。运行全量质量门禁与黄金路径，记录环境、模型开关、已知限制、回滚方式和发布候选 SHA。不得在最后阶段新增需求或深入修改领域模块。",
+          "acceptance": [
+            "全部依赖 SHA 以干净 no-ff merge 合入且无冲突",
+            "lint/typecheck/unit/build/E2E/权限负路径全部通过",
+            "生产构建不包含真实密钥或敏感 Fixture 原文",
+            "一键 reset 与 DemoClock 仅在明确 Demo 配置下启用",
+            "发布证据证明报告 renderer 与确认后的看护状态机没有 LLM 运行时依赖",
+            "docs/release 包含 smoke test、known issues、demo runbook 链接和回滚说明",
+            "产出可部署的发布候选 SHA"
+          ],
+          "checks": [
+            "python scripts/fleet.py validate .agents/plans/current.json",
+            "python -B -m unittest discover -s scripts/tests -v",
+            "pnpm install --frozen-lockfile",
+            "pnpm lint",
+            "pnpm typecheck",
+            "pnpm test",
+            "pnpm build",
+            "pnpm e2e:fixture"
+          ],
+          "agent": "codex"
+        }
+      ]
+    }
+  ]
+}

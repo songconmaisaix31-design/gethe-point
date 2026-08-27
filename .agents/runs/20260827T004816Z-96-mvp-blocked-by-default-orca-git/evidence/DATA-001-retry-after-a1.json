@@ -1,0 +1,17 @@
+{
+  "recorded_at": "2026-08-27T00:56:11Z",
+  "logical_task_id": "DATA-001",
+  "reason": "Attempt 1 failed before Dispatch/worktree creation with selector_not_found. Two local gethe-point registrations exist; Run recovery now uses the unique exact selector path:C:/Users/DW/orca/gethe-point while preserving frozen base_ref and base_sha. Attempt 2 must use a fresh -a2 top-level worktree.",
+  "previous": {
+    "attempt": 1,
+    "dispatch_id": null,
+    "workspace_name": "trk-foundation-data-001--262bccf7adb3-a1",
+    "branch": null,
+    "status": "failed"
+  },
+  "settlement": null,
+  "next_attempt": 2,
+  "agent": "codex",
+  "model": null,
+  "effort": null
+}
