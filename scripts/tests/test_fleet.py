@@ -203,7 +203,7 @@ class DispatchRecoveryTests(unittest.TestCase):
     ):
         first_calls = []
 
-        def first_orca(_root, args, _label, _dry_run=False):
+        def first_orca(_root, args, _label, _dry_run=False, **_kwargs):
             first_calls.append(args)
             if args[:2] == ["repo", "set-base-ref"]:
                 return {"ok": True}
@@ -223,7 +223,7 @@ class DispatchRecoveryTests(unittest.TestCase):
 
         second_calls = []
 
-        def second_orca(_root, args, _label, _dry_run=False):
+        def second_orca(_root, args, _label, _dry_run=False, **_kwargs):
             second_calls.append(args)
             if args[:2] == ["repo", "set-base-ref"]:
                 return {"ok": True}
@@ -250,6 +250,64 @@ class DispatchRecoveryTests(unittest.TestCase):
         self.assertEqual(worker_start[worker_start.index("--base-branch") + 1], "a" * 40)
         self.assertEqual(persisted["tasks"]["CONTRACT-001"]["dispatch_id"], "ctx_abc123")
         self.assertEqual(persisted["tasks"]["CONTRACT-001"]["status"], "dispatched")
+
+    @patch("fleet.render_spec", return_value="spec")
+    @patch("fleet.resolve_wave_base", return_value=("origin/data", "b" * 40))
+    @patch("fleet.canonical_repo_selector", return_value="id:repo_test")
+    @patch("fleet.run_coordinator_handle", return_value="term_coordinator")
+    def test_failed_worker_does_not_block_parallel_sibling_launch(
+        self,
+        _coordinator,
+        _selector,
+        _base,
+        _spec,
+    ):
+        self.wave["tasks"] = ["CARE-001", "PRIV-001"]
+        self.state["tasks"] = {
+            task_id: {
+                "id": task_id,
+                "title": task_id,
+                "track": task_id.split("-")[0].lower(),
+                "workspace_name": f"trk-{task_id.lower()}",
+                "status": "planned",
+                "orca_task_id": None,
+                "dispatch_id": None,
+                "branch": None,
+            }
+            for task_id in self.wave["tasks"]
+        }
+        created = iter(["task_care123", "task_priv123"])
+
+        def parallel_orca(_root, args, _label, _dry_run=False, **_kwargs):
+            if args[:2] == ["repo", "set-base-ref"]:
+                return {"ok": True}
+            if args[:2] == ["orchestration", "task-create"]:
+                return {"result": {"taskId": next(created)}}
+            if args[:2] == ["orchestration", "dispatch-show"]:
+                return {"result": {"dispatch": None}}
+            if args[:2] == ["orchestration", "worker-start"]:
+                task_id = args[args.index("--task") + 1]
+                if task_id == "task_care123":
+                    return {
+                        "result": {
+                            "dispatchId": "ctx_cafe123",
+                            "state": "failed",
+                            "lastError": "agent_prompt_stalled",
+                        }
+                    }
+                return {"result": {"dispatchId": "ctx_beef123", "state": "ready"}}
+            raise AssertionError(f"unexpected Orca call: {args}")
+
+        with patch("fleet.orca", side_effect=parallel_orca):
+            with self.assertRaisesRegex(FleetError, "CARE-001=agent_prompt_stalled"):
+                dispatch_wave(self.root, {}, self.state, self.wave, self.state_path, False)
+
+        persisted = json.loads(self.state_path.read_text(encoding="utf-8"))
+        self.assertEqual(persisted["tasks"]["CARE-001"]["status"], "planned")
+        self.assertEqual(persisted["tasks"]["CARE-001"]["last_dispatch_id"], "ctx_cafe123")
+        self.assertEqual(persisted["tasks"]["PRIV-001"]["status"], "dispatched")
+        self.assertEqual(persisted["tasks"]["PRIV-001"]["dispatch_id"], "ctx_beef123")
+        self.assertEqual(persisted["waves"][0]["status"], "planned")
 
 
 class LaunchAuthorizationTests(unittest.TestCase):

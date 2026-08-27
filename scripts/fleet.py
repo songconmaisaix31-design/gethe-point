@@ -104,18 +104,34 @@ def cli() -> argparse.ArgumentParser:
     return p
 
 
-def orca(root: Path, args: list[str], label: str, dry_run: bool = False) -> dict[str, Any]:
+def orca(
+    root: Path,
+    args: list[str],
+    label: str,
+    dry_run: bool = False,
+    *,
+    allow_nonzero: bool = False,
+) -> dict[str, Any]:
     cmd = ["orca", *args]
     if "--json" not in cmd:
         cmd.append("--json")
-    cp = run(cmd, cwd=root, dry_run=dry_run, echo=True)
+    cp = run(cmd, cwd=root, check=False, dry_run=dry_run, echo=True)
     if dry_run:
         return {"ok": True, "dry_run": True, "command": cmd}
-    value = parse_json(cp.stdout, label)
+    try:
+        value = parse_json(cp.stdout, label)
+    except FleetError:
+        if cp.returncode:
+            detail = cp.stderr.strip() or cp.stdout.strip() or "no output"
+            raise FleetError(f"command failed ({cp.returncode}): {' '.join(cmd)}\n{detail}")
+        raise
     if not isinstance(value, dict):
         raise FleetError(f"{label} must return a JSON object")
     if value.get("ok") is False:
         raise FleetError(f"{label} failed: {json.dumps(value, ensure_ascii=False)}")
+    if cp.returncode and not allow_nonzero:
+        detail = cp.stderr.strip() or cp.stdout.strip() or "no output"
+        raise FleetError(f"command failed ({cp.returncode}): {' '.join(cmd)}\n{detail}")
     return value
 
 
@@ -127,6 +143,17 @@ def dispatch_id_from_receipt(receipt: Mapping[str, Any]) -> str | None:
         if isinstance(candidate, str) and re.fullmatch(r"(?:ctx|dispatch)_[0-9a-fA-F]{6,}", candidate):
             return candidate
     return None
+
+
+def dispatch_status_from_receipt(receipt: Mapping[str, Any]) -> str | None:
+    result = receipt.get("result")
+    if not isinstance(result, Mapping):
+        return None
+    dispatch = result.get("dispatch")
+    if not isinstance(dispatch, Mapping):
+        return None
+    status = dispatch.get("status")
+    return str(status) if isinstance(status, str) else None
 
 
 def settle_worker(root: Path, action: str, dispatch: str, dry_run: bool = False) -> dict[str, Any]:
@@ -428,6 +455,7 @@ def dispatch_wave(root: Path, cfg: Mapping[str, Any], state: dict[str, Any], wav
     orca(root, ["repo", "set-base-ref", "--repo", selector, "--ref", base_ref], f"set base for {wave['id']}", dry_run)
     evidence = Path(state["run_dir"]) / "evidence"
     defaults = cfg.get("worker_defaults", {})
+    launch_failures: list[str] = []
     for tid in wave["tasks"]:
         task = state["tasks"][tid]
         task["base_ref"], task["base_sha"] = base_ref, base_sha
@@ -460,6 +488,14 @@ def dispatch_wave(root: Path, cfg: Mapping[str, Any], state: dict[str, Any], wav
             dry_run,
         )
         dispatch = dispatch_id_from_receipt(existing)
+        existing_status = dispatch_status_from_receipt(existing)
+        if dispatch and existing_status not in (None, "dispatched", "completed"):
+            task["last_dispatch_id"] = dispatch
+            task["last_dispatch_error"] = existing_status
+            save_json(evidence / f"{tid}-dispatch-show-failed.json", existing)
+            save_state(state_path, state)
+            launch_failures.append(f"{tid}={existing_status}")
+            continue
         started = existing
         if not dispatch:
             cmd = [
@@ -475,8 +511,18 @@ def dispatch_wave(root: Path, cfg: Mapping[str, Any], state: dict[str, Any], wav
                     cmd += ["--effort", str(task["effort"])]
             elif task.get("effort"):
                 raise FleetError(f"task {tid}: effort requires model")
-            started = orca(root, cmd, f"start worker {tid}", dry_run)
+            started = orca(root, cmd, f"start worker {tid}", dry_run, allow_nonzero=True)
             dispatch = dispatch_id_from_receipt(started)
+            result = started.get("result")
+            worker_state = result.get("state") if isinstance(result, Mapping) else None
+            if worker_state == "failed":
+                task["last_dispatch_id"] = dispatch
+                error = result.get("lastError") or result.get("last_error") or "worker-start failed"
+                task["last_dispatch_error"] = str(error)
+                save_json(evidence / f"{tid}-worker-start-failed.json", started)
+                save_state(state_path, state)
+                launch_failures.append(f"{tid}={error}")
+                continue
         dispatch = dispatch or (f"dispatch_dry_{tid.lower()}" if dry_run else None)
         if not dispatch:
             raise FleetError(f"worker-start receipt missing dispatch_ ID for {tid}")
@@ -486,6 +532,10 @@ def dispatch_wave(root: Path, cfg: Mapping[str, Any], state: dict[str, Any], wav
         task["dispatched_at"] = now()
         save_json(evidence / f"{tid}-worker-start.json", started)
         save_state(state_path, state)
+    if launch_failures:
+        wave["status"] = "planned"
+        save_state(state_path, state)
+        raise FleetError("worker launches require exact retry: " + ", ".join(launch_failures))
     wave["status"] = "dispatched"
     wave["dispatched_at"] = now()
     save_state(state_path, state)
