@@ -10,13 +10,104 @@ import re
 import shutil
 import subprocess
 import tempfile
+import time
+from contextlib import contextmanager
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any, Iterable, Iterator, Mapping, Sequence
 
 
 class FleetError(RuntimeError):
     pass
+
+
+STATE_LOCK_TIMEOUT_SECONDS = 5.0
+STATE_LOCK_POLL_SECONDS = 0.05
+
+
+@dataclass(frozen=True)
+class JsonSnapshot:
+    """One immutable byte snapshot and the JSON value parsed from those bytes."""
+
+    path: Path
+    data: bytes
+    sha256: str
+    value: Any
+
+
+def run_state_lock_path(state_path: Path) -> Path:
+    """Return the stable lock identity shared by every writer of one Run state."""
+    state_path = state_path.resolve()
+    identity = os.path.normcase(str(state_path)).encode("utf-8")
+    digest = hashlib.sha256(identity).hexdigest()
+    return Path(tempfile.gettempdir()) / "orca-fleet-state-locks" / f"{digest}.lock"
+
+
+@contextmanager
+def run_state_lock(
+    state_path: Path,
+    timeout_seconds: float | None = None,
+    poll_seconds: float = STATE_LOCK_POLL_SECONDS,
+) -> Iterator[Path]:
+    """Acquire one bounded cross-process lock for a Run state.
+
+    The separate lock file remains stable while ``state.json`` is atomically
+    replaced. Callers must acquire this lock before their first state snapshot
+    and retain it through every state, evidence, STATUS, and external mutation.
+    """
+    timeout = STATE_LOCK_TIMEOUT_SECONDS if timeout_seconds is None else timeout_seconds
+    if timeout < 0:
+        raise FleetError("Run state lock timeout must be non-negative")
+    lock_path = run_state_lock_path(state_path)
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    handle = lock_path.open("a+b")
+    acquired = False
+    try:
+        handle.seek(0, os.SEEK_END)
+        if handle.tell() == 0:
+            handle.write(b"\0")
+            handle.flush()
+            os.fsync(handle.fileno())
+
+        deadline = time.monotonic() + timeout
+        while True:
+            try:
+                handle.seek(0)
+                if os.name == "nt":
+                    import msvcrt
+
+                    msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+                else:
+                    import fcntl
+
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                acquired = True
+                break
+            except OSError as exc:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise FleetError(
+                        f"timed out acquiring Run state lock after {timeout:g}s: {lock_path}"
+                    ) from exc
+                time.sleep(min(poll_seconds, remaining))
+        yield lock_path
+    finally:
+        if acquired:
+            try:
+                handle.seek(0)
+                if os.name == "nt":
+                    import msvcrt
+
+                    msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+                else:
+                    import fcntl
+
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+            finally:
+                handle.close()
+        else:
+            handle.close()
 
 
 def run(
@@ -79,13 +170,32 @@ def git_path(root: Path, name: str) -> Path:
     return (raw if raw.is_absolute() else root / raw).resolve()
 
 
-def load_json(path: Path) -> Any:
+def json_bytes(value: Any) -> bytes:
+    """Serialize JSON once so hashing and publication use identical bytes."""
+    return (json.dumps(value, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+
+
+def load_json_snapshot(path: Path) -> JsonSnapshot:
+    """Read, hash, and parse one immutable filesystem snapshot."""
+    path = path.resolve()
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        data = path.read_bytes()
     except FileNotFoundError as exc:
         raise FleetError(f"missing file: {path}") from exc
+    digest = hashlib.sha256(data).hexdigest()
+    try:
+        text = data.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise FleetError(f"invalid UTF-8 {path}:{exc.start + 1}") from exc
+    try:
+        value = json.loads(text)
     except json.JSONDecodeError as exc:
         raise FleetError(f"invalid JSON {path}:{exc.lineno}:{exc.colno}: {exc.msg}") from exc
+    return JsonSnapshot(path=path, data=data, sha256=digest, value=value)
+
+
+def load_json(path: Path) -> Any:
+    return load_json_snapshot(path).value
 
 
 def sha256_file(path: Path) -> str:
@@ -100,13 +210,67 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def save_json(path: Path, value: Any) -> None:
+def _sync_directory(path: Path) -> None:
+    """Persist a published directory entry where the platform supports it."""
+    if os.name == "nt":
+        return
+    try:
+        descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+    except OSError:
+        return
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
+def save_bytes(path: Path, data: bytes) -> None:
+    """Durably publish bytes with one atomic replacement."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    text = json.dumps(value, ensure_ascii=False, indent=2) + "\n"
-    with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=path.parent, delete=False) as tmp:
-        tmp.write(text)
-        tmp_name = tmp.name
-    os.replace(tmp_name, path)
+    descriptor, tmp_name = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
+    try:
+        with os.fdopen(descriptor, "wb") as tmp:
+            tmp.write(data)
+            tmp.flush()
+            os.fsync(tmp.fileno())
+        os.replace(tmp_name, path)
+        _sync_directory(path.parent)
+        tmp_name = ""
+    finally:
+        if tmp_name:
+            try:
+                os.unlink(tmp_name)
+            except FileNotFoundError:
+                pass
+
+
+def save_new_bytes(path: Path, data: bytes) -> None:
+    """Atomically publish immutable evidence without replacing an existing path."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, tmp_name = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
+    try:
+        with os.fdopen(descriptor, "wb") as tmp:
+            tmp.write(data)
+            tmp.flush()
+            os.fsync(tmp.fileno())
+        try:
+            os.link(tmp_name, path)
+        except FileExistsError as exc:
+            raise FleetError(f"immutable file already exists: {path}") from exc
+        _sync_directory(path.parent)
+    finally:
+        try:
+            os.unlink(tmp_name)
+        except FileNotFoundError:
+            pass
+
+
+def save_json(path: Path, value: Any) -> None:
+    save_bytes(path, json_bytes(value))
+
+
+def save_new_json(path: Path, value: Any) -> None:
+    save_new_bytes(path, json_bytes(value))
 
 
 def parse_json(text: str, label: str) -> Any:

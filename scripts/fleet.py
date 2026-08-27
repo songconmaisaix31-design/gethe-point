@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+import hashlib
 import json
 import re
 import sys
@@ -14,6 +15,7 @@ sys.dont_write_bytecode = True
 
 from common import (  # noqa: E402
     FleetError,
+    JsonSnapshot,
     changed_files,
     command_exists,
     commit_subject,
@@ -25,13 +27,18 @@ from common import (  # noqa: E402
     git_root,
     git_sha,
     integration_analysis,
+    json_bytes,
     load_config,
     load_json,
+    load_json_snapshot,
     now,
     parse_json,
     run,
+    run_state_lock,
+    save_bytes,
     save_json,
-    sha256_file,
+    save_new_bytes,
+    save_new_json,
     scope_violations,
     slug,
     timestamp,
@@ -421,18 +428,28 @@ def build_state(plan: Mapping[str, Any], run_id: str, run_dir: Path, selector: s
     }
 
 
-def load_state(path: Path) -> tuple[Path, dict[str, Any]]:
-    path = path.resolve()
-    state = load_json(path)
+def load_state_snapshot(path: Path) -> tuple[Path, dict[str, Any], JsonSnapshot]:
+    """Load one state snapshot whose parsed value and hash share exact bytes."""
+    snapshot = load_json_snapshot(path.resolve())
+    state = snapshot.value
     if not isinstance(state, dict) or state.get("schema_version") != 1:
-        raise FleetError(f"invalid state file: {path}")
-    return path, state
+        raise FleetError(f"invalid state file: {snapshot.path}")
+    return snapshot.path, state, snapshot
+
+
+def load_state(path: Path) -> tuple[Path, dict[str, Any]]:
+    state_path, state, _ = load_state_snapshot(path)
+    return state_path, state
+
+
+def status_bytes(state: Mapping[str, Any]) -> bytes:
+    return status_markdown(state).encode("utf-8")
 
 
 def save_state(path: Path, state: dict[str, Any]) -> None:
     state["updated_at"] = now()
     save_json(path, state)
-    (path.parent / "STATUS.md").write_text(status_markdown(state), encoding="utf-8")
+    save_bytes(path.parent / "STATUS.md", status_bytes(state))
 
 
 def require_amendment_authorization(amendment: Mapping[str, Any]) -> None:
@@ -586,6 +603,39 @@ def validate_materialized_state(state: Mapping[str, Any], cfg: Mapping[str, Any]
         raise FleetError("amended DAG errors:\n- " + "\n- ".join(errors))
 
 
+def transitive_downstream(
+    state: Mapping[str, Any], sources: list[str]
+) -> dict[str, tuple[set[str], set[str]]]:
+    """Return original task/wave descendants for each resolution source."""
+    topological_waves(state)
+    task_wave = {
+        str(task_id): str(wave["id"])
+        for wave in state["waves"]
+        for task_id in wave["tasks"]
+    }
+    dependents: dict[str, set[str]] = {str(task_id): set() for task_id in state["tasks"]}
+    for wave in state["waves"]:
+        for dependency in wave["depends_on"]:
+            dependents[str(dependency)].update(str(task_id) for task_id in wave["tasks"])
+
+    result: dict[str, tuple[set[str], set[str]]] = {}
+    for source in sources:
+        pending = [source]
+        visited = {source}
+        downstream_tasks: set[str] = set()
+        while pending:
+            current = pending.pop()
+            for dependent in dependents.get(current, set()):
+                if dependent in visited:
+                    continue
+                visited.add(dependent)
+                downstream_tasks.add(dependent)
+                pending.append(dependent)
+        downstream_waves = {task_wave[task_id] for task_id in downstream_tasks}
+        result[source] = downstream_tasks, downstream_waves
+    return result
+
+
 def materialize_amendment(
     state: Mapping[str, Any],
     amendment: Mapping[str, Any],
@@ -663,6 +713,48 @@ def materialize_amendment(
         )
         appended_wave_ids.append(wid)
 
+    resolutions = candidate.get("resolutions", {})
+    if not isinstance(resolutions, dict):
+        raise FleetError("state resolutions must be an object")
+    candidate["resolutions"] = resolutions
+    validated_resolutions: list[tuple[str, str, str]] = []
+    seen_resolution_sources: set[str] = set()
+    for item in resolution_items:
+        unknown = sorted(set(item) - {"task", "corrected_by", "superseded_by"})
+        if unknown:
+            raise FleetError("resolution has forbidden fields: " + ", ".join(unknown))
+        source = item.get("task")
+        relations = [name for name in ("corrected_by", "superseded_by") if name in item]
+        if not isinstance(source, str) or source not in state["tasks"]:
+            raise FleetError(f"resolution source must be an existing task: {source}")
+        if len(relations) != 1:
+            raise FleetError(f"resolution {source} must contain exactly one of corrected_by or superseded_by")
+        relation = relations[0]
+        replacement = item.get(relation)
+        if not isinstance(replacement, str) or replacement not in appended_task_ids:
+            raise FleetError(f"resolution {source} must point to a fresh appended task")
+        if source in resolutions or source in seen_resolution_sources:
+            raise FleetError(f"resolution for {source} is immutable")
+        source_status = state["tasks"][source].get("status")
+        if relation == "superseded_by" and source_status != "failed":
+            raise FleetError(f"superseded task {source} must already be failed")
+        if relation == "corrected_by" and source_status != "completed":
+            raise FleetError(f"corrected task {source} must already be completed")
+        seen_resolution_sources.add(source)
+        validated_resolutions.append((source, relation, replacement))
+
+    downstream = transitive_downstream(state, sorted(seen_resolution_sources))
+    allowed_task_updates = {
+        task_id
+        for task_ids, _ in downstream.values()
+        for task_id in task_ids
+    }
+    allowed_wave_updates = {
+        wave_id
+        for _, wave_ids in downstream.values()
+        for wave_id in wave_ids
+    }
+
     original_waves = {str(wave["id"]): wave for wave in state["waves"]}
     updated_wave_ids: list[str] = []
     for patch in update_wave_items:
@@ -676,6 +768,8 @@ def materialize_amendment(
             raise FleetError(f"duplicate wave update: {wid}")
         if not wave_never_dispatched(original_waves[wid], state):
             raise FleetError(f"downstream wave {wid} has already been dispatched")
+        if wid not in allowed_wave_updates:
+            raise FleetError(f"existing wave {wid} is not downstream of any resolved source")
         if len(patch) == 1:
             raise FleetError(f"wave update {wid} has no contract changes")
         target = next(wave for wave in candidate["waves"] if wave["id"] == wid)
@@ -696,6 +790,8 @@ def materialize_amendment(
             raise FleetError(f"duplicate task update: {tid}")
         if not task_never_dispatched(state["tasks"][tid]):
             raise FleetError(f"downstream task {tid} has already been dispatched")
+        if tid not in allowed_task_updates:
+            raise FleetError(f"existing task {tid} is not downstream of any resolved source")
         if len(patch) == 1:
             raise FleetError(f"task update {tid} has no contract changes")
         for field in TASK_PATCH_FIELDS - {"id"}:
@@ -703,32 +799,8 @@ def materialize_amendment(
                 candidate["tasks"][tid][field] = copy.deepcopy(patch[field])
         updated_task_ids.append(tid)
 
-    resolutions = candidate.get("resolutions", {})
-    if not isinstance(resolutions, dict):
-        raise FleetError("state resolutions must be an object")
-    candidate["resolutions"] = resolutions
     recorded_resolutions: list[dict[str, str]] = []
-    for item in resolution_items:
-        unknown = sorted(set(item) - {"task", "corrected_by", "superseded_by"})
-        if unknown:
-            raise FleetError("resolution has forbidden fields: " + ", ".join(unknown))
-        source = item.get("task")
-        relations = [name for name in ("corrected_by", "superseded_by") if name in item]
-        if not isinstance(source, str) or source not in state["tasks"]:
-            raise FleetError(f"resolution source must be an existing task: {source}")
-        if len(relations) != 1:
-            raise FleetError(f"resolution {source} must contain exactly one of corrected_by or superseded_by")
-        relation = relations[0]
-        replacement = item.get(relation)
-        if not isinstance(replacement, str) or replacement not in appended_task_ids:
-            raise FleetError(f"resolution {source} must point to a fresh appended task")
-        if source in resolutions:
-            raise FleetError(f"resolution for {source} is immutable")
-        source_status = state["tasks"][source].get("status")
-        if relation == "superseded_by" and source_status != "failed":
-            raise FleetError(f"superseded task {source} must already be failed")
-        if relation == "corrected_by" and source_status not in ("completed", "failed"):
-            raise FleetError(f"corrected task {source} must have a terminal outcome")
+    for source, relation, replacement in validated_resolutions:
         record = {
             relation: replacement,
             "amendment_id": amendment_name,
@@ -744,14 +816,355 @@ def materialize_amendment(
         "updated_waves": updated_wave_ids,
         "updated_tasks": updated_task_ids,
         "resolutions": recorded_resolutions,
+        "requested_changes": {
+            "append_waves": copy.deepcopy(append_waves),
+            "update_waves": copy.deepcopy(update_wave_items),
+            "update_tasks": copy.deepcopy(update_task_items),
+            "resolutions": copy.deepcopy(resolution_items),
+        },
     }
     return candidate, changes
 
 
-def do_amend(_root: Path, cfg: Mapping[str, Any], args: argparse.Namespace) -> int:
-    state_path, state = load_state(args.state)
-    amendment_path = args.amendment.resolve()
-    amendment = load_json(amendment_path)
+AMENDMENT_CHANGE_KEYS = {
+    "appended_waves",
+    "appended_tasks",
+    "updated_waves",
+    "updated_tasks",
+    "resolutions",
+    "requested_changes",
+}
+AMENDMENT_REQUEST_KEYS = {"append_waves", "update_waves", "update_tasks", "resolutions"}
+
+
+def bytes_sha256(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def amendment_artifact_paths(state_path: Path, aid: str, source_hash: str) -> tuple[Path, Path, Path]:
+    stem = f"amendment-{aid}-{source_hash[:12]}"
+    evidence = state_path.parent / "evidence"
+    return evidence / f"{stem}.journal.json", evidence / f"{stem}.json", state_path.parent / "STATUS.md"
+
+
+def amendment_receipt_from_journal(journal: Mapping[str, Any]) -> dict[str, Any]:
+    state_identity = journal["state"]
+    parent_plan = journal["parent_plan"]
+    expected_status = journal["expected_status"]
+    changes = copy.deepcopy(journal["changes"])
+    return {
+        "schema_version": 1,
+        "kind": "fleet_amendment_receipt",
+        "ok": True,
+        "dry_run": False,
+        "amendment_id": journal["amendment_id"],
+        "already_applied": False,
+        "state": state_identity["path"],
+        "parent_plan_sha256": parent_plan["sha256"],
+        "state_before_sha256": state_identity["before_sha256"],
+        **changes,
+        "applied_at": journal["applied_at"],
+        "amendment_source": journal["amendment_source"],
+        "amendment_sha256": journal["amendment_sha256"],
+        "automation": copy.deepcopy(journal["automation"]),
+        "state_after_sha256": state_identity["after_sha256"],
+        "journal": journal["journal_path"],
+        "status": expected_status["path"],
+        "status_sha256": expected_status["sha256"],
+    }
+
+
+def amendment_record_from_journal(journal: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        "id": journal["amendment_id"],
+        "source": journal["amendment_source"],
+        "source_sha256": journal["amendment_sha256"],
+        "parent_plan_sha256": journal["parent_plan"]["sha256"],
+        "state_before_sha256": journal["state"]["before_sha256"],
+        "automation": copy.deepcopy(journal["automation"]),
+        "applied_at": journal["applied_at"],
+        "changes": copy.deepcopy(journal["changes"]),
+        "journal": journal["journal_path"],
+        "receipt": journal["expected_receipt"]["path"],
+        "status": journal["expected_status"]["path"],
+    }
+
+
+def prepare_amendment_transaction(
+    state_path: Path,
+    state: Mapping[str, Any],
+    state_before_hash: str,
+    amendment: Mapping[str, Any],
+    amendment_source: str,
+    amendment_hash: str,
+    plan_path: Path,
+    parent_plan_hash: str,
+    cfg: Mapping[str, Any],
+    applied_at: str,
+) -> dict[str, Any]:
+    candidate, changes = materialize_amendment(state, amendment, cfg, applied_at)
+    aid = str(amendment["amendment_id"])
+    journal_path, receipt_path, status_path = amendment_artifact_paths(state_path, aid, amendment_hash)
+    record = {
+        "id": aid,
+        "source": amendment_source,
+        "source_sha256": amendment_hash,
+        "parent_plan_sha256": parent_plan_hash,
+        "state_before_sha256": state_before_hash,
+        "automation": copy.deepcopy(amendment["automation"]),
+        "applied_at": applied_at,
+        "changes": copy.deepcopy(changes),
+        "journal": str(journal_path),
+        "receipt": str(receipt_path),
+        "status": str(status_path),
+    }
+    candidate.setdefault("amendments", []).append(record)
+    candidate["updated_at"] = applied_at
+    state_data = json_bytes(candidate)
+    state_after_hash = bytes_sha256(state_data)
+    derived_status = status_bytes(candidate)
+    journal: dict[str, Any] = {
+        "schema_version": 1,
+        "kind": "fleet_amendment_journal",
+        "journal_path": str(journal_path),
+        "amendment_id": aid,
+        "run_id": state["run_id"],
+        "amendment_source": amendment_source,
+        "amendment_sha256": amendment_hash,
+        "parent_plan": {"path": str(plan_path), "sha256": parent_plan_hash},
+        "state": {
+            "path": str(state_path),
+            "before_sha256": state_before_hash,
+            "after_sha256": state_after_hash,
+        },
+        "applied_at": applied_at,
+        "automation": copy.deepcopy(amendment["automation"]),
+        "changes": copy.deepcopy(changes),
+        "expected_status": {
+            "path": str(status_path),
+            "sha256": bytes_sha256(derived_status),
+            "size": len(derived_status),
+            "state_sha256": state_after_hash,
+        },
+        "expected_receipt": {},
+    }
+    receipt = amendment_receipt_from_journal(journal)
+    receipt_data = json_bytes(receipt)
+    journal["expected_receipt"] = {
+        "path": str(receipt_path),
+        "sha256": bytes_sha256(receipt_data),
+        "size": len(receipt_data),
+    }
+    if record != amendment_record_from_journal(journal):
+        raise FleetError("internal amendment record does not match prepared journal")
+    return {
+        "candidate": candidate,
+        "changes": changes,
+        "journal": journal,
+        "journal_data": json_bytes(journal),
+        "journal_path": journal_path,
+        "receipt": receipt,
+        "receipt_data": receipt_data,
+        "receipt_path": receipt_path,
+        "status_data": derived_status,
+        "status_path": status_path,
+        "state_data": state_data,
+        "state_after_sha256": state_after_hash,
+    }
+
+
+def _exact_fields(value: Any, fields: set[str], label: str) -> Mapping[str, Any]:
+    if not isinstance(value, Mapping) or set(value) != fields:
+        raise FleetError(f"{label} fields conflict")
+    return value
+
+
+def _full_sha256(value: Any, label: str) -> str:
+    if not isinstance(value, str) or re.fullmatch(r"[0-9a-f]{64}", value) is None:
+        raise FleetError(f"{label} must be a lowercase SHA-256")
+    return value
+
+
+def validate_amendment_journal(
+    journal: Any,
+    *,
+    state_path: Path,
+    run_id: str,
+    aid: str,
+    amendment_hash: str,
+    expected_state_before_hash: str,
+    automation: Mapping[str, Any],
+    plan_path: Path,
+    parent_plan_hash: str,
+    journal_path: Path,
+    receipt_path: Path,
+    status_path: Path,
+) -> bytes:
+    journal = _exact_fields(
+        journal,
+        {
+            "schema_version", "kind", "journal_path", "amendment_id", "run_id",
+            "amendment_source", "amendment_sha256", "parent_plan", "state",
+            "applied_at", "automation", "changes", "expected_status", "expected_receipt",
+        },
+        "amendment journal",
+    )
+    if journal["schema_version"] != 1 or journal["kind"] != "fleet_amendment_journal":
+        raise FleetError("amendment journal schema or kind conflicts")
+    if journal["journal_path"] != str(journal_path):
+        raise FleetError("amendment journal path conflicts")
+    if journal["amendment_id"] != aid or journal["run_id"] != run_id:
+        raise FleetError("amendment journal identity conflicts")
+    if journal["amendment_sha256"] != amendment_hash:
+        raise FleetError("amendment journal source hash conflicts")
+    if journal["automation"] != automation:
+        raise FleetError("amendment journal automation identity conflicts")
+    if not isinstance(journal["amendment_source"], str) or not journal["amendment_source"]:
+        raise FleetError("amendment journal source path conflicts")
+    if not isinstance(journal["applied_at"], str) or not journal["applied_at"]:
+        raise FleetError("amendment journal applied_at conflicts")
+
+    parent_plan = _exact_fields(journal["parent_plan"], {"path", "sha256"}, "journal parent plan")
+    if parent_plan["path"] != str(plan_path) or parent_plan["sha256"] != parent_plan_hash:
+        raise FleetError("amendment journal parent plan conflicts")
+    state_identity = _exact_fields(
+        journal["state"], {"path", "before_sha256", "after_sha256"}, "journal state"
+    )
+    if state_identity["path"] != str(state_path):
+        raise FleetError("amendment journal state path conflicts")
+    before_hash = _full_sha256(state_identity["before_sha256"], "journal state before hash")
+    if before_hash != expected_state_before_hash.lower():
+        raise FleetError("amendment journal state precondition conflicts")
+    _full_sha256(state_identity["after_sha256"], "journal state after hash")
+
+    changes = _exact_fields(journal["changes"], AMENDMENT_CHANGE_KEYS, "journal change summary")
+    for field in AMENDMENT_CHANGE_KEYS - {"requested_changes"}:
+        if not isinstance(changes[field], list):
+            raise FleetError(f"journal change summary {field} must be a list")
+    requested = _exact_fields(changes["requested_changes"], AMENDMENT_REQUEST_KEYS, "journal requested changes")
+    if not all(isinstance(requested[field], list) for field in AMENDMENT_REQUEST_KEYS):
+        raise FleetError("journal requested changes must be object lists")
+
+    expected_status = _exact_fields(
+        journal["expected_status"], {"path", "sha256", "size", "state_sha256"}, "journal STATUS identity"
+    )
+    if expected_status["path"] != str(status_path):
+        raise FleetError("amendment journal STATUS path conflicts")
+    _full_sha256(expected_status["sha256"], "journal STATUS hash")
+    if expected_status["state_sha256"] != state_identity["after_sha256"]:
+        raise FleetError("amendment journal STATUS state identity conflicts")
+    if not isinstance(expected_status["size"], int) or expected_status["size"] < 0:
+        raise FleetError("amendment journal STATUS size conflicts")
+
+    expected_receipt = _exact_fields(
+        journal["expected_receipt"], {"path", "sha256", "size"}, "journal receipt identity"
+    )
+    if expected_receipt["path"] != str(receipt_path):
+        raise FleetError("amendment journal receipt path conflicts")
+    _full_sha256(expected_receipt["sha256"], "journal receipt hash")
+    if not isinstance(expected_receipt["size"], int) or expected_receipt["size"] < 0:
+        raise FleetError("amendment journal receipt size conflicts")
+    receipt_data = json_bytes(amendment_receipt_from_journal(journal))
+    if expected_receipt["sha256"] != bytes_sha256(receipt_data) or expected_receipt["size"] != len(receipt_data):
+        raise FleetError("amendment journal receipt content identity conflicts")
+    return receipt_data
+
+
+def validate_applied_amendment_state(state: Mapping[str, Any], journal: Mapping[str, Any]) -> None:
+    """Prove that the committed state still contains every amendment identity."""
+    changes = journal["changes"]
+    wave_ids = [wave.get("id") for wave in state.get("waves", []) if isinstance(wave, Mapping)]
+    for wave_id in changes["appended_waves"]:
+        if wave_ids.count(wave_id) != 1:
+            raise FleetError(f"applied amendment wave identity is missing or duplicated: {wave_id}")
+    tasks = state.get("tasks")
+    if not isinstance(tasks, Mapping):
+        raise FleetError("applied amendment state tasks are invalid")
+    for task_id in [*changes["appended_tasks"], *changes["updated_tasks"]]:
+        if task_id not in tasks:
+            raise FleetError(f"applied amendment task identity is missing: {task_id}")
+    for wave_id in changes["updated_waves"]:
+        if wave_id not in wave_ids:
+            raise FleetError(f"applied amendment updated wave identity is missing: {wave_id}")
+    resolutions = state.get("resolutions")
+    if not isinstance(resolutions, Mapping):
+        raise FleetError("applied amendment resolutions are invalid")
+    for summary in changes["resolutions"]:
+        source = summary.get("task") if isinstance(summary, Mapping) else None
+        relations = [name for name in ("corrected_by", "superseded_by") if isinstance(summary, Mapping) and name in summary]
+        if not isinstance(source, str) or len(relations) != 1:
+            raise FleetError("applied amendment resolution summary conflicts")
+        relation = relations[0]
+        expected = {
+            relation: summary[relation],
+            "amendment_id": journal["amendment_id"],
+            "recorded_at": journal["applied_at"],
+        }
+        if resolutions.get(source) != expected:
+            raise FleetError(f"applied amendment resolution conflicts: {source}")
+    topological_waves(state)
+
+
+def publish_amendment_journal(path: Path, data: bytes) -> None:
+    save_new_bytes(path, data)
+
+
+def replace_amendment_state(path: Path, data: bytes) -> None:
+    save_bytes(path, data)
+
+
+def publish_amendment_receipt(path: Path, data: bytes) -> None:
+    save_new_bytes(path, data)
+
+
+def publish_amendment_status(path: Path, data: bytes) -> None:
+    save_bytes(path, data)
+
+
+def ensure_amendment_receipt(path: Path, expected: bytes, dry_run: bool) -> None:
+    if not path.exists():
+        if dry_run:
+            raise FleetError(f"amendment receipt is missing and dry-run cannot repair it: {path}")
+        publish_amendment_receipt(path, expected)
+    snapshot = load_json_snapshot(path)
+    if snapshot.data != expected or snapshot.sha256 != bytes_sha256(expected):
+        raise FleetError(f"amendment receipt content conflicts: {path}")
+
+
+def ensure_amendment_status(path: Path, expected: bytes, dry_run: bool) -> None:
+    current = path.read_bytes() if path.exists() else None
+    if current != expected:
+        if dry_run:
+            raise FleetError(f"derived STATUS is missing or stale and dry-run cannot repair it: {path}")
+        publish_amendment_status(path, expected)
+    if path.read_bytes() != expected:
+        raise FleetError(f"derived STATUS content conflicts after repair: {path}")
+
+
+def amendment_result(
+    journal: Mapping[str, Any], *, dry_run: bool, already_applied: bool
+) -> dict[str, Any]:
+    return {
+        "ok": True,
+        "dry_run": dry_run,
+        "amendment_id": journal["amendment_id"],
+        "already_applied": already_applied,
+        "state": journal["state"]["path"],
+        "parent_plan_sha256": journal["parent_plan"]["sha256"],
+        "state_before_sha256": journal["state"]["before_sha256"],
+        **copy.deepcopy(journal["changes"]),
+        "applied_at": journal["applied_at"],
+        "state_after_sha256": journal["state"]["after_sha256"],
+        "journal": journal["journal_path"],
+        "receipt": journal["expected_receipt"]["path"],
+        "status": journal["expected_status"]["path"],
+    }
+
+
+def _do_amend_locked(_root: Path, cfg: Mapping[str, Any], args: argparse.Namespace) -> int:
+    state_path, state, state_snapshot = load_state_snapshot(args.state)
+    amendment_snapshot = load_json_snapshot(args.amendment.resolve())
+    amendment = amendment_snapshot.value
     if not isinstance(amendment, dict):
         raise FleetError("amendment must be a JSON object")
     require_amendment_authorization(amendment)
@@ -759,88 +1172,152 @@ def do_amend(_root: Path, cfg: Mapping[str, Any], args: argparse.Namespace) -> i
     if amendment["run_id"] != state.get("run_id"):
         raise FleetError(f"amendment run_id {amendment['run_id']} != state {state.get('run_id')}")
 
-    plan_path = state_path.parent / "plan.json"
-    parent_plan_hash = sha256_file(plan_path)
+    plan_path = (state_path.parent / "plan.json").resolve()
+    plan_snapshot = load_json_snapshot(plan_path)
+    parent_plan_hash = plan_snapshot.sha256
     if parent_plan_hash.lower() != str(amendment["parent_plan_sha256"]).lower():
         raise FleetError("parent plan SHA-256 precondition failed")
-    amendment_hash = sha256_file(amendment_path)
+    amendment_hash = amendment_snapshot.sha256
+    journal_path, receipt_path, status_path = amendment_artifact_paths(state_path, aid, amendment_hash)
+
     records = state.get("amendments", [])
-    if not isinstance(records, list):
-        raise FleetError("state amendments must be a list")
-    existing = next((record for record in records if isinstance(record, dict) and record.get("id") == aid), None)
+    if not isinstance(records, list) or not all(isinstance(record, dict) for record in records):
+        raise FleetError("state amendments must be an object list")
+    matches = [record for record in records if record.get("id") == aid]
+    if len(matches) > 1:
+        raise FleetError(f"state contains duplicate amendment records for {aid}")
+    existing = matches[0] if matches else None
+
     if existing is not None:
         if existing.get("source_sha256") != amendment_hash:
             raise FleetError(f"amendment id {aid} was already applied with different content")
-        result = {
-            "ok": True,
-            "dry_run": bool(args.dry_run),
-            "amendment_id": aid,
-            "already_applied": True,
-            "state": str(state_path),
-            "receipt": existing.get("receipt"),
-        }
+        if not journal_path.exists():
+            raise FleetError(f"applied amendment journal is missing: {journal_path}")
+        journal_snapshot = load_json_snapshot(journal_path)
+        journal = journal_snapshot.value
+        if journal_snapshot.data != json_bytes(journal):
+            raise FleetError(f"applied amendment journal bytes conflict: {journal_path}")
+        receipt_data = validate_amendment_journal(
+            journal,
+            state_path=state_path,
+            run_id=str(state["run_id"]),
+            aid=aid,
+            amendment_hash=amendment_hash,
+            expected_state_before_hash=str(amendment["state_sha256"]),
+            automation=amendment["automation"],
+            plan_path=plan_path,
+            parent_plan_hash=parent_plan_hash,
+            journal_path=journal_path,
+            receipt_path=receipt_path,
+            status_path=status_path,
+        )
+        if existing != amendment_record_from_journal(journal):
+            raise FleetError(f"state amendment record conflicts with journal: {aid}")
+        validate_applied_amendment_state(state, journal)
+        current_status = status_bytes(state)
+        if state_snapshot.sha256 == journal["state"]["after_sha256"]:
+            expected_status = journal["expected_status"]
+            if expected_status["sha256"] != bytes_sha256(current_status) or expected_status["size"] != len(current_status):
+                raise FleetError("amendment journal STATUS identity conflicts with committed state")
+        ensure_amendment_receipt(receipt_path, receipt_data, bool(args.dry_run))
+        ensure_amendment_status(status_path, current_status, bool(args.dry_run))
+        result = amendment_result(journal, dry_run=bool(args.dry_run), already_applied=True)
         print(json.dumps(result, ensure_ascii=False, indent=2) if args.json else f"amendment already applied: {aid}")
         return 0
 
-    state_before_hash = sha256_file(state_path)
-    if state_before_hash.lower() != str(amendment["state_sha256"]).lower():
-        raise FleetError("state SHA-256 precondition failed")
-    applied_at = now()
-    candidate, changes = materialize_amendment(state, amendment, cfg, applied_at)
-    evidence_path = state_path.parent / "evidence" / f"amendment-{aid}-{amendment_hash[:12]}.json"
-    if evidence_path.exists():
-        raise FleetError(f"amendment evidence already exists without a state record: {evidence_path}")
-    record = {
-        "id": aid,
-        "source": str(amendment_path),
-        "source_sha256": amendment_hash,
-        "parent_plan_sha256": parent_plan_hash,
-        "state_before_sha256": state_before_hash,
-        "automation": copy.deepcopy(amendment["automation"]),
-        "applied_at": applied_at,
-        "receipt": str(evidence_path),
-    }
-    candidate.setdefault("amendments", []).append(record)
-    result: dict[str, Any] = {
-        "ok": True,
-        "dry_run": bool(args.dry_run),
-        "amendment_id": aid,
-        "already_applied": False,
-        "state": str(state_path),
-        "parent_plan_sha256": parent_plan_hash,
-        "state_before_sha256": state_before_hash,
-        **changes,
-    }
+    if journal_path.exists():
+        journal_snapshot = load_json_snapshot(journal_path)
+        journal = journal_snapshot.value
+        if journal_snapshot.data != json_bytes(journal):
+            raise FleetError(f"amendment journal bytes conflict: {journal_path}")
+        validate_amendment_journal(
+            journal,
+            state_path=state_path,
+            run_id=str(state["run_id"]),
+            aid=aid,
+            amendment_hash=amendment_hash,
+            expected_state_before_hash=str(amendment["state_sha256"]),
+            automation=amendment["automation"],
+            plan_path=plan_path,
+            parent_plan_hash=parent_plan_hash,
+            journal_path=journal_path,
+            receipt_path=receipt_path,
+            status_path=status_path,
+        )
+        if state_snapshot.sha256 != journal["state"]["before_sha256"]:
+            raise FleetError("journal exists but state matches neither a recoverable before-state nor an applied record")
+        transaction = prepare_amendment_transaction(
+            state_path,
+            state,
+            state_snapshot.sha256,
+            amendment,
+            str(journal["amendment_source"]),
+            amendment_hash,
+            plan_path,
+            parent_plan_hash,
+            cfg,
+            str(journal["applied_at"]),
+        )
+        if journal != transaction["journal"]:
+            raise FleetError("amendment journal content conflicts with deterministic replay")
+        if receipt_path.exists():
+            raise FleetError("amendment receipt exists before state replacement")
+    else:
+        if receipt_path.exists():
+            raise FleetError(f"amendment receipt exists without a journal: {receipt_path}")
+        if state_snapshot.sha256.lower() != str(amendment["state_sha256"]).lower():
+            raise FleetError("state SHA-256 precondition failed")
+        transaction = prepare_amendment_transaction(
+            state_path,
+            state,
+            state_snapshot.sha256,
+            amendment,
+            str(amendment_snapshot.path),
+            amendment_hash,
+            plan_path,
+            parent_plan_hash,
+            cfg,
+            now(),
+        )
+        journal = transaction["journal"]
+
+    result = amendment_result(journal, dry_run=bool(args.dry_run), already_applied=False)
     if args.dry_run:
         result["materialized"] = {
-            "waves": candidate["waves"],
-            "tasks": candidate["tasks"],
-            "resolutions": candidate.get("resolutions", {}),
-            "amendments": candidate.get("amendments", []),
+            "waves": transaction["candidate"]["waves"],
+            "tasks": transaction["candidate"]["tasks"],
+            "resolutions": transaction["candidate"].get("resolutions", {}),
+            "amendments": transaction["candidate"].get("amendments", []),
         }
         print(json.dumps(result, ensure_ascii=False, indent=2) if args.json else f"amendment dry-run valid: {aid}")
         return 0
 
-    # Recheck both inputs immediately before the single atomic state replacement.
-    if sha256_file(plan_path) != parent_plan_hash:
-        raise FleetError("parent plan changed while amendment was being validated")
-    if sha256_file(state_path) != state_before_hash:
-        raise FleetError("state changed while amendment was being validated")
-    save_state(state_path, candidate)
-    state_after_hash = sha256_file(state_path)
-    receipt = {
-        **result,
-        "dry_run": False,
-        "applied_at": applied_at,
-        "amendment_source": str(amendment_path),
-        "amendment_sha256": amendment_hash,
-        "automation": copy.deepcopy(amendment["automation"]),
-        "state_after_sha256": state_after_hash,
-    }
-    save_json(evidence_path, receipt)
-    result.update({"state_after_sha256": state_after_hash, "receipt": str(evidence_path)})
-    print(json.dumps(result, ensure_ascii=False, indent=2) if args.json else f"amendment applied: {aid}; receipt={evidence_path}")
+    if not journal_path.exists():
+        publish_amendment_journal(journal_path, transaction["journal_data"])
+    committed_journal = load_json_snapshot(journal_path)
+    if committed_journal.data != transaction["journal_data"] or committed_journal.value != journal:
+        raise FleetError("published amendment journal conflicts with prepared transaction")
+
+    current_state = load_json_snapshot(state_path)
+    if current_state.data != state_snapshot.data or current_state.sha256 != state_snapshot.sha256:
+        raise FleetError("state changed while amendment lock was held")
+    current_plan = load_json_snapshot(plan_path)
+    if current_plan.data != plan_snapshot.data or current_plan.sha256 != plan_snapshot.sha256:
+        raise FleetError("parent plan changed while amendment lock was held")
+    replace_amendment_state(state_path, transaction["state_data"])
+    committed_state = load_json_snapshot(state_path)
+    if committed_state.data != transaction["state_data"] or committed_state.sha256 != transaction["state_after_sha256"]:
+        raise FleetError("amendment state replacement did not commit the prepared bytes")
+    ensure_amendment_receipt(receipt_path, transaction["receipt_data"], False)
+    ensure_amendment_status(status_path, transaction["status_data"], False)
+    print(json.dumps(result, ensure_ascii=False, indent=2) if args.json else f"amendment applied: {aid}; receipt={receipt_path}")
     return 0
+
+
+def do_amend(root: Path, cfg: Mapping[str, Any], args: argparse.Namespace) -> int:
+    state_path = args.state.resolve()
+    with run_state_lock(state_path):
+        return _do_amend_locked(root, cfg, args)
 
 
 def wave_ready(wave: Mapping[str, Any], state: Mapping[str, Any]) -> bool:
@@ -1058,25 +1535,29 @@ def do_launch(root: Path, cfg: Mapping[str, Any], args: argparse.Namespace) -> i
     fetch(root, cfg, args.dry_run)
     base_ref = str(plan.get("base_ref") or cfg.get("base_ref") or "origin/main")
     base_sha = resolve_sha(root, base_ref, args.dry_run)
-    orca(root, ["repo", "set-base-ref", "--repo", selector, "--ref", base_ref], "set initial base", args.dry_run)
-    receipt = orca(root, ["orchestration", "run-create", "--objective", plan["objective"]], "run-create", args.dry_run)
-    run_id = find_prefixed(receipt, "run_") or ("run_dry_run" if args.dry_run else None)
-    if not run_id:
-        raise FleetError("run-create receipt missing run_ ID")
     run_dir = root / ".agents" / "runs" / f"{timestamp()}-{slug(plan['objective'])}"
-    run_dir.mkdir(parents=True, exist_ok=True)
-    save_json(run_dir / "plan.json", plan)
-    save_json(run_dir / "evidence" / "run-create.json", receipt)
-    state = build_state(plan, run_id, run_dir, selector, base_ref, base_sha, branch)
     state_path = run_dir / "state.json"
-    save_state(state_path, state)
-    dispatched = dispatch_ready(root, cfg, state, state_path, args.dry_run)
-    result = {"ok": True, "run_id": run_id, "state": str(state_path), "dispatched_waves": dispatched}
-    print(json.dumps(result, ensure_ascii=False, indent=2) if args.json else f"run {run_id} created; state={state_path}; dispatched={dispatched}")
-    return 0
+    with run_state_lock(state_path):
+        plan_copy = run_dir / "plan.json"
+        run_receipt_path = run_dir / "evidence" / "run-create.json"
+        if state_path.exists() or plan_copy.exists() or run_receipt_path.exists():
+            raise FleetError(f"Run directory identity already contains immutable files: {run_dir}")
+        orca(root, ["repo", "set-base-ref", "--repo", selector, "--ref", base_ref], "set initial base", args.dry_run)
+        receipt = orca(root, ["orchestration", "run-create", "--objective", plan["objective"]], "run-create", args.dry_run)
+        run_id = find_prefixed(receipt, "run_") or ("run_dry_run" if args.dry_run else None)
+        if not run_id:
+            raise FleetError("run-create receipt missing run_ ID")
+        save_new_json(plan_copy, plan)
+        save_new_json(run_receipt_path, receipt)
+        state = build_state(plan, run_id, run_dir, selector, base_ref, base_sha, branch)
+        save_state(state_path, state)
+        dispatched = dispatch_ready(root, cfg, state, state_path, args.dry_run)
+        result = {"ok": True, "run_id": run_id, "state": str(state_path), "dispatched_waves": dispatched}
+        print(json.dumps(result, ensure_ascii=False, indent=2) if args.json else f"run {run_id} created; state={state_path}; dispatched={dispatched}")
+        return 0
 
 
-def do_inbox(root: Path, args: argparse.Namespace) -> int:
+def _do_inbox_locked(root: Path, args: argparse.Namespace) -> int:
     state_path, state = load_state(args.state)
     cmd = ["orchestration", "check"]
     if args.ack:
@@ -1097,6 +1578,11 @@ def do_inbox(root: Path, args: argparse.Namespace) -> int:
     return 0
 
 
+def do_inbox(root: Path, args: argparse.Namespace) -> int:
+    with run_state_lock(args.state.resolve()):
+        return _do_inbox_locked(root, args)
+
+
 def clean_branch(branch: str) -> str:
     for prefix in ("refs/heads/", "refs/remotes/origin/", "origin/"):
         if branch.startswith(prefix):
@@ -1111,7 +1597,7 @@ def acceptance_evidence_path(state: Mapping[str, Any], task_id: str, dispatch_id
     return Path(state["run_dir"]) / "evidence" / f"{task_id}-acceptance-{safe_dispatch}.json"
 
 
-def do_accept(root: Path, cfg: Mapping[str, Any], args: argparse.Namespace) -> int:
+def _do_accept_locked(root: Path, cfg: Mapping[str, Any], args: argparse.Namespace) -> int:
     state_path, state = load_state(args.state)
     if args.task not in state["tasks"]:
         raise FleetError(f"unknown task: {args.task}")
@@ -1185,12 +1671,22 @@ def do_accept(root: Path, cfg: Mapping[str, Any], args: argparse.Namespace) -> i
     return 0
 
 
-def do_advance(root: Path, cfg: Mapping[str, Any], args: argparse.Namespace) -> int:
+def do_accept(root: Path, cfg: Mapping[str, Any], args: argparse.Namespace) -> int:
+    with run_state_lock(args.state.resolve()):
+        return _do_accept_locked(root, cfg, args)
+
+
+def _do_advance_locked(root: Path, cfg: Mapping[str, Any], args: argparse.Namespace) -> int:
     state_path, state = load_state(args.state)
     dispatched = dispatch_ready(root, cfg, state, state_path, args.dry_run)
     result = {"ok": True, "dispatched_waves": dispatched, "state": str(state_path)}
     print(json.dumps(result, ensure_ascii=False, indent=2) if args.json else (f"dispatched: {dispatched}" if dispatched else "no wave ready"))
     return 0
+
+
+def do_advance(root: Path, cfg: Mapping[str, Any], args: argparse.Namespace) -> int:
+    with run_state_lock(args.state.resolve()):
+        return _do_advance_locked(root, cfg, args)
 
 
 def resolution_view(state: Mapping[str, Any], task_id: str) -> dict[str, Any] | None:
@@ -1320,7 +1816,7 @@ def do_status(args: argparse.Namespace) -> int:
     return 0
 
 
-def do_finalize(args: argparse.Namespace) -> int:
+def _do_finalize_locked(args: argparse.Namespace) -> int:
     state_path, state = load_state(args.state)
     view = status_view(state)
     unresolved_failures = list(view["unresolved_failures"])
@@ -1372,6 +1868,11 @@ def do_finalize(args: argparse.Namespace) -> int:
     save_json(path, manifest)
     print(json.dumps(manifest, ensure_ascii=False, indent=2) if args.json else f"release manifest: {path}")
     return 0
+
+
+def do_finalize(args: argparse.Namespace) -> int:
+    with run_state_lock(args.state.resolve()):
+        return _do_finalize_locked(args)
 
 
 def main() -> int:

@@ -1,13 +1,23 @@
+import hashlib
 import json
 import sys
 import unittest
 from itertools import combinations
 from pathlib import Path
+from unittest.mock import patch
 
 SCRIPTS = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(SCRIPTS))
 
-from common import branch_context, path_matches, pattern_within, patterns_overlap, run, validate_plan  # noqa: E402
+from common import (  # noqa: E402
+    branch_context,
+    load_json_snapshot,
+    path_matches,
+    pattern_within,
+    patterns_overlap,
+    run,
+    validate_plan,
+)
 
 
 class SubprocessTests(unittest.TestCase):
@@ -15,6 +25,20 @@ class SubprocessTests(unittest.TestCase):
         completed = run([sys.executable, "-c", "import os; os.write(1, bytes([255]))"])
 
         self.assertEqual(completed.stdout, "\ufffd")
+
+
+class JsonSnapshotTests(unittest.TestCase):
+    def test_hash_and_parse_use_one_immutable_byte_read(self):
+        first = b'{"generation": 1}\n'
+        second = b'{"generation": 2}\n'
+
+        with patch("pathlib.Path.read_bytes", side_effect=[first, second]) as read_bytes:
+            snapshot = load_json_snapshot(Path("state.json"))
+
+        self.assertEqual(snapshot.value, {"generation": 1})
+        self.assertEqual(snapshot.data, first)
+        self.assertEqual(snapshot.sha256, hashlib.sha256(first).hexdigest())
+        read_bytes.assert_called_once()
 
 
 class BranchContextTests(unittest.TestCase):

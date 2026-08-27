@@ -71,7 +71,7 @@ python scripts/fleet.py accept \
 Never reopen, edit, or re-accept a failed logical Task. A failed Attempt keeps its original
 Task ID, Dispatch ID, outcome, branch, receipt, and evidence forever; only a fresh logical
 Task can replace it. Record the relationship in the amendment as `superseded_by` for a
-failed Attempt or `corrected_by` for a terminal Attempt whose accepted baseline needs a
+failed Attempt or `corrected_by` for a completed Attempt whose accepted baseline needs a
 forward correction.
 
 An amendment is an approved JSON object with this contract:
@@ -136,6 +136,11 @@ never been dispatched. `update_tasks` may change only `title`, `spec`, `acceptan
 historical Task/Dispatch field, duplicate workspace, overlapping write path, invalid DAG,
 or unresolved identity fails before a state or Orca write.
 
+Existing wave and Task updates must also be in the original DAG's transitive downstream
+set for at least one resolution source. Never patch an unrelated planned wave merely
+because it has not been dispatched. Use `superseded_by` only when the source is already
+failed and `corrected_by` only when the source is already completed.
+
 Always validate the exact current absolute state path first:
 
 ```bash
@@ -143,12 +148,26 @@ python scripts/fleet.py amend --state <absolute-state.json> --amendment <amendme
 python scripts/fleet.py amend --state <absolute-state.json> --amendment <amendment.json> --json
 ```
 
-`amend` atomically updates only local Run state and writes a unique receipt containing the
-before/after state hashes; it never creates or dispatches an Orca Task. Review the applied
-status, then call `advance` separately. Reapplying the identical amendment is a no-op;
-reusing its ID with different bytes fails closed. Finalization treats the historical
-outcome as failed and reports `resolved_failure` only after the named replacement has been
-accepted with a full remote SHA.
+Every command that can mutate an existing Run state uses the same bounded cross-process
+lock for that state, starting before the first byte snapshot and ending after state,
+evidence, STATUS, or Worker settlement completes. Lock timeout is fail-closed: retry only
+after the active command exits; do not bypass the lock or hand-edit state.
+
+`amend` parses and hashes each JSON input from one immutable byte snapshot. It publishes a
+non-overwriting journal before state replacement; that journal fixes `applied_at`, the
+amendment and before/after state hashes, the exact requested change summary, and the
+expected receipt and STATUS identities. It then publishes the prepared state bytes,
+immutable receipt, and derived STATUS in that order and never creates or dispatches an
+Orca Task.
+
+After an interruption, rerun the identical command. A valid journal can finish a pending
+state replacement or recreate only a missing deterministic receipt/STATUS. A missing,
+corrupt, or conflicting journal, state record, or existing receipt fails closed. The
+command reports `already_applied` only after validating the source hash, state record,
+journal, receipt, and current derived STATUS. Review the applied status, then call
+`advance` separately. Reusing an amendment ID with different bytes fails closed.
+Finalization preserves the historical failed outcome and reports `resolved_failure` only
+after the named replacement has been accepted with a full remote SHA.
 
 ## 完成标准
 
