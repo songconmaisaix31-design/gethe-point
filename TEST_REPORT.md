@@ -1,6 +1,6 @@
 # Test Report
 
-Generated: 2026-08-27
+Generated: 2026-08-27; updated for the execution-authorization checkpoint
 
 ## Result
 
@@ -16,7 +16,7 @@ Current plan: 7 Waves / 19 Tasks
 Execution mode: child-agents-only
 Required Worktree mode: new-top-level
 Completion task: INT-002
-Launch authorization: false
+Launch authorization: true on the reviewed shared remote control branch
 ```
 
 ## Verified controls
@@ -29,7 +29,7 @@ Launch authorization: false
 - Product Agent boundaries are separate from execution isolation: every Task Attempt still receives a fresh top-level Worktree.
 - Care escalation forbids LLM calls. The care track consumes a validated `CareRuleDraft` but cannot depend on an AI package.
 - Report rendering forbids LLM calls and permits only versioned human-authored templates with allowlisted literal substitution.
-- The plan is intentionally `draft`, `launch_authorized=false`, and uses `BLOCKED_UNTIL_KIT_IS_IN_SHARED_BASE`.
+- The initial plan was deliberately blocked. After the reviewed control commit was published, the user explicitly authorized the active plan on `origin/songconmaisaix31-design/we-remember-fleet-kit`.
 
 ### Plan and ownership
 
@@ -56,7 +56,7 @@ Launch authorization: false
 - `orca.yaml` runs plan validation only.
 - `scripts/install_hooks.py` remains available but opt-in because `core.hooksPath` is shared across worktrees.
 - Local and global `core.hooksPath` were both unset after validation.
-- The launch and start-coordinator paths reject the current non-authorized plan before creating any Run, Task, Dispatch, Coordinator, or Worker.
+- The launch and start-coordinator paths still reject any plan without explicit authorization. The current plan is authorized only against its reviewed shared remote base.
 
 ### Integration and release
 
@@ -75,6 +75,6 @@ Launch authorization: false
 
 ## Deliberate limitation
 
-No real Fleet Run or child Agent was launched. The control plane exists only on the local branch `songconmaisaix31-design/we-remember-fleet-kit`; the protected `main` and `origin/main` remain at `70ca3dce63e137902274c14c101e69e47a84f1cb`.
+The initial validation created no Fleet Run or child Agent. The control plane is now published on `origin/songconmaisaix31-design/we-remember-fleet-kit`; the protected `main` and `origin/main` remain at `70ca3dce63e137902274c14c101e69e47a84f1cb`. Runtime execution evidence is written separately under `.agents/runs/**`.
 
 The original `PACKAGE_MANIFEST.json` remains source-archive provenance. Customized files intentionally no longer match its payload hashes; the installed tree is verified by Git diff, tests, plan validation, and the local commit instead.

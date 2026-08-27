@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "objective": "在 96 小时内交付《都记得》黑客松 MVP：以逐条同意为边界，从家庭对话识别隐形责任，生成五阶段责任报告，完成 blocked-by-default 的整块责任交接，并用确定性看护升级链证明交接后责任真正转移；保留完整 Orca/Git 审查证据链。",
-  "plan_status": "draft",
-  "launch_authorized": false,
+  "plan_status": "active",
+  "launch_authorized": true,
   "product_agent_boundaries": [
     {
       "id": "witness",
@@ -48,7 +48,7 @@
       "llm_calls": "forbidden"
     }
   },
-  "base_ref": "BLOCKED_UNTIL_KIT_IS_IN_SHARED_BASE",
+  "base_ref": "origin/songconmaisaix31-design/we-remember-fleet-kit",
   "execution": {
     "mode": "child-agents-only",
     "worktree_per_task": true,
@@ -63,7 +63,7 @@
       "depends_on": [],
       "base": {
         "type": "ref",
-        "value": "BLOCKED_UNTIL_KIT_IS_IN_SHARED_BASE"
+        "value": "origin/songconmaisaix31-design/we-remember-fleet-kit"
       },
       "tasks": [
         {

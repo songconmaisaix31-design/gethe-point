@@ -77,11 +77,14 @@ class PlanTests(unittest.TestCase):
     def test_example_is_valid(self):
         self.assertEqual(validate_plan(self.plan, self.cfg), [])
 
-    def test_current_plan_is_valid_and_launch_blocked(self):
+    def test_current_plan_is_authorized_on_shared_remote_base(self):
         self.assertEqual(validate_plan(self.current_plan, self.cfg), [])
-        self.assertEqual(self.current_plan["plan_status"], "draft")
-        self.assertFalse(self.current_plan["launch_authorized"])
-        self.assertEqual(self.current_plan["base_ref"], "BLOCKED_UNTIL_KIT_IS_IN_SHARED_BASE")
+        self.assertEqual(self.current_plan["plan_status"], "active")
+        self.assertTrue(self.current_plan["launch_authorized"])
+        self.assertEqual(
+            self.current_plan["base_ref"],
+            "origin/songconmaisaix31-design/we-remember-fleet-kit",
+        )
 
     def test_current_plan_encodes_product_and_deterministic_boundaries(self):
         agent_ids = {agent["id"] for agent in self.current_plan["product_agent_boundaries"]}

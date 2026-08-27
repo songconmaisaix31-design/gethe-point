@@ -106,7 +106,7 @@ orca skills get orchestration --full
 - `.agents/fleet.json` 中的 `base_ref`、轨道 allowlist、检查命令和 Agent 默认值；
 - `.agents/plans/current.json` 中的任务、依赖、write_paths 与 checks。
 
-计划默认是 `draft`、`launch_authorized=false`，并使用不可解析的 `BLOCKED_UNTIL_KIT_IS_IN_SHARED_BASE`。先在隔离分支完成验证和评审；控制面通过 PR 进入共享远端基线后，再在单独受审查提交中替换真实 `base_ref` 并显式设为 `launch_authorized=true`。
+模板计划默认应保持 `draft`、`launch_authorized=false`，并使用不可解析的阻断基线。当前《都记得》执行计划已在用户审阅后显式授权，使用共享远端分支 `origin/songconmaisaix31-design/we-remember-fleet-kit`；该授权只适用于这次计划和这个精确控制面，不得复制为其他 Run 的默认值。
 
 示例提交步骤如下；不要绕过受保护分支或直接 force push：
 

@@ -5,7 +5,7 @@
 | 产品 | 都记得（We Remember） |
 | 版本 | 黑客松 MVP / V1.0 |
 | 计划日期 | 2026-08-26 |
-| 计划状态 | Draft / Launch Disabled |
+| 计划状态 | Active / Launch Authorized |
 | 产品依据 | `docs/product/PRD.md` |
 | 工程决策 | `.agents/decisions/0001-mvp-engineering-freeze.md`、`.agents/decisions/0002-worktree-isolation-completion.md` |
 | 机器计划 | `.agents/plans/current.json` |
@@ -19,7 +19,7 @@
 
 PRD 5.1 的见证、责任域、交接、边界四个 Agent 是产品领域与结构化契约边界，不是四个长期 Git Worktree。执行层仍然坚持每个 Task Attempt 一个全新 Worktree；看护升级与报告渲染是确定性服务，不增加产品 Agent。
 
-当前计划为 `draft`、`launch_authorized=false`，且基线是 `BLOCKED_UNTIL_KIT_IS_IN_SHARED_BASE`。只有控制面进入经过评审的共享远端基线后，才能在单独审查中替换基线并显式授权启动。
+控制面提交 `c2d8751` 已发布到共享远端分支 `origin/songconmaisaix31-design/we-remember-fleet-kit`，用户在审阅交付摘要后于 2026-08-27 明确授权开始执行。当前计划因此为 `active`、`launch_authorized=true`，首个且唯一可派发的产品任务仍是 `DATA-001`；受保护的 `main` 不作为本次执行写入目标。
 
 每次任务尝试使用唯一身份：
 
@@ -577,9 +577,7 @@ fix(care): deduplicate concurrent scheduler ticks [CARE-002]
 
 ## 16. 启动命令
 
-将本套文件复制到实际项目根目录并提交到 `origin/main` 后：
-
-先在受审查提交中把 `.agents/fleet.json` 与 `current.json` 的阻塞基线替换为实际共享远端 ref，并把 `launch_authorized` 从 `false` 改为 `true`。不要在本地孤立分支或未评审控制面上解除该门禁。
+控制面必须先存在于经过审阅的共享远端 ref。当前执行使用 `origin/songconmaisaix31-design/we-remember-fleet-kit`；任何后续 Run 若改用其他基线，必须重新审查 `.agents/fleet.json` 与 `current.json`，不得在本地孤立分支解除门禁。
 
 ```bash
 python scripts/fleet.py doctor --plan .agents/plans/current.json
@@ -617,16 +615,16 @@ python scripts/fleet.py finalize \
 
 ## 17. 开发启动前最终检查
 
-- [ ] PRD 与 ADR 已提交到共同基线
-- [ ] `DATA-001` 是首个产品实现任务，且所有后续 Wave 传递依赖它
-- [ ] `.agents/fleet.json` 项目名、远端基线和轨道路径已核对
-- [ ] `launch_authorized=true` 只出现在经过评审的共享基线
-- [ ] `current.json` 验证通过
-- [ ] 所有目录 allowlist 零重叠
-- [ ] Orca Runtime 与 orchestration skill 可用
-- [ ] `origin/main` 可 fetch，所有 Worker 有 push 权限
-- [ ] 共享密钥只存在本地 Secret 管理，不在仓库
-- [ ] `FOUND-002` 未完成前不派发领域 Worker
-- [ ] 所有 Agent 知道“远端 SHA 才算完成”
+- [x] PRD 与 ADR 已提交到共同基线
+- [x] `DATA-001` 是首个产品实现任务，且所有后续 Wave 传递依赖它
+- [x] `.agents/fleet.json` 项目名、远端基线和轨道路径已核对
+- [x] `launch_authorized=true` 只出现在经过评审的共享基线
+- [x] `current.json` 验证通过
+- [x] 所有目录 allowlist 零重叠
+- [x] Orca Runtime 与 orchestration skill 可用
+- [x] `origin/main` 可 fetch，控制面分支 push 已验证
+- [ ] 需要外部服务密钥时，只允许从本地 Secret 管理注入；`DATA-001` 不需要密钥
+- [x] `FOUND-002` 未完成前不派发领域 Worker
+- [x] 所有 Agent 知道“远端 SHA 才算完成”
 - [ ] Demo Fixture 的唯一 ID 已由 QA 轨冻结
 - [ ] 最终路演不依赖现场 LLM 一次成功

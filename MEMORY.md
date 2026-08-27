@@ -26,11 +26,11 @@
 - Treat commands configured under track `checks` as trusted repository code because the runner uses a shell.
 - Safe preflight commands are unit tests, Python compilation, plan validation, and `fleet.py doctor`. Do not launch real runs or workers without a concrete reviewed objective and an approved shared base.
 - The control plan must preserve the distinction between four product Agent boundaries and per-Attempt Git worktrees.
-- The adapted plan is intentionally non-launchable: `plan_status=draft`, `launch_authorized=false`, and `base_ref=BLOCKED_UNTIL_KIT_IS_IN_SHARED_BASE` in both Fleet configuration and the first Wave. Do not replace these until the control plane is reviewed in a shared remote base.
+- The initial adapted plan was deliberately non-launchable. After the reviewed control commit `c2d8751` was published to `origin/songconmaisaix31-design/we-remember-fleet-kit`, the user explicitly authorized execution on 2026-08-27. The active plan uses that remote branch as its shared base and must still dispatch `DATA-001` alone before any later task.
 - The executable DAG has 7 Waves and 19 Tasks. `DATA-001` is the first product implementation task and must apply the complete migration to disposable PostgreSQL before `FOUND-001` creates application scaffolding.
 - Orca on this host prefixes Git branches with the GitHub owner. Branch identity accepts exactly one optional owner segment while retaining the unprefixed Orca workspace name as a separate immutable field.
 - `orca.yaml` performs plan validation only. `scripts/install_hooks.py` remains opt-in because `core.hooksPath` is shared by all worktrees.
-- Validation on 2026-08-27 passed 26 unit/integration tests, syntax compilation for 9 Python files, current-plan validation, and live Fleet doctor against Orca 1.4.188. No Run, Task, Dispatch, Coordinator, Worker, or remote branch was created.
+- Pre-execution validation on 2026-08-27 passed 26 unit/integration tests, syntax compilation for 9 Python files, current-plan validation, and live Fleet doctor against Orca 1.4.188. At that checkpoint no Run, Task, Dispatch, Coordinator, Worker, or remote branch existed; subsequent execution evidence belongs under `.agents/runs/**`.
 - On Windows, do not use an extensionless fake `orca` executable in tests: command resolution can fall through to the installed `orca.exe`. Mock only the send boundary in-process while retaining real temporary Git operations.
 - `PACKAGE_MANIFEST.json` is provenance for the untouched source archive, not a hash manifest for the customized installed tree.
 

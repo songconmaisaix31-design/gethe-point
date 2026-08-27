@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "we-remember-mvp",
   "repo_selector": "id:14e93d48-5336-4dbf-a84d-88325f8f3d77",
-  "base_ref": "BLOCKED_UNTIL_KIT_IS_IN_SHARED_BASE",
+  "base_ref": "origin/songconmaisaix31-design/we-remember-fleet-kit",
   "fetch_before_launch": true,
   "coordinator": {
     "agent": "codex",
