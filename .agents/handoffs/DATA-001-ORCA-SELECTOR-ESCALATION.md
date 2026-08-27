@@ -4,6 +4,7 @@
 - Logical task: `DATA-001`
 - Severity: blocking
 - Responsible boundary: Orca runtime / automation control plane
+- Recovery status: Attempt 3 failed before Dispatch; retry budget exhausted; permanently stopped
 - Frozen base ref: `origin/songconmaisaix31-design/we-remember-fleet-kit`
 - Frozen base SHA: `ecc7d5cbc32bc606cf568cd508038476689c4154`
 
@@ -34,4 +35,16 @@ Acceptance for recovery:
 - the next Fleet retry creates only fresh Attempt 3 workspace `trk-foundation-data-001--262bccf7adb3-a3` from the unchanged frozen SHA;
 - no later DAG task is dispatched before DATA-001 is remotely accepted.
 
-Do not invoke `fleet.py retry` again until the runtime correction is verified and Attempt 3 is explicitly authorized.
+## Recovery Verification and One-Time Retry
+
+The runtime correction is now verified. The live coordinator terminal `term_e9818968-fa20-4ea2-8ca3-970672121227` resolves to the exact full coordinator worktree ID, and that worktree resolves both with and without the `id:` selector prefix. The repository selector remains `path:C:/Users/DW/orca/gethe-point`; the frozen base ref and SHA remain unchanged.
+
+Attempt 3 is authorized exactly once with fresh workspace `trk-foundation-data-001--262bccf7adb3-a3`. If `worker-start` does not return ready, stop permanently and do not create another retry. If ready, supervise `DATA-001` through structured completion and remote acceptance before advancing the DAG.
+
+## Final Attempt 3 Result
+
+The authorized retry invoked `worker-start` once for Orca Task `task_45f46286189c`, contract hash `82040db046b14ac39dea458aa5c53f4a29b8e13530faeebd7d3ff635abb662a7`, and workspace identity `trk-foundation-data-001--262bccf7adb3-a3`. It returned `selector_not_found` before creating any Dispatch, branch, worktree, or Worker.
+
+Orca now contains three residual `ready` Task records for the failed pre-dispatch attempts, but all three Dispatch lookups are `null` and `worker-list` is empty. These records must not be dispatched manually.
+
+The retry budget is exhausted. No Attempt 4 or other retry is permitted for this Run. `DATA-001` remains failed, all later tasks remain `planned`, and strict finalize cannot succeed.

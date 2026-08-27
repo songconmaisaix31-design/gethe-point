@@ -4,7 +4,7 @@
 - Coordinator branch: `songconmaisaix31-design/fleet-control-execute-the-we-remember-20260827t004358z`
 - Initial base: `origin/songconmaisaix31-design/we-remember-fleet-kit` / `ecc7d5cbc32bc606cf568cd508038476689c4154`
 - Created: 2026-08-27T00:48:16Z
-- Updated: 2026-08-27T00:56:13Z
+- Updated: 2026-08-27T01:06:14Z
 
 ## Waves
 
@@ -22,7 +22,7 @@
 
 | Task | Track | Status | Attempt | Worktree mode | Orca Task | Dispatch | Branch | SHA |
 |---|---|---|---:|---|---|---|---|---|
-| DATA-001 | foundation | failed | 2 | `new-top-level` | `task_901149216cb7` | `—` | `—` | `—` |
+| DATA-001 | foundation | failed | 3 | `new-top-level` | `task_45f46286189c` | `—` | `—` | `—` |
 | FOUND-001 | foundation | planned | 0 | `new-top-level` | `—` | `—` | `—` | `—` |
 | FOUND-002 | foundation | planned | 0 | `new-top-level` | `—` | `—` | `—` | `—` |
 | EXPR-001 | experience | planned | 0 | `new-top-level` | `—` | `—` | `—` | `—` |

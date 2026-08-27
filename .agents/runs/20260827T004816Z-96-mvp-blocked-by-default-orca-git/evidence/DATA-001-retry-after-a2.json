@@ -1,0 +1,17 @@
+{
+  "recorded_at": "2026-08-27T01:06:12Z",
+  "logical_task_id": "DATA-001",
+  "reason": "Attempt 3 authorized after Orca runtime worktree cache/resolution refresh. Live coordinator terminal and exact full worktree selectors resolve consistently. Preserve path:C:/Users/DW/orca/gethe-point and frozen base ecc7d5cbc32bc606cf568cd508038476689c4154; create fresh trk-foundation-data-001--262bccf7adb3-a3. This is the final retry; stop permanently if worker-start is not ready.",
+  "previous": {
+    "attempt": 2,
+    "dispatch_id": null,
+    "workspace_name": "trk-foundation-data-001--262bccf7adb3-a2",
+    "branch": null,
+    "status": "failed"
+  },
+  "settlement": null,
+  "next_attempt": 3,
+  "agent": "codex",
+  "model": null,
+  "effort": null
+}

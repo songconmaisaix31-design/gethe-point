@@ -33,6 +33,7 @@
 - Pre-execution validation on 2026-08-27 passed 26 unit/integration tests, syntax compilation for 9 Python files, current-plan validation, and live Fleet doctor against Orca 1.4.188. At that checkpoint no Run, Task, Dispatch, Coordinator, Worker, or remote branch existed; subsequent execution evidence belongs under `.agents/runs/**`.
 - On Windows, do not use an extensionless fake `orca` executable in tests: command resolution can fall through to the installed `orca.exe`. Mock only the send boundary in-process while retaining real temporary Git operations.
 - `PACKAGE_MANIFEST.json` is provenance for the untouched source archive, not a hash manifest for the customized installed tree.
+- Run `run_262bccf7adb3` exhausted `DATA-001` Attempts 1-3: `orchestration worker-start` returned `selector_not_found` before any Dispatch, worktree, or branch even though read-only repo and coordinator-worktree selectors resolved. No product work began. Do not reuse or manually dispatch the three residual `ready` Task records: `task_6a6c81796edb`, `task_901149216cb7`, and `task_45f46286189c`.
 
 ## Secret handling
 
