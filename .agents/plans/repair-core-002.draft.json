@@ -1,0 +1,238 @@
+{
+  "schema_version": 1,
+  "amendment_id": "repair-core-002",
+  "description": "Repair the DATA-001 lock baseline, replace three failed correction attempts in parallel, and retarget only never-dispatched downstream contracts.",
+  "plan_status": "draft",
+  "launch_authorized": false,
+  "run_id": "run_a6e82cb7623f",
+  "parent_plan_sha256": "a6e2df82bd3c282a5053820d4388e9f5af231062b119d96d340e3e820c4bd7ce",
+  "state_sha256": "87ad655bfed430980611dac118fd36be677f2f4a7cb446efe41436218028c720",
+  "automation": {
+    "branch": "trk-automation-auto-repair-005-v2",
+    "sha": "100083fe6ea93c0552793264a8de883b15369623"
+  },
+  "workspace_suffix": "repair-v2",
+  "append_waves": [
+    {
+      "id": "repair-base-lock-correction",
+      "description": "Synchronize the accepted DATA-001 workspace manifests into the foundation-owned lockfile.",
+      "depends_on": [
+        "DATA-001"
+      ],
+      "base": {
+        "type": "task",
+        "task": "DATA-001"
+      },
+      "tasks": [
+        {
+          "id": "FOUND-BASELOCK-001",
+          "title": "Synchronize DATA-001 workspace importers before fresh repairs",
+          "track": "foundation",
+          "write_paths": [
+            "pnpm-lock.yaml"
+          ],
+          "spec": "Regenerate only pnpm-lock.yaml from the exact accepted DATA-001 baseline using the pinned pnpm version. Add the packages/contracts and packages/db workspace importers required by their checked-in manifests. Do not change package manifests, package-manager configuration, dependency versions, integrity data, overrides, external package snapshots, or unrelated importers. Skip normal worker setup because this task repairs the frozen-install precondition, and disable dependency lifecycle scripts while generating and verifying the lockfile.",
+          "acceptance": [
+            "The task starts from the exact accepted DATA-001 SHA",
+            "The only changed tracked path is pnpm-lock.yaml",
+            "The lockfile adds exactly the packages/contracts and packages/db importers required by checked-in manifests",
+            "No external dependency version, integrity, override, package snapshot, package manifest, or unrelated importer changes",
+            "A clean frozen install succeeds with lifecycle scripts disabled",
+            "Foundation, contract, and data track checks pass"
+          ],
+          "checks": [
+            "pnpm install --lockfile-only --ignore-scripts --no-frozen-lockfile",
+            "pnpm install --frozen-lockfile --ignore-scripts",
+            "pnpm run check:foundation",
+            "pnpm run check:contracts",
+            "pnpm run check:data"
+          ],
+          "agent": "codex",
+          "setup": "skip"
+        }
+      ]
+    },
+    {
+      "id": "repair-contract-ai-boundaries-v2",
+      "description": "Replace the failed contract, conversation, and responsibility Attempts from one synchronized baseline.",
+      "depends_on": [
+        "FOUND-BASELOCK-001"
+      ],
+      "base": {
+        "type": "task",
+        "task": "FOUND-BASELOCK-001"
+      },
+      "tasks": [
+        {
+          "id": "CONTRACT-CORR-002",
+          "title": "Correct authoritative care timing and persisted resolution contracts",
+          "track": "architecture",
+          "write_paths": [
+            "packages/contracts/**",
+            "docs/architecture/state-machines.md",
+            "API_CONTRACT.md",
+            "Tech-Spec.md"
+          ],
+          "spec": "Implement a fresh forward-only public-contract correction from the exact accepted FOUND-BASELOCK-001 SHA without merging or cherry-picking the failed CONTRACT-CORR-001 Attempt. Remove caller-supplied acknowledgedAt and handledAt from AcknowledgeCareEvent and HandleCareEvent requests. Define Clock.now as the sole authoritative transition, deadline, persistence, idempotency, and audit time for those commands. Freeze acknowledgement as timely only when server now is strictly before the deadline; equality is already timed out. Add a bounded CareResolution to handled events, preserve it when a handled event closes, and add resolution to the content-free audit change-field contract. Include a non-user-selectable legacy_unknown persisted value for pre-correction handled or closed rows while rejecting it from new HandleCareEvent requests. Update examples and technical documentation without changing unrelated APIs, error codes, or product semantics.",
+          "acceptance": [
+            "The task starts from the exact accepted FOUND-BASELOCK-001 SHA and no rejected Attempt SHA is an ancestor",
+            "Strict request schemas reject acknowledgedAt and handledAt supplied by callers",
+            "The public contract defines now before deadline as the only timely acknowledgement and treats equality as timed out",
+            "Handled events require one bounded resolution and closed events preserve any prior handling resolution",
+            "legacy_unknown is visible only for migrated history and cannot be selected by a new handling request",
+            "Audit changes can record only the bounded resolution enum and never free-form care content",
+            "Examples cover valid acknowledgement, handling, closure, invalid timestamps, missing resolution, and invalid resolution",
+            "The operation registry and every public schema example validate",
+            "No lockfile, unrelated command, query, privacy, handover, or UI contract changes"
+          ],
+          "checks": [
+            "python -B -c \"import sys; from subprocess import call,DEVNULL; bad=['8c8a07fa77e26a975944e4df75ea6d6930a5d91f','26ae5d926adbc0cddaa4fe21015eef5481056917','7ebd3ebafb7274eed1f6f1551e1c64550a772167','b5371bb0d23cd0f2b51dcd4df020043fd54942ed','a90c520cbd0a65c86d3f76e2f3e08f3b4d671ad8','cf864638a7d196f1370dcb6d732eed41a9aaafac','e90b8aec43e79a15a921721af1efbd9eff8595f6','8f44897b4a5f8d1d6119e279675c7d02aa060963']; quiet={'stdout':DEVNULL,'stderr':DEVNULL}; missing=[sha for sha in bad if call(['git','cat-file','-e',sha+'^{commit}'],**quiet)!=0]; found=[sha for sha in bad if sha not in missing and call(['git','merge-base','--is-ancestor',sha,'HEAD'],**quiet)==0]; print('forbidden ancestor gate passed' if not missing and not found else 'missing commits: '+','.join(missing)+'; forbidden ancestors: '+','.join(found)); sys.exit(1 if missing or found else 0)\"",
+            "pnpm install --frozen-lockfile --ignore-scripts",
+            "pnpm run check:contracts"
+          ],
+          "agent": "codex",
+          "setup": "skip"
+        },
+        {
+          "id": "CONV-REPAIR-002",
+          "title": "Replace private conversation and consented signal safety boundaries",
+          "track": "conversation",
+          "write_paths": [
+            "modules/conversation/**",
+            "modules/ai-witness/**",
+            "modules/boundary/**"
+          ],
+          "spec": "Implement a fresh conversation capability from the exact accepted FOUND-BASELOCK-001 SHA without merging or cherry-picking CONV-001 or the rejected CONV-REPAIR-001 Attempt. Before any provider invocation, authorize the active actor, space, private message, evidence ownership and state, and same-speaker analysis consent. Detect every frozen high-risk category deterministically before provider invocation. Permit only bounded provider fields combined with human-authored templates, and apply the disclosure guard recursively to every provider-derived string, nested field, rendered draft, and shared signal. Compare private disclosure using Unicode Default Full Case Folding, including multi-code-point mappings, Unicode normalization, whitespace, punctuation, symbol, containment, and one-code-point edit normalization; lowercase alone is insufficient. ConfirmSignal must enter its transaction before reading authoritative Clock.now, lock and reread actor, consent, evidence, visibility, and versions, and revalidate immediately before persistence. Raw evidence and private messages remain self-only, and logs and errors remain content-free.",
+          "acceptance": [
+            "The task starts from the exact accepted FOUND-BASELOCK-001 SHA and neither CONV-001 nor CONV-REPAIR-001 is an ancestor",
+            "Unauthorized, inactive, cross-space, missing, or mismatched source input fails before provider invocation and provider call count remains zero",
+            "Self-harm, domestic-violence, and acute-medical fixtures bypass the provider and create no ordinary task or automatic shared signal",
+            "Every provider-derived field, including nested and finally rendered values, is disclosure-checked and cannot publish private raw content",
+            "Exact and near-verbatim variants fail closed after Unicode Default Full Case Folding and normalization, including both directions of Straße family and STRASSE family, final sigma, canonical-equivalent, fullwidth, case, whitespace, punctuation, and one-code-point edits",
+            "Creating a private message produces no shared signal, task, report fact, confirmation record, or cross-role query result",
+            "Consent is per signal, belongs to the same speaker, and remains present, unexpired, and unrevoked through confirmation; a queued confirmation entering the transaction after expiry writes nothing",
+            "Raw-evidence and private-message queries remain self-only even when another role guesses an identifier",
+            "Consent revocation, evidence invalidation, actor deactivation, visibility drift, or version drift during provider execution or before persistence yields zero shared writes",
+            "Invalid output, timeout, provider failure, and a second invalid output return needs_human_review without consequential mutation",
+            "Logs and errors contain only identifiers and bounded outcome metadata"
+          ],
+          "checks": [
+            "python -B -c \"import sys; from subprocess import call,DEVNULL; bad=['8c8a07fa77e26a975944e4df75ea6d6930a5d91f','26ae5d926adbc0cddaa4fe21015eef5481056917','7ebd3ebafb7274eed1f6f1551e1c64550a772167','b5371bb0d23cd0f2b51dcd4df020043fd54942ed','a90c520cbd0a65c86d3f76e2f3e08f3b4d671ad8','cf864638a7d196f1370dcb6d732eed41a9aaafac','e90b8aec43e79a15a921721af1efbd9eff8595f6','8f44897b4a5f8d1d6119e279675c7d02aa060963']; quiet={'stdout':DEVNULL,'stderr':DEVNULL}; missing=[sha for sha in bad if call(['git','cat-file','-e',sha+'^{commit}'],**quiet)!=0]; found=[sha for sha in bad if sha not in missing and call(['git','merge-base','--is-ancestor',sha,'HEAD'],**quiet)==0]; print('forbidden ancestor gate passed' if not missing and not found else 'missing commits: '+','.join(missing)+'; forbidden ancestors: '+','.join(found)); sys.exit(1 if missing or found else 0)\"",
+            "pnpm install --frozen-lockfile --ignore-scripts",
+            "pnpm run check:conversation"
+          ],
+          "agent": "codex",
+          "setup": "skip"
+        },
+        {
+          "id": "RESP-REPAIR-002",
+          "title": "Replace responsibility attribution and neutral deterministic reporting",
+          "track": "responsibility",
+          "write_paths": [
+            "modules/responsibility/**",
+            "modules/ai-domain/**"
+          ],
+          "spec": "Implement a fresh responsibility capability from the exact accepted FOUND-BASELOCK-001 SHA without merging or cherry-picking RESP-001 or the rejected RESP-REPAIR-001 Attempt. Before provider invocation, validate the active requesting actor and every selected signal, provenance, evidence, and source member. Require signal, provenance, and persisted-evidence speaker identities to match; every source member must be active in the same space with analysisConsent enabled. Send only bounded redacted excerpts and provider-safe metadata; raw evidence and persistent entity identifiers must not cross the provider boundary. Revalidate the same guard after provider return. Confirmation may consume only an opaque server-issued, integrity-bound draft receipt whose persisted server-side content and current guard are verified; clients cannot submit mutable suggestion fields as authority. Resolve correction idempotency before mutable-state and no-op validation, generate audit identity and time only on a replay miss, and return the original content-free audit on replay. Derive reports deterministically from the five persisted stages, separate hidden coordination from execution, and use frozen neutral Chinese templates without an LLM.",
+          "acceptance": [
+            "The task starts from the exact accepted FOUND-BASELOCK-001 SHA and neither RESP-001 nor RESP-REPAIR-001 is an ancestor",
+            "Unauthorized actor, space, task, signal, evidence, or non-exact selected sets fail before provider invocation",
+            "Revoked, inactive, or missing source members and any mismatch among signal, provenance, and evidence speaker identities leave provider and mutation counts at zero",
+            "Provider input contains no raw evidence, raw references, private content, or selected persistent entity identifiers",
+            "Timeout, provider error, and invalid first and second outputs return a bounded review state with zero attribution, report, or domain mutation",
+            "Actor or source consent, membership, visibility, evidence, review, or version drift during provider execution produces zero mutation",
+            "Unconfirmed, fabricated, failed-call, replayed, or field-tampered drafts cannot persist; only the exact server-issued draft confirmed by the same currently authorized human may persist",
+            "Exact correction replay returns the original task and audit ID and time with one total mutation; same-key different payload fails idempotency conflict; stale new requests write nothing",
+            "Corrections require an authorized actor and expected version, and audit metadata remains content-free",
+            "Every report cell traces to the five persisted responsibility fields and authorized current signals; discussion-only, evidence_missing, and needs_review facts are excluded",
+            "A four-hidden-stages-to-one-member and execution-to-another fixture uses the exact PRD concentrated-coordination template, not the shared template",
+            "The concentrated template is 本周家庭协调工作集中在一位成员身上。虽然执行任务有所分担，但发现、安排与跟进仍未形成完整责任所有权。",
+            "Empty, balanced, and uneven fixtures remain deterministic and contain no score, rank, blame, diagnosis, or relationship judgment"
+          ],
+          "checks": [
+            "python -B -c \"import sys; from subprocess import call,DEVNULL; bad=['8c8a07fa77e26a975944e4df75ea6d6930a5d91f','26ae5d926adbc0cddaa4fe21015eef5481056917','7ebd3ebafb7274eed1f6f1551e1c64550a772167','b5371bb0d23cd0f2b51dcd4df020043fd54942ed','a90c520cbd0a65c86d3f76e2f3e08f3b4d671ad8','cf864638a7d196f1370dcb6d732eed41a9aaafac','e90b8aec43e79a15a921721af1efbd9eff8595f6','8f44897b4a5f8d1d6119e279675c7d02aa060963']; quiet={'stdout':DEVNULL,'stderr':DEVNULL}; missing=[sha for sha in bad if call(['git','cat-file','-e',sha+'^{commit}'],**quiet)!=0]; found=[sha for sha in bad if sha not in missing and call(['git','merge-base','--is-ancestor',sha,'HEAD'],**quiet)==0]; print('forbidden ancestor gate passed' if not missing and not found else 'missing commits: '+','.join(missing)+'; forbidden ancestors: '+','.join(found)); sys.exit(1 if missing or found else 0)\"",
+            "pnpm install --frozen-lockfile --ignore-scripts",
+            "pnpm run check:responsibility"
+          ],
+          "agent": "codex",
+          "setup": "skip"
+        }
+      ]
+    }
+  ],
+  "update_waves": [
+    {
+      "id": "repair-data-experience",
+      "description": "Persist the fresh corrected contract and replace the rejected web runtime Attempt.",
+      "depends_on": [
+        "CONTRACT-CORR-002"
+      ],
+      "base": {
+        "type": "task",
+        "task": "CONTRACT-CORR-002"
+      }
+    },
+    {
+      "id": "alpha-integration",
+      "description": "Merge only accepted fresh corrections, replacements, handover, and workspace-lock SHAs into the alpha.",
+      "depends_on": [
+        "FOUND-LOCK-001",
+        "DATA-CORR-001",
+        "EXPR-REPAIR-001",
+        "CONV-REPAIR-002",
+        "RESP-REPAIR-002",
+        "HAND-001",
+        "CARE-REPAIR-001",
+        "PRIV-REPAIR-001",
+        "QA-REPAIR-001"
+      ],
+      "base": {
+        "type": "task",
+        "task": "FOUND-LOCK-001"
+      }
+    }
+  ],
+  "update_tasks": [
+    {
+      "id": "CARE-REPAIR-001",
+      "spec": "Implement a fresh care capability against CONTRACT-CORR-002 and DATA-CORR-001 without merging the rejected attempt. Read Clock.now once per command and use that reading for all deadline decisions, transition timestamps, idempotency persistence, and audits. Acknowledgement is timely only when server now is strictly before the acknowledgement deadline; equality or lateness cannot suppress escalation. Persist and audit the bounded handling resolution and retain it through closure. Enforce one PostgreSQL lock order: care events in deterministic ID order before care rules in deterministic ID order. Add a credential-free disposable PostgreSQL race test using existing locked dependencies and a care-local harness."
+    },
+    {
+      "id": "INT-001",
+      "spec": "Start from the exact accepted FOUND-LOCK-001 SHA, which must contain accepted QA-REPAIR-001, DATA-CORR-001, and CONTRACT-CORR-002 ancestry. Merge the exact accepted remote SHAs for EXPR-REPAIR-001, CONV-REPAIR-002, RESP-REPAIR-002, HAND-001, CARE-REPAIR-001, and PRIV-REPAIR-001 with clean --no-ff merges. Never merge or cherry-pick rejected EXPR-001, CONV-001, RESP-001, CARE-001, PRIV-001, QA-001, CONV-REPAIR-001, or RESP-REPAIR-001 commit objects. Add only integration-owned actor boundaries, command/query composition, routes, database wiring, and demo documentation. Preserve Fixture and non-production truth labels.",
+      "acceptance": [
+        "FOUND-LOCK-001 is the exact integration base and QA-REPAIR-001, DATA-CORR-001, and CONTRACT-CORR-002 are verified ancestors",
+        "Every non-ancestor dependency SHA is an exact second parent of a clean no-ff merge",
+        "HAND-001 remains the accepted handover implementation and is not repeated or replaced",
+        "No rejected or failed Attempt SHA is an ancestor of the integrated alpha",
+        "The seven-step Fixture flow runs through real command/query handlers and disposable PostgreSQL",
+        "Server-side authorization and pre-provider authorization remain effective",
+        "Blocked, denied, provider-failed, database-failed, care-boundary, deletion, and export paths remain explicit",
+        "Both browser viewports render the real Next.js application without regression",
+        "README and demo documentation distinguish Fixture, local runtime, public deployment, and official acceptance"
+      ],
+      "checks": [
+        "python -B -c \"import sys; from subprocess import call,DEVNULL; bad=['8c8a07fa77e26a975944e4df75ea6d6930a5d91f','26ae5d926adbc0cddaa4fe21015eef5481056917','7ebd3ebafb7274eed1f6f1551e1c64550a772167','b5371bb0d23cd0f2b51dcd4df020043fd54942ed','a90c520cbd0a65c86d3f76e2f3e08f3b4d671ad8','cf864638a7d196f1370dcb6d732eed41a9aaafac','e90b8aec43e79a15a921721af1efbd9eff8595f6','8f44897b4a5f8d1d6119e279675c7d02aa060963']; quiet={'stdout':DEVNULL,'stderr':DEVNULL}; missing=[sha for sha in bad if call(['git','cat-file','-e',sha+'^{commit}'],**quiet)!=0]; found=[sha for sha in bad if sha not in missing and call(['git','merge-base','--is-ancestor',sha,'HEAD'],**quiet)==0]; print('forbidden ancestor gate passed' if not missing and not found else 'missing commits: '+','.join(missing)+'; forbidden ancestors: '+','.join(found)); sys.exit(1 if missing or found else 0)\"",
+        "pnpm install --frozen-lockfile",
+        "pnpm run check",
+        "pnpm run db:verify",
+        "pnpm run build",
+        "pnpm run test:e2e:fixture",
+        "pnpm run test:visual:fixture"
+      ]
+    }
+  ],
+  "resolutions": [
+    {
+      "task": "CONTRACT-CORR-001",
+      "superseded_by": "CONTRACT-CORR-002"
+    },
+    {
+      "task": "CONV-REPAIR-001",
+      "superseded_by": "CONV-REPAIR-002"
+    },
+    {
+      "task": "RESP-REPAIR-001",
+      "superseded_by": "RESP-REPAIR-002"
+    }
+  ]
+}
