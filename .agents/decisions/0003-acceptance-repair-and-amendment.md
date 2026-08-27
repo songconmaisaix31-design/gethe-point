@@ -11,6 +11,7 @@
 Independent acceptance found defects that mechanical scope and test gates did not detect:
 
 - `EXPR-001` cannot prove the required Next.js runtime because `apps/web/next-env.d.ts` has no owning write path.
+- `CONV-001` can publish provider-supplied private content as a shared conclusion, accepts near-verbatim excerpts as redacted, and omits frozen domestic-violence and acute-medical risk categories.
 - `RESP-001` can send structurally valid but unauthorized task and evidence identifiers to an AI provider before scope validation.
 - `CARE-001` accepts a caller-backdated acknowledgement after the server clock has passed the deadline and discards the validated handling resolution.
 - `PRIV-001` returns an export authorization error outside the frozen API contract.
@@ -33,13 +34,13 @@ The original Tasks and Dispatches are immutable evidence. Reopening them, editin
 
 ```text
 AUTO-REPAIR-001
-  -> Wave A from DATA-001: CONTRACT-CORR-001 + RESP-REPAIR-001
+  -> Wave A from DATA-001: CONTRACT-CORR-001 + CONV-REPAIR-001 + RESP-REPAIR-001
   -> Wave B from CONTRACT-CORR-001: DATA-CORR-001 + EXPR-REPAIR-001
   -> Wave C from DATA-CORR-001: CARE-REPAIR-001 + PRIV-REPAIR-001 + QA-REPAIR-001
   -> amended INT-001 after all accepted core and replacement SHAs
 ```
 
-`CONTRACT-CORR-001` freezes server-observed care timing and a persisted/audited safe resolution. `DATA-CORR-001` adds the signal-specific evidence-state storage, care resolution storage, forward migrations, and catalog proof. `CARE-REPAIR-001` enforces one PostgreSQL lock order and adds a representative concurrency regression. The experience, responsibility, care, privacy, and QA replacements use fresh Task IDs, Dispatches, worktrees, branches, and receipts.
+`CONTRACT-CORR-001` freezes server-observed care timing and a persisted/audited safe resolution. `DATA-CORR-001` adds the signal-specific evidence-state storage, care resolution storage, forward migrations, and catalog proof. `CONV-REPAIR-001` validates every provider-derived shared field against private-input disclosure and routes every frozen high-risk category before provider invocation. `CARE-REPAIR-001` enforces one PostgreSQL lock order and adds a representative concurrency regression. The experience, conversation, responsibility, care, privacy, and QA replacements use fresh Task IDs, Dispatches, worktrees, branches, and receipts.
 
 ## Integration dependency set
 
@@ -47,14 +48,14 @@ The amended but still undispatched `INT-001` must use `DATA-CORR-001` as its bas
 
 - `DATA-CORR-001`
 - `EXPR-REPAIR-001`
-- `CONV-001`
+- `CONV-REPAIR-001`
 - `RESP-REPAIR-001`
 - `HAND-001`
 - `CARE-REPAIR-001`
 - `PRIV-REPAIR-001`
 - `QA-REPAIR-001`
 
-Rejected EXPR, RESP, CARE, PRIV, and QA SHAs must not enter integration. `DATA-001` and `CONTRACT-001` remain ancestors and historical accepted gates, while their corrections become the active integration lineage.
+Rejected EXPR, CONV, RESP, CARE, PRIV, and QA SHAs must not enter integration. `DATA-001` and `CONTRACT-001` remain ancestors and historical accepted gates, while their corrections become the active integration lineage.
 
 ## Consequences
 

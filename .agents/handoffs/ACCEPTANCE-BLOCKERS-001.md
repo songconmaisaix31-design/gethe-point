@@ -16,6 +16,12 @@
 - Reason: provider input is not checked against authorized space, task IDs, and evidence IDs before the external AI call.
 - Required replacement proof: unauthorized input fails closed before invocation and the provider call count remains zero.
 
+### CONV-001
+
+- Evidence SHA: `26ae5d926adbc0cddaa4fe21015eef5481056917`
+- Reasons: provider-derived conclusions can publish private raw content; near-verbatim excerpts pass the minimum-disclosure check; domestic-violence and acute-medical inputs bypass frozen high-risk routing.
+- Required replacement proof: every provider-derived shared field is disclosure-checked, near-verbatim variants fail closed, every frozen high-risk category bypasses the provider and cannot create an ordinary task, and content-free logs remain proven.
+
 ### CARE-001
 
 - Evidence SHA: `b5371bb0d23cd0f2b51dcd4df020043fd54942ed`
@@ -31,7 +37,7 @@
 
 ### EXPR-001
 
-- Status: awaiting failed worker completion.
+- Evidence SHA: `8c8a07fa77e26a975944e4df75ea6d6930a5d91f`
 - Reason: the exact scope omits `apps/web/next-env.d.ts`; a test-only renderer is not accepted as proof that the required Next.js app runs.
 - Required replacement proof: fresh owned runtime path plus real browser checks at both frozen viewports.
 
@@ -49,4 +55,4 @@
 
 ## Gate
 
-`INT-001` remains blocked until every replacement and correction named in ADR 0003, including `QA-REPAIR-001`, is independently accepted by exact remote SHA.
+`INT-001` remains blocked until every replacement and correction named in ADR 0003, including `CONV-REPAIR-001` and `QA-REPAIR-001`, is independently accepted by exact remote SHA.
