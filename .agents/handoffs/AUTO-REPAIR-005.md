@@ -7,7 +7,7 @@ Resolve amendment replacement chains to their final accepted task so a failed re
 ## Incident evidence
 
 - Active Run: `run_a6e82cb7623f`
-- Accepted control base: `0a85a0ce6f84dcaa178bb4c70780f7e369fd2451`
+- Accepted setup merge: `0a85a0ce6f84dcaa178bb4c70780f7e369fd2451`; the worker base must contain this commit.
 - Existing immutable chain prefix: `CONTRACT-001 corrected_by CONTRACT-CORR-001`
 - `CONTRACT-CORR-001` is failed and must be replaced by a fresh `CONTRACT-CORR-002` Attempt.
 - The current `resolution_view()` inspects only the direct replacement. Even after `CONTRACT-CORR-002` succeeds, it would keep `CONTRACT-001` unresolved because `CONTRACT-CORR-001` has no accepted SHA.
@@ -61,7 +61,7 @@ Do not modify configuration, prompts, plans, Run state or evidence, product code
 
 ## Commit and provenance
 
-- Start from exact SHA `0a85a0ce6f84dcaa178bb4c70780f7e369fd2451` in a fresh top-level worktree with setup explicitly skipped.
+- Start from the exact latest control SHA supplied by the coordinator in a fresh top-level worktree with setup explicitly skipped; prove that `0a85a0ce6f84dcaa178bb4c70780f7e369fd2451` is an ancestor.
 - Create one commit with subject `fix(fleet): resolve chained amendment replacements [AUTO-REPAIR-005]`.
 - Push without history rewrite and prove `HEAD == upstream == remote` with a clean worktree.
 - Run `worker_finish.py --verify-only`, then send exactly one supervised `worker_done` for the injected Task and Dispatch.
