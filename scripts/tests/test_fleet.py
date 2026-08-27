@@ -154,6 +154,8 @@ class DispatchRecoveryTests(unittest.TestCase):
             dispatch_wave(self.root, {}, persisted, self.wave, self.state_path, False)
 
         self.assertFalse(any(call[:2] == ["orchestration", "task-create"] for call in second_calls))
+        worker_start = next(call for call in second_calls if call[:2] == ["orchestration", "worker-start"])
+        self.assertEqual(worker_start[worker_start.index("--base-branch") + 1], "origin/foundation")
         self.assertEqual(persisted["tasks"]["CONTRACT-001"]["dispatch_id"], "ctx_abc123")
         self.assertEqual(persisted["tasks"]["CONTRACT-001"]["status"], "dispatched")
 

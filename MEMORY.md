@@ -42,6 +42,7 @@
 - Worker resource cleanup is operational bookkeeping, not product acceptance. Record `release_unknown` or other cleanup failures in acceptance evidence while preserving the independently verified task outcome and Run state.
 - In `run_a6e82cb7623f`, `FOUND-001` was accepted at remote SHA `bede795a127ef5baa48fc4bd01752c2f3c408c65`. The locked Node 24 / pnpm 11 harness, strict checks, native Sharp and Drizzle smoke tests, and full dependency audit passed; the execution policy prevented physical removal of `node_modules`, so clean-install evidence used both forced and ordinary frozen reinstalls without weakening the clean-HEAD gate.
 - Persist an Orca Task ID immediately after `task-create` and before `worker-start`. If launch fails, recover the ID from the task-create evidence receipt and reuse it; otherwise a retry can create duplicate logical work while the external Orca Task remains ready.
+- Pass each resolved frozen wave base explicitly as `worker-start --base-branch`; updating the repository default base-ref alone can leave new-worktree placement dependent on an implicit selector and fail with `selector_not_found` even when the ref is discoverable.
 
 ## Secret handling
 

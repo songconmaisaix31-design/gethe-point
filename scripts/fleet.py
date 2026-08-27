@@ -429,6 +429,7 @@ def dispatch_wave(root: Path, cfg: Mapping[str, Any], state: dict[str, Any], wav
         cmd = [
             "orchestration", "worker-start", "--task", task_id,
             "--worktree", str(mode), "--repo", selector, "--name", task["workspace_name"],
+            "--base-branch", base_ref,
             "--agent", str(agent), "--setup", str(setup),
         ]
         if task.get("model"):
