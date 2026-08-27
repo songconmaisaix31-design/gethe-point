@@ -10,6 +10,16 @@
 python scripts/gate.py check --preflight
 ```
 
+## JavaScript 依赖引导
+
+完成注入的 `gate.py init` 和上述 clean preflight 后，仅当任务所需的 JavaScript 工具不可用时，才允许运行：
+
+```bash
+pnpm install --no-lockfile --offline --ignore-scripts
+```
+
+随后必须在编辑任何文件前再次运行 `python scripts/gate.py check --preflight`。如果引导改动任何 tracked file，立即停止并通过 Orca escalation 上报；绝不恢复、暂存或提交不属于 `WRITE_PATHS` 的文件。
+
 ## 工作边界
 
 - 可以读取全仓库，但只能写任务列出的 `WRITE_PATHS`。

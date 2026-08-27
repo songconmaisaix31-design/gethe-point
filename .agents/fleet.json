@@ -11,7 +11,7 @@
   },
   "worker_defaults": {
     "agent": "codex",
-    "setup": "run",
+    "setup": "skip",
     "worktree_mode": "new-top-level"
   },
   "branch_rules": {

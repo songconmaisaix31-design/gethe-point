@@ -9,7 +9,7 @@ from unittest.mock import patch
 SCRIPTS = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(SCRIPTS))
 
-from common import FleetError  # noqa: E402
+from common import FleetError, load_config  # noqa: E402
 from fleet import (  # noqa: E402
     build_state,
     canonical_repo_selector,
@@ -189,6 +189,76 @@ class DispatchRecoveryTests(unittest.TestCase):
 
     def tearDown(self):
         self.temp.cleanup()
+
+    @patch("fleet.render_spec", return_value="spec")
+    @patch("fleet.resolve_wave_base", return_value=("origin/foundation", "a" * 40))
+    @patch("fleet.canonical_repo_selector", return_value="id:repo_test")
+    @patch("fleet.run_coordinator_handle", return_value="term_coordinator")
+    def test_checked_in_worker_setup_defaults_to_skip_with_task_override(
+        self,
+        _coordinator,
+        _selector,
+        _base,
+        _spec,
+    ):
+        self.wave["tasks"] = ["DEFAULT-001", "OVERRIDE-001"]
+        self.state["tasks"] = {
+            "DEFAULT-001": {
+                "id": "DEFAULT-001",
+                "title": "Use repository worker setup",
+                "track": "architecture",
+                "workspace_name": "trk-architecture-default-001",
+                "status": "planned",
+                "orca_task_id": None,
+                "dispatch_id": None,
+                "branch": None,
+            },
+            "OVERRIDE-001": {
+                "id": "OVERRIDE-001",
+                "title": "Override worker setup",
+                "track": "architecture",
+                "workspace_name": "trk-architecture-override-001",
+                "setup": "run",
+                "status": "planned",
+                "orca_task_id": None,
+                "dispatch_id": None,
+                "branch": None,
+            },
+        }
+        created = iter(["task_default123", "task_override123"])
+        dispatched = iter(["ctx_abc123", "ctx_def456"])
+        worker_start_calls = []
+
+        def fake_orca(_root, args, _label, _dry_run=False, **_kwargs):
+            if args[:2] == ["repo", "set-base-ref"]:
+                return {"ok": True}
+            if args[:2] == ["orchestration", "task-create"]:
+                return {"result": {"taskId": next(created)}}
+            if args[:2] == ["orchestration", "dispatch-show"]:
+                return {"result": {"dispatch": None}}
+            if args[:2] == ["orchestration", "worker-start"]:
+                worker_start_calls.append(args)
+                return {"result": {"dispatchId": next(dispatched), "state": "ready"}}
+            raise AssertionError(f"unexpected Orca call: {args}")
+
+        with patch("fleet.orca", side_effect=fake_orca):
+            dispatch_wave(
+                self.root,
+                load_config(SCRIPTS.parent),
+                self.state,
+                self.wave,
+                self.state_path,
+                False,
+            )
+
+        starts_by_task = {
+            call[call.index("--task") + 1]: call
+            for call in worker_start_calls
+        }
+        default_start = starts_by_task["task_default123"]
+        override_start = starts_by_task["task_override123"]
+        self.assertEqual(default_start[default_start.index("--setup") + 1], "skip")
+        self.assertEqual(override_start[override_start.index("--setup") + 1], "run")
 
     @patch("fleet.render_spec", return_value="contract spec")
     @patch("fleet.resolve_wave_base", return_value=("origin/foundation", "a" * 40))
