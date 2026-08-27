@@ -1,0 +1,2032 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>都记得 We Remember · 可交互原型 v1.0</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════════════════════════════════
+   都记得 · 设计系统（风格 A「纸页」已定稿 · PRD 6.4 要求开发前落地 :root）
+   墨绿 + 棕 / 衬线标题 / 近直角 / 纸感暖白
+   正文对比度 15.05:1（WCAG AAA）· 次要标签 4.84:1（AA）
+   ═══════════════════════════════════════════════════════════════════════════ */
+:root{
+  /* 表面 */
+  --bg:#F4F1EA; --surface:#FFFFFF; --surface2:#EAE5DA; --surface3:#DFD8C9;
+  /* 文字 */
+  --text:#1F1C17; --dim:#6E695E; --line:rgba(31,28,23,.13);
+  /* 语义色 */
+  --primary:#33513F; --primary-ink:#FFFFFF; --primary-soft:#E3EAE2;
+  --accent:#8A5A3B; --accent-soft:#F0E5DC;
+  --warn:#9C4E22; --warn-soft:#F6E7DA;
+  --ok:#33513F; --ok-soft:#E3EAE2;
+  /* 气泡 */
+  --bubble-me:#33513F; --bubble-me-ink:#FFFFFF;
+  --bubble-you:#FFFFFF; --bubble-you-ink:#1F1C17;
+  --nav-bg:#EDE9E0;
+  /* 形状 */
+  --radius:10px; --radius-sm:8px; --pill:6px;
+  --border:1px solid var(--line);
+  --card-shadow:0 1px 3px rgba(31,28,23,.07);
+  --shadow:0 4px 18px rgba(31,28,23,.12);
+  --shadow-lg:0 -8px 32px rgba(31,28,23,.18);
+  /* 字体 */
+  --cn:"PingFang SC","HarmonyOS Sans SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  --serif:"Instrument Serif","Songti SC","Noto Serif CJK SC","Source Han Serif SC",serif;
+  --label-ls:.10em;
+  /* 页面外壳 */
+  --page-bg:#E7E2D8; --page-ink:#1F1C17; --page-dim:#6E695E; --page-line:rgba(31,28,23,.14);
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:var(--page-bg); color:var(--page-ink);
+  font-family:"Inter",var(--cn); -webkit-font-smoothing:antialiased;
+  display:flex; align-items:stretch; overflow:hidden;
+}
+button{font:inherit;color:inherit}
+
+/* ══════════════════════ 左侧：Demo 控制轨 ══════════════════════ */
+.rail{
+  width:330px; flex:none; height:100vh; overflow-y:auto;
+  background:#FBF9F5; border-right:1px solid var(--page-line);
+  padding:26px 22px 40px;
+}
+.rail::-webkit-scrollbar{width:8px}
+.rail::-webkit-scrollbar-thumb{background:var(--surface3);border-radius:4px}
+.brand{font-family:var(--serif);font-size:29px;line-height:1.1;letter-spacing:0}
+.brand small{display:block;font-family:"Inter",var(--cn);font-size:11px;letter-spacing:var(--label-ls);
+  text-transform:uppercase;color:var(--page-dim);margin-top:7px;font-weight:600}
+.brandsub{font-size:12.5px;color:var(--page-dim);line-height:1.7;margin-top:12px;
+  padding-bottom:18px;border-bottom:1px solid var(--page-line)}
+
+.railhead{font-size:10.5px;letter-spacing:var(--label-ls);text-transform:uppercase;
+  color:var(--page-dim);font-weight:600;margin:20px 0 11px;display:flex;justify-content:space-between;align-items:center}
+
+.steps{display:flex;flex-direction:column;gap:7px;counter-reset:s}
+.step{
+  display:flex;gap:11px;align-items:flex-start;text-align:left;cursor:pointer;
+  background:var(--surface);border:1px solid var(--page-line);border-radius:var(--radius);
+  padding:11px 12px;transition:border-color .15s,transform .12s;
+}
+.step:hover:not(:disabled){transform:translateX(2px);border-color:var(--primary)}
+.step:focus-visible{outline:3px solid var(--primary);outline-offset:2px}
+.step:disabled{opacity:.5;cursor:not-allowed}
+.step .n{
+  width:21px;height:21px;flex:none;border-radius:50%;background:var(--surface2);color:var(--dim);
+  font-size:11px;font-weight:600;display:grid;place-items:center;margin-top:1px;font-variant-numeric:tabular-nums;
+}
+.step .tx{flex:1}
+.step .tt{font-size:13px;font-weight:600;line-height:1.4;letter-spacing:-.01em}
+.step .dd{font-size:11.5px;color:var(--page-dim);line-height:1.55;margin-top:3px}
+.step .dd em{font-style:normal;color:var(--accent);font-weight:600}
+.step[data-state="done"] .n{background:var(--primary);color:var(--primary-ink)}
+.step[data-state="active"]{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft)}
+.step[data-state="active"] .n{background:var(--accent);color:#fff}
+
+.railbtns{display:flex;gap:8px;margin-top:16px}
+.rbtn{
+  flex:1;min-height:40px;border-radius:var(--radius-sm);border:1px solid var(--page-line);
+  background:var(--surface);cursor:pointer;font-size:12.5px;font-weight:600;
+  display:flex;align-items:center;justify-content:center;gap:6px;
+}
+.rbtn:hover{border-color:var(--primary)}
+.rbtn:focus-visible{outline:3px solid var(--primary);outline-offset:2px}
+.rbtn.solid{background:var(--primary);color:var(--primary-ink);border-color:transparent}
+
+.setting{display:flex;flex-direction:column;gap:9px;margin-top:6px}
+.setrow{font-size:12px;color:var(--page-dim);line-height:1.6}
+.setrow b{display:block;color:var(--page-ink);font-size:12.5px;font-weight:600;margin-bottom:5px}
+.segs{display:flex;border:1px solid var(--page-line);border-radius:var(--radius-sm);overflow:hidden}
+.segs button{flex:1;min-height:34px;background:var(--surface);border:0;cursor:pointer;font-size:11.5px;
+  border-right:1px solid var(--page-line)}
+.segs button:last-child{border-right:0}
+.segs button[aria-pressed="true"]{background:var(--primary);color:var(--primary-ink);font-weight:600}
+.chk{display:flex;align-items:center;gap:8px;font-size:12.5px;cursor:pointer;line-height:1.5}
+.chk input{width:15px;height:15px;flex:none;accent-color:var(--primary);cursor:pointer;margin-top:1px}
+
+.railnote{font-size:11.5px;color:var(--page-dim);line-height:1.7;margin-top:8px;
+  background:var(--surface2);border-radius:var(--radius-sm);padding:11px 12px}
+.railnote b{color:var(--page-ink)}
+.audit{display:flex;flex-direction:column;gap:6px;max-height:190px;overflow-y:auto}
+.audit .a{font-size:11px;color:var(--page-dim);line-height:1.55;border-left:2px solid var(--surface3);padding-left:9px}
+.audit .a b{color:var(--page-ink);font-weight:600}
+.audit .a i{font-style:normal;font-variant-numeric:tabular-nums;opacity:.7}
+.audit .empty{font-size:11.5px;color:var(--page-dim);font-style:italic}
+
+/* ══════════════════════ 右侧：手机舞台 ══════════════════════ */
+.stage{flex:1;height:100vh;overflow:auto;padding:26px 30px 40px;display:flex;flex-direction:column;align-items:center;gap:18px}
+.stagehead{width:100%;max-width:1080px;display:flex;justify-content:space-between;align-items:flex-end;gap:20px;flex-wrap:wrap}
+.stagehead h1{font-family:var(--serif);font-size:23px;font-weight:400}
+.stagehead p{font-size:12.5px;color:var(--page-dim);line-height:1.65;margin-top:5px;max-width:620px}
+.phones{display:flex;gap:22px;flex-wrap:wrap;justify-content:center;align-items:flex-start}
+.phone-col{display:flex;flex-direction:column;align-items:center;gap:10px;width:322px}
+.plabel{text-align:center;font-size:11.5px;color:var(--page-dim);line-height:1.5}
+.plabel b{display:block;font-size:13px;color:var(--page-ink);font-weight:600;margin-bottom:2px}
+.plabel .role{font-family:"Inter";font-size:10px;letter-spacing:var(--label-ls);text-transform:uppercase;opacity:.75}
+.phone{
+  width:322px;height:690px;border-radius:44px;padding:11px;background:#100F0E;flex:none;
+  box-shadow:0 26px 58px rgba(31,26,22,.30); position:relative; transition:box-shadow .3s;
+}
+.phone.spot{box-shadow:0 0 0 4px var(--accent),0 26px 58px rgba(31,26,22,.32)}
+.screen{
+  width:100%;height:100%;border-radius:34px;overflow:hidden;background:var(--bg);color:var(--text);
+  font-family:var(--cn);display:flex;flex-direction:column;position:relative;--fs:15px;
+}
+.screen[data-senior]{--fs:20px}
+body.bigfont .screen[data-senior]{--fs:24px}
+
+/* 状态栏 / 导航 */
+.statusbar{flex:none;display:flex;justify-content:space-between;align-items:center;
+  padding:14px 22px 4px;font-size:11.5px;font-weight:600;letter-spacing:.02em}
+.statusbar .r{display:flex;gap:5px;opacity:.75}
+.navbar{flex:none;display:flex;align-items:center;gap:8px;padding:8px 15px 11px;
+  background:var(--nav-bg);border-bottom:1px solid var(--line)}
+.navbar .nb{width:26px;font-size:20px;line-height:1;background:none;border:0;cursor:pointer;text-align:left}
+.navbar .nb:disabled{opacity:0;cursor:default}
+.navbar .nt{flex:1;text-align:center;font-size:15.5px;font-weight:600;letter-spacing:-.01em;line-height:1.25}
+.navbar .nt small{display:block;font-size:10.5px;font-weight:400;color:var(--dim);
+  letter-spacing:var(--label-ls);margin-top:2px}
+.navbar .nr{width:26px;font-size:18px;text-align:right;line-height:1;background:none;border:0;cursor:pointer}
+.screen[data-senior] .navbar .nt{font-size:19px}
+.screen[data-senior] .navbar .nt small{font-size:13px;letter-spacing:.02em}
+
+.body{flex:1;overflow-y:auto;padding:15px 14px;scrollbar-width:none}
+.body::-webkit-scrollbar{display:none}
+.body.chat{background:var(--bg)}
+
+/* 底部 tabbar */
+.tabbar{flex:none;display:flex;background:var(--nav-bg);border-top:1px solid var(--line);padding:7px 0 19px}
+.tabbar button{flex:1;background:none;border:0;cursor:pointer;display:flex;flex-direction:column;
+  align-items:center;gap:3px;font-size:10px;color:var(--dim);padding:2px 0}
+.tabbar button.on{color:var(--primary);font-weight:600}
+.tabbar svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round}
+.tabbar .badgedot{position:relative}
+.tabbar .badgedot::after{content:"";position:absolute;top:-1px;right:-4px;width:7px;height:7px;
+  border-radius:50%;background:var(--warn)}
+
+/* ══════════════════════ 通用组件 ══════════════════════ */
+.eyebrow{font-size:10.5px;letter-spacing:var(--label-ls);text-transform:uppercase;color:var(--dim);font-weight:600}
+.sec{margin-bottom:18px}
+.sec>.sechead{display:flex;justify-content:space-between;align-items:center;margin-bottom:9px;gap:8px}
+.card{background:var(--surface);border:var(--border);border-radius:var(--radius);
+  padding:13px;box-shadow:var(--card-shadow);margin-bottom:9px}
+.card:last-child{margin-bottom:0}
+.serif{font-family:var(--serif);font-weight:400;letter-spacing:0}
+
+.badge{font-size:10.5px;font-weight:600;letter-spacing:var(--label-ls);padding:4px 9px;
+  border-radius:var(--pill);white-space:nowrap;flex:none;display:inline-block}
+.badge.none{background:var(--warn-soft);color:var(--warn)}
+.badge.mine{background:var(--surface2);color:var(--dim)}
+.badge.other{background:var(--primary-soft);color:var(--primary)}
+.badge.ok{background:var(--ok-soft);color:var(--ok)}
+.badge.warn{background:var(--warn-soft);color:var(--warn)}
+
+.btn{
+  min-height:46px;width:100%;border-radius:var(--radius-sm);border:var(--border);
+  background:var(--surface2);cursor:pointer;font-size:13.5px;font-weight:600;
+  display:flex;align-items:center;justify-content:center;gap:8px;transition:transform .12s;
+}
+.btn+.btn{margin-top:8px}
+.btn:hover:not(:disabled){transform:translateY(-1px)}
+.btn:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.btn:disabled{opacity:.45;cursor:not-allowed;transform:none}
+.btn.primary{background:var(--primary);color:var(--primary-ink);border-color:transparent}
+.btn.danger{background:var(--warn-soft);color:var(--warn);border-color:transparent}
+.btn.sm{min-height:36px;font-size:12px}
+.btnrow{display:flex;gap:8px}
+.btnrow .btn+.btn{margin-top:0}
+
+/* 证据入口 */
+.ev{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;color:var(--dim);
+  border:1px dashed var(--line);padding:3px 8px;border-radius:var(--pill);
+  background:none;cursor:pointer;margin:7px 5px 0 0;text-align:left;line-height:1.4}
+.ev:hover{color:var(--accent);border-color:var(--accent)}
+.ev:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.ev.gone{color:var(--warn);border-color:var(--warn);text-decoration:line-through}
+
+/* 空状态 */
+.empty{text-align:center;padding:34px 18px;color:var(--dim);font-size:13px;line-height:1.75}
+.empty .big{font-family:var(--serif);font-size:21px;color:var(--text);display:block;margin-bottom:8px}
+
+/* ══════════════════════ 聊天 ══════════════════════ */
+.timesep{text-align:center;margin:2px 0 15px}
+.timesep span{font-size:11px;color:var(--dim);background:var(--surface2);padding:3px 10px;border-radius:var(--pill)}
+.screen[data-senior] .timesep span{font-size:14px}
+.syssep{text-align:center;margin:2px 0 14px}
+.syssep span{display:inline-block;max-width:88%;font-size:10.5px;color:var(--dim);line-height:1.6;
+  background:var(--surface2);padding:6px 11px;border-radius:var(--pill)}
+.screen[data-senior] .syssep span{font-size:13px}
+
+.msg{display:flex;gap:9px;margin-bottom:15px;align-items:flex-start}
+.msg.me{flex-direction:row-reverse}
+.av{width:38px;height:38px;flex:none;border-radius:var(--radius-sm);background:var(--surface2);
+  color:var(--dim);display:grid;place-items:center;font-size:12px;font-weight:600}
+.av.ai{background:var(--primary);color:var(--primary-ink);font-family:var(--serif);font-size:17px}
+.wrapb{max-width:78%;display:flex;flex-direction:column}
+.msg.me .wrapb{align-items:flex-end}
+.who{font-size:10.5px;color:var(--dim);margin-bottom:4px;padding:0 2px}
+.bubble{padding:11px 13px;border-radius:var(--radius-sm);background:var(--bubble-you);
+  color:var(--bubble-you-ink);box-shadow:var(--card-shadow);position:relative;
+  line-height:1.62;font-size:var(--fs);word-break:break-word}
+.bubble::after{content:"";position:absolute;top:13px;left:-3px;width:8px;height:8px;
+  background:inherit;transform:rotate(45deg);border-radius:1px}
+.msg.me .bubble{background:var(--bubble-me);color:var(--bubble-me-ink)}
+.msg.me .bubble::after{left:auto;right:-3px}
+.bubble .voice{display:flex;align-items:center;gap:9px}
+.bubble .wave{display:flex;gap:2.5px;align-items:flex-end;height:15px}
+.bubble .wave i{width:2.5px;background:currentColor;opacity:.65;border-radius:2px;display:block}
+
+/* 结构化卡片消息 */
+.cardmsg{background:var(--surface);border:var(--border);border-radius:var(--radius);
+  padding:14px;box-shadow:var(--card-shadow);width:100%}
+.cardmsg .ck{font-size:10px;letter-spacing:var(--label-ls);text-transform:uppercase;
+  color:var(--dim);font-weight:600;margin-bottom:7px;display:flex;align-items:center;gap:6px}
+.cardmsg .ct{font-size:calc(var(--fs) + 1px);font-weight:600;line-height:1.45;letter-spacing:-.01em}
+.cardmsg .cb{font-size:var(--fs);line-height:1.62;margin-top:8px}
+.cardmsg .cf{font-size:calc(var(--fs) - 3.5px);color:var(--dim);line-height:1.65;margin-top:10px}
+.screen[data-senior] .cardmsg .cf{color:var(--text);opacity:.85;font-size:calc(var(--fs) - 3px)}
+.cardmsg .quote{margin:10px 0;padding:9px 11px;background:var(--surface2);
+  border-left:3px solid var(--accent);border-radius:0 var(--radius-sm) var(--radius-sm) 0;
+  font-size:var(--fs);line-height:1.55}
+.cardmsg.alert{border-left:3px solid var(--warn)}
+.cardmsg.alert .ck{color:var(--warn)}
+.cardmsg.good{border-left:3px solid var(--ok)}
+.cardmsg.good .ck{color:var(--ok)}
+.wrapb.wide{max-width:90%}
+
+.opts{display:flex;flex-direction:column;gap:9px;margin-top:12px}
+.opt{min-height:50px;padding:11px 13px;border-radius:var(--radius-sm);background:var(--surface2);
+  border:var(--border);cursor:pointer;font-size:var(--fs);font-weight:600;text-align:left;
+  display:flex;align-items:center;gap:10px;transition:transform .12s}
+.screen[data-senior] .opt{min-height:60px}
+.opt:hover{transform:translateY(-1px)}
+.opt:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.opt.primary{background:var(--primary);color:var(--primary-ink);border-color:transparent}
+.opt.ghost{background:transparent}
+.opt .ico{flex:none;width:20px;text-align:center}
+.opt small{display:block;font-weight:400;font-size:calc(var(--fs) - 4px);opacity:.8;margin-top:2px}
+
+/* 输入栏 */
+.inputbar{flex:none;display:flex;align-items:center;gap:8px;padding:9px 12px 19px;
+  background:var(--nav-bg);border-top:1px solid var(--line)}
+.inputbar .ib{flex:1;min-height:36px;border-radius:var(--radius-sm);background:var(--surface);
+  border:var(--border);display:flex;align-items:center;padding:0 11px;font-size:13px;color:var(--dim);
+  cursor:text}
+.inputbar .ic{width:33px;height:33px;flex:none;border-radius:50%;background:var(--surface2);
+  border:0;cursor:pointer;display:grid;place-items:center;font-size:15px}
+.voicebar{flex:none;padding:12px 14px 21px;background:var(--nav-bg);border-top:1px solid var(--line);
+  display:flex;flex-direction:column;gap:9px}
+.holdtalk{min-height:64px;border-radius:var(--radius-sm);background:var(--primary);color:var(--primary-ink);
+  border:0;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;
+  font-size:var(--fs);font-weight:600}
+.holdtalk:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+.voicebar .alt{display:flex;gap:9px}
+.voicebar .alt button{flex:1;min-height:44px;border-radius:var(--radius-sm);background:var(--surface2);
+  border:var(--border);cursor:pointer;font-size:calc(var(--fs) - 3px);color:var(--text)}
+
+/* ══════════════════════ 责任地图（primary 首页） ══════════════════════ */
+.hero{padding:5px 3px 16px}
+.hero .q{font-family:var(--serif);font-size:24px;line-height:1.36}
+.hero .cnt{display:flex;align-items:baseline;gap:10px;margin-top:14px}
+.hero .cnt b{font-family:var(--serif);font-size:46px;line-height:.95;font-weight:400}
+.hero .cnt b.pop{animation:pop .55s ease}
+@keyframes pop{0%{transform:translateY(-7px);opacity:.25}100%{transform:none;opacity:1}}
+.hero .cnt span{font-size:12.5px;color:var(--dim);line-height:1.5}
+
+.dcard .r1{display:flex;justify-content:space-between;align-items:flex-start;gap:9px}
+.dcard .nm{font-size:14.5px;font-weight:600;line-height:1.4;letter-spacing:-.01em}
+.dcard .meta{font-size:11.5px;color:var(--dim);line-height:1.6;margin-top:6px}
+.dcard .stages{display:flex;gap:4px;margin-top:9px;flex-wrap:wrap}
+.stg{font-size:9.5px;padding:2.5px 6px;border-radius:3px;background:var(--surface2);color:var(--dim);
+  letter-spacing:.02em;white-space:nowrap}
+.stg.me{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.stg.you{background:var(--primary-soft);color:var(--primary);font-weight:600}
+.dcard.leaving{opacity:0;transform:translateX(22px);max-height:0;padding:0;margin:0;border-width:0;
+  overflow:hidden;transition:all .55s ease}
+.dcard.entering{animation:slidein .5s ease}
+@keyframes slidein{0%{opacity:0;transform:translateX(-14px)}100%{opacity:1;transform:none}}
+
+/* 报告 */
+.rep table{width:100%;border-collapse:collapse}
+.rep th{font-size:10px;letter-spacing:var(--label-ls);color:var(--dim);font-weight:600;
+  text-align:right;padding:0 0 8px;text-transform:uppercase}
+.rep th:first-child{text-align:left}
+.rep td{font-size:12.5px;padding:7px 0;border-top:1px solid var(--line);text-align:right;
+  font-variant-numeric:tabular-nums}
+.rep td:first-child{text-align:left}
+.rep td b{font-weight:600}
+.bar{height:5px;border-radius:3px;background:var(--surface3);margin-top:5px;display:flex;overflow:hidden}
+.bar i{display:block;height:100%}
+.bar i.a{background:var(--dim);opacity:.7}
+.bar i.b{background:var(--surface3)}
+.narr{font-size:12px;line-height:1.75;color:var(--dim);margin-top:12px;padding-top:11px;border-top:1px solid var(--line)}
+.mtr{display:flex;justify-content:space-between;font-size:11.5px;padding:6px 0;border-top:1px solid var(--line)}
+.mtr:first-of-type{border-top:0}
+.mtr span{color:var(--dim)}
+.mtr b{font-weight:600;font-variant-numeric:tabular-nums}
+
+/* ══════════════════════ 交接卡 ══════════════════════ */
+.hpk{background:var(--surface);border:var(--border);border-radius:var(--radius);
+  overflow:hidden;box-shadow:var(--card-shadow)}
+.hpk .hh{padding:15px;border-bottom:1px solid var(--line)}
+.hpk .hh .t{font-family:var(--serif);font-size:20px;line-height:1.32}
+.flow{display:flex;align-items:center;gap:8px;margin-top:12px;font-size:11.5px;color:var(--dim)}
+.flow .av2{width:25px;height:25px;border-radius:var(--radius-sm);background:var(--surface2);
+  display:grid;place-items:center;font-size:10px;font-weight:600}
+.flow .ar{flex:1;text-align:center;letter-spacing:.16em}
+.spill{display:inline-flex;align-items:center;gap:7px;font-size:11.5px;font-weight:600;
+  letter-spacing:var(--label-ls);padding:6px 11px;border-radius:var(--pill);margin-top:12px}
+.spill .d{width:7px;height:7px;border-radius:50%;background:currentColor;flex:none}
+.spill.blocked{background:var(--warn-soft);color:var(--warn)}
+.spill.pending{background:var(--surface2);color:var(--dim)}
+.spill.done{background:var(--ok-soft);color:var(--ok)}
+.hs{padding:12px 15px;border-bottom:1px solid var(--line)}
+.hs h5{font-size:10px;letter-spacing:var(--label-ls);text-transform:uppercase;color:var(--dim);
+  font-weight:600;margin-bottom:7px}
+.hs p{font-size:12.5px;line-height:1.68}
+.hs ul{margin-left:15px}
+.hs li{font-size:12.5px;line-height:1.7}
+.hs.miss{background:var(--warn-soft);border-left:3px solid var(--warn)}
+.hs.miss h5{color:var(--warn)}
+.hs.miss li.filled{opacity:.5;text-decoration:line-through}
+.hact{padding:13px 15px}
+.hnote{font-size:11.5px;color:var(--dim);line-height:1.68;text-align:center;padding:0 15px 14px}
+
+/* ══════════════════════ 看护 ══════════════════════ */
+.cr{}
+.cr .crt{font-size:14px;font-weight:600;letter-spacing:-.01em}
+.cr .crm{font-size:11.5px;color:var(--dim);line-height:1.6;margin-top:5px}
+.lvl{display:flex;align-items:center;gap:7px;margin-top:10px;font-size:11px;color:var(--dim)}
+.lvl .dots{display:flex;gap:4px}
+.lvl .dots i{width:6.5px;height:6.5px;border-radius:50%;background:var(--surface3);display:block}
+.lvl .dots i.on{background:var(--warn)}
+.lvl .dots i.ok{background:var(--ok)}
+.countdown{font-variant-numeric:tabular-nums;font-weight:600;color:var(--warn)}
+.machine{display:flex;flex-wrap:wrap;gap:4px;margin-top:10px}
+.mst{font-size:9.5px;padding:2.5px 7px;border-radius:3px;background:var(--surface2);color:var(--dim);
+  letter-spacing:.03em;font-family:"Inter"}
+.mst.on{background:var(--primary);color:var(--primary-ink);font-weight:600}
+.mst.warn{background:var(--warn);color:#fff;font-weight:600}
+.ackbig{min-height:72px;font-size:calc(var(--fs) + 2px)}
+
+/* ══════════════════════ 底部抽屉 sheet ══════════════════════ */
+.scrim{position:absolute;inset:0;background:rgba(31,26,22,.42);opacity:0;pointer-events:none;
+  transition:opacity .26s;z-index:8;border-radius:34px}
+.scrim.show{opacity:1;pointer-events:auto}
+.sheet{position:absolute;left:0;right:0;bottom:0;z-index:9;background:var(--bg);
+  border-radius:18px 18px 34px 34px;max-height:82%;display:flex;flex-direction:column;
+  transform:translateY(102%);transition:transform .3s cubic-bezier(.2,.8,.2,1);box-shadow:var(--shadow-lg)}
+.sheet.show{transform:none}
+.sheet .sh{flex:none;padding:14px 16px 11px;border-bottom:1px solid var(--line);display:flex;
+  align-items:flex-start;gap:10px;background:var(--nav-bg);border-radius:18px 18px 0 0}
+.sheet .sh .st{flex:1;font-size:15px;font-weight:600;line-height:1.35}
+.sheet .sh .st small{display:block;font-size:10.5px;font-weight:400;color:var(--dim);
+  letter-spacing:var(--label-ls);margin-top:3px;text-transform:uppercase}
+.sheet .sh button{width:28px;height:28px;flex:none;border-radius:50%;border:0;background:var(--surface2);
+  cursor:pointer;font-size:15px;line-height:1}
+.sheet .sb{flex:1;overflow-y:auto;padding:14px 16px 26px;scrollbar-width:none}
+.sheet .sb::-webkit-scrollbar{display:none}
+.screen[data-senior] .sheet .sh .st{font-size:19px}
+
+/* 证据溯源 */
+.evrow{background:var(--surface);border:var(--border);border-radius:var(--radius);padding:12px;margin-bottom:9px}
+.evrow .eh{display:flex;justify-content:space-between;gap:8px;font-size:11px;color:var(--dim);margin-bottom:7px}
+.evrow .raw{font-size:13.5px;line-height:1.62;padding:9px 11px;background:var(--surface2);
+  border-left:3px solid var(--accent);border-radius:0 var(--radius-sm) var(--radius-sm) 0}
+.evrow .src{font-size:10.5px;color:var(--dim);margin-top:8px;line-height:1.6}
+.evrow.deleted{opacity:.62}
+.evrow.deleted .raw{border-left-color:var(--warn);text-decoration:line-through}
+
+/* toast */
+.toast{position:absolute;left:14px;right:14px;bottom:20px;z-index:12;background:var(--surface);
+  border:var(--border);border-left:3px solid var(--primary);border-radius:var(--radius);
+  padding:12px 14px;box-shadow:var(--shadow);font-size:12.5px;line-height:1.62;
+  opacity:0;transform:translateY(12px);pointer-events:none;transition:all .3s}
+.toast.show{opacity:1;transform:none}
+.toast b{display:block;font-weight:600;margin-bottom:3px}
+.toast.warnish{border-left-color:var(--warn)}
+
+/* 隐私中心行 */
+.prow{display:flex;align-items:center;gap:11px;background:var(--surface);border:var(--border);
+  border-radius:var(--radius);padding:12px 13px;margin-bottom:8px;width:100%;text-align:left;
+  cursor:pointer;box-shadow:var(--card-shadow)}
+.prow:hover{border-color:var(--primary)}
+.prow:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.prow .pi{width:30px;height:30px;flex:none;border-radius:var(--radius-sm);background:var(--surface2);
+  display:grid;place-items:center;font-size:14px}
+.prow .pt{flex:1}
+.prow .pt b{display:block;font-size:13.5px;font-weight:600;letter-spacing:-.01em}
+.prow .pt span{display:block;font-size:11px;color:var(--dim);line-height:1.55;margin-top:3px}
+.prow .pa{font-size:16px;color:var(--dim)}
+.prow.danger .pt b{color:var(--warn)}
+.switch{width:40px;height:23px;border-radius:12px;background:var(--surface3);flex:none;position:relative;
+  transition:background .2s}
+.switch i{position:absolute;top:2.5px;left:2.5px;width:18px;height:18px;border-radius:50%;
+  background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.2);transition:transform .2s;display:block}
+.switch.on{background:var(--primary)}
+.switch.on i{transform:translateX(17px)}
+
+.warnbox{background:var(--warn-soft);border-left:3px solid var(--warn);border-radius:0 var(--radius) var(--radius) 0;
+  padding:12px 13px;margin-bottom:10px;font-size:12px;line-height:1.68;color:var(--text)}
+.warnbox b{display:block;color:var(--warn);font-weight:600;margin-bottom:4px;font-size:12.5px}
+.okbox{background:var(--ok-soft);border-left:3px solid var(--ok);border-radius:0 var(--radius) var(--radius) 0;
+  padding:12px 13px;margin-bottom:10px;font-size:12px;line-height:1.68}
+.okbox b{display:block;color:var(--ok);font-weight:600;margin-bottom:4px;font-size:12.5px}
+
+/* 待观察池（见证 Agent 的判断力） */
+.obs{background:var(--surface2);border-radius:var(--radius);padding:12px 13px}
+.obs .oi{font-size:12px;line-height:1.6;padding:8px 0;border-top:1px solid var(--line);color:var(--dim)}
+.obs .oi:first-of-type{border-top:0}
+.obs .oi q{color:var(--text);font-style:normal}
+.obs .oi em{font-style:normal;color:var(--accent);font-weight:600;font-size:11px}
+
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+@media (max-width:1180px){
+  body{overflow:auto;flex-direction:column;height:auto}
+  .rail{width:100%;height:auto;border-right:0;border-bottom:1px solid var(--page-line)}
+  .stage{height:auto;overflow:visible}
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════ Demo 控制轨 ═══════════════════ -->
+<aside class="rail">
+  <div class="brand">都记得<small>We Remember · 可交互原型</small></div>
+  <p class="brandsub">
+    家里的事，不是顺手。<br>
+    三台手机同时在线：妈妈（主责任人）、爸爸（共同生活成员）、奶奶（被看护人）。
+    同一个家庭库，三张脸。跨设备联动是真的 —— 爸爸确认交接，妈妈那屏当场变。
+  </p>
+
+  <div class="railhead"><span>Demo 脚本 · PRD 第 8 章</span><span id="stepPos">0 / 7</span></div>
+  <div class="steps" id="steps"></div>
+  <div class="railbtns">
+    <button class="rbtn solid" id="nextStep">下一步 ▸</button>
+    <button class="rbtn" id="resetAll">重置</button>
+  </div>
+
+  <div class="railhead">演示速度开关 · PRD 7.1</div>
+  <div class="setting">
+    <div class="setrow">
+      <b>看护回应超时阈值</b>
+      <div class="segs" id="speedSegs">
+        <button data-ms="1800000" aria-pressed="false">真实 30 分</button>
+        <button data-ms="60000" aria-pressed="true">演示 60 秒</button>
+        <button data-ms="6000" aria-pressed="false">极速 6 秒</button>
+      </div>
+    </div>
+    <label class="chk"><input type="checkbox" id="bigfont"> 模拟系统字号放大（奶奶侧 20→24px）</label>
+    <label class="chk"><input type="checkbox" id="spotlight" checked> 高亮当前该看哪台手机</label>
+  </div>
+
+  <div class="railhead">审计留痕 · AuditLog</div>
+  <div class="audit" id="auditList"></div>
+
+  <div class="railnote">
+    <b>这个原型刻意暴露的工程细节：</b>五阶段归属是数据字段，报告表由 <code>tasks</code> 现场统计得出，不是写死的文案；
+    交接在信息不全或缺一方确认时停在 <b>blocked</b>；看护升级链是纯状态机，代码里没有任何模型调用。
+  </div>
+</aside>
+
+<!-- ═══════════════════ 手机舞台 ═══════════════════ -->
+<main class="stage">
+  <div class="stagehead">
+    <div>
+      <h1 class="serif" id="stageTitle">先看这家人已经「分好工」了</h1>
+      <p id="stageDesc">点左边的「下一步」按脚本走，也可以直接在手机上点任何按钮自己探索。</p>
+    </div>
+  </div>
+
+  <div class="phones">
+    <div class="phone-col">
+      <div class="phone" id="ph-mom"><div class="screen" id="scr-mom"></div></div>
+      <div class="plabel"><b>妈妈 · 林秀</b><span class="role">primary · 主责任人</span><br>capacityState：加班期</div>
+    </div>
+    <div class="phone-col">
+      <div class="phone" id="ph-dad"><div class="screen" id="scr-dad"></div></div>
+      <div class="plabel"><b>爸爸 · 陈建国</b><span class="role">partner · 共同生活成员</span><br>capacityState：正常</div>
+    </div>
+    <div class="phone-col">
+      <div class="phone" id="ph-grandma"><div class="screen" id="scr-grandma" data-senior></div></div>
+      <div class="plabel"><b>奶奶 · 周素兰</b><span class="role">subject · 被看护人</span><br>首页就是聊天，无嵌套导航</div>
+    </div>
+  </div>
+</main>
+
+<script>
+"use strict";
+/* ═══════════════════════════════════════════════════════════════════════════
+   数据模型 —— 严格对齐 PRD 5.4
+   关键：Task 的五个阶段字段是一等字段，报告由它们统计得出，不允许视图层推导。
+   ═══════════════════════════════════════════════════════════════════════════ */
+const MEM = {
+  mom:     { id:'mom',     name:'林秀',   short:'妈妈', role:'primary', capacityState:'加班期', consentAt:'2026-08-19' },
+  dad:     { id:'dad',     name:'陈建国', short:'爸爸', role:'partner', capacityState:'正常',   consentAt:'2026-08-19' },
+  grandma: { id:'grandma', name:'周素兰', short:'奶奶', role:'subject', capacityState:'正常',   consentAt:'2026-08-20' }
+};
+const nameOf = id => id ? (MEM[id] ? MEM[id].short : id) : '无主人';
+
+/* 五阶段字段的中文标签（PRD 4.4.2） */
+const STAGES = [
+  ['discoveredBy',   '发现问题'],
+  ['deadlineKeptBy', '记住截止时间'],
+  ['scheduledBy',    '制定安排'],
+  ['executedBy',     '实际执行'],
+  ['followedUpBy',   '跟进结果']
+];
+const INVISIBLE = ['discoveredBy','deadlineKeptBy','scheduledBy','followedUpBy']; // 执行是可见劳动
+
+let S, timers = [], careTimer = null;
+
+function seed(){
+  S = {
+    space:{ id:'sp1', name:'林家', createdBy:'mom' },
+
+    /* ── L0 原始证据：端内指针 + 最小摘要 ── */
+    evidence:[
+      { id:'e1', speakerId:'grandma', sourceType:'agent_dm',    occurredAt:'08-12 09:20', raw:'腿这两天又疼了，下楼有点吃力', visibility:'care_related', deleted:false },
+      { id:'e2', speakerId:'mom',     sourceType:'agent_dm',    occurredAt:'07-15 16:04', raw:'医生说一个月以后复查，挂骨科', visibility:'space', deleted:false },
+      { id:'e3', speakerId:'mom',     sourceType:'family_group',occurredAt:'08-13 21:11', raw:'要先挂哪个科？上次的报告放哪了', visibility:'space', deleted:false },
+      { id:'e4', speakerId:'grandma', sourceType:'agent_dm',    occurredAt:'07-20 10:02', raw:'我不爱空着肚子出门，下午的号好', visibility:'care_related', deleted:false },
+      { id:'e5', speakerId:'mom',     sourceType:'screenshot',  occurredAt:'08-15 08:40', raw:'[学校通知截图] 新生体检表请于 8 月 28 日前交回', visibility:'space', deleted:false },
+      { id:'e6', speakerId:'dad',     sourceType:'agent_dm',    occurredAt:'08-20 19:30', raw:'奶奶血压药一天两次，饭后吃，别忘了', visibility:'care_related', deleted:false },
+      { id:'e7', speakerId:'mom',     sourceType:'agent_dm',    occurredAt:'08-21 22:15', raw:'换季的衣服还没收，柜子塞不下了', visibility:'space', deleted:false },
+      { id:'e8', speakerId:'grandma', sourceType:'agent_dm',    occurredAt:'07-15 17:00', raw:'市三院我熟，别的医院我不去', visibility:'care_related', deleted:false },
+      /* 两条干扰句：只是讨论，见证 Agent 不建任务（PRD 8 演示数据要求） */
+      { id:'e9', speakerId:'dad',     sourceType:'family_group',occurredAt:'08-22 12:30', raw:'明年是不是该考虑换个大点的房子', visibility:'space', deleted:false },
+      { id:'e10',speakerId:'mom',     sourceType:'family_group',occurredAt:'08-23 20:05', raw:'听说隔壁老王家孩子去学游泳了', visibility:'space', deleted:false }
+    ],
+
+    /* ── 见证 Agent 产出的信号 ── */
+    signals:[
+      { id:'s1', text:'奶奶腿疼加重',       domainId:'d_health', confidence:.91, status:'confirmed', evidenceIds:['e1'], promptVersion:'witness@1.3' },
+      { id:'s2', text:'骨科复查一个月到期', domainId:'d_health', confidence:.88, status:'confirmed', evidenceIds:['e2'], promptVersion:'witness@1.3' },
+      { id:'s3', text:'挂号科室未确定',     domainId:'d_health', confidence:.74, status:'confirmed', evidenceIds:['e3'], promptVersion:'witness@1.3' },
+      { id:'s4', text:'检查报告位置未知',   domainId:'d_health', confidence:.71, status:'confirmed', evidenceIds:['e3'], promptVersion:'witness@1.3' },
+      { id:'s5', text:'就诊偏好：下午号',   domainId:'d_health', confidence:.83, status:'confirmed', evidenceIds:['e4','e8'], promptVersion:'witness@1.3' },
+      { id:'s6', text:'体检表 8/28 截止',   domainId:'d_school', confidence:.95, status:'confirmed', evidenceIds:['e5'], promptVersion:'witness@1.3' },
+      { id:'s7', text:'血压药每日两次',     domainId:'d_health', confidence:.93, status:'confirmed', evidenceIds:['e6'], promptVersion:'witness@1.3' },
+      { id:'s8', text:'换季衣物待收纳',     domainId:'d_home',   confidence:.79, status:'confirmed', evidenceIds:['e7'], promptVersion:'witness@1.3' },
+      /* 低置信度 → 不打扰用户，只入待观察池 */
+      { id:'s9', text:'换房（仅为讨论，无时间约束、无承诺）',   domainId:null, confidence:.21, status:'observing', evidenceIds:['e9'],  promptVersion:'witness@1.3' },
+      { id:'s10',text:'游泳班（他人家事，与本家庭无任务关系）', domainId:null, confidence:.14, status:'observing', evidenceIds:['e10'], promptVersion:'witness@1.3' }
+    ],
+
+    /* ── 责任域：ownerId 为空本身就是要报告的结论 ── */
+    domains:[
+      { id:'d_health', name:'奶奶的近期健康照护', ownerId:null,  status:'active', visibility:'care_related',
+        nextAction:'约市三院骨科下午号，确认是否需要空腹', evidenceIds:['e1','e2','e3','e4','e8'] },
+      { id:'d_school', name:'孩子的开学准备',     ownerId:'mom', status:'active', visibility:'space',
+        nextAction:'8/28 前交回新生体检表', evidenceIds:['e5'] },
+      /* ownerId 仍是妈妈：爸爸执行了其中一件事，但发现/记时间/安排/跟进都还在妈妈身上。
+         这正是 PRD 痛点 1 —— 家务已经分了，隐形劳动没有分。 */
+      { id:'d_home',   name:'家里的日常补给与收纳', ownerId:'mom', status:'active', visibility:'space',
+        nextAction:'暂无待办 · 上一件已由爸爸执行完成', evidenceIds:['e7'] }
+    ],
+
+    /* ── Task 五阶段归属：一等字段（P0 第一项） ── */
+    tasks:[
+      /* d_health —— 全部隐形劳动都在妈妈身上，且责任域无主人 */
+      { id:'t1', domainId:'d_health', title:'挂市三院骨科复查号', dueAt:'08-29', status:'open', inWeek:true,
+        discoveredBy:'mom', deadlineKeptBy:'mom', scheduledBy:'mom', executedBy:'mom', followedUpBy:'mom', evidenceIds:['e2','e3'] },
+      { id:'t2', domainId:'d_health', title:'确认复查是否需要空腹', dueAt:null, status:'open', inWeek:false,
+        discoveredBy:'mom', deadlineKeptBy:'mom', scheduledBy:'mom', executedBy:null, followedUpBy:'mom', evidenceIds:['e4'] },
+      { id:'t3', domainId:'d_health', title:'找出上次的检查报告', dueAt:null, status:'open', inWeek:false,
+        discoveredBy:'mom', deadlineKeptBy:'mom', scheduledBy:'mom', executedBy:null, followedUpBy:'mom', evidenceIds:['e3'] },
+      { id:'t4', domainId:'d_health', title:'陪诊当天到场', dueAt:'08-29', status:'open', inWeek:false,
+        discoveredBy:'mom', deadlineKeptBy:'mom', scheduledBy:'mom', executedBy:null, followedUpBy:'mom', evidenceIds:['e2'] },
+      { id:'t5', domainId:'d_health', title:'两周后复诊预约', dueAt:'09-12', status:'open', inWeek:false,
+        discoveredBy:'mom', deadlineKeptBy:'mom', scheduledBy:'mom', executedBy:null, followedUpBy:'mom', evidenceIds:['e2'] },
+      /* d_school —— 妈妈自己的责任域，隐形劳动也全在她身上 */
+      { id:'t6', domainId:'d_school', title:'交回新生体检表', dueAt:'08-28', status:'open', inWeek:true,
+        discoveredBy:'mom', deadlineKeptBy:'mom', scheduledBy:'mom', executedBy:'mom', followedUpBy:'mom', evidenceIds:['e5'] },
+      { id:'t7', domainId:'d_school', title:'买齐校服与文具', dueAt:'08-31', status:'open', inWeek:false,
+        discoveredBy:'mom', deadlineKeptBy:'mom', scheduledBy:'mom', executedBy:null, followedUpBy:'mom', evidenceIds:['e5'] },
+      /* d_home —— 爸爸执行了，但发现/记时间/安排/跟进仍是妈妈 → 「分了工，没分隐形劳动」
+         这条也让「仅执行参与」这个指标真的算出爸爸：有执行、无隐形劳动、拥有责任域数为 0 */
+      { id:'t8', domainId:'d_home', title:'收换季衣物', dueAt:'08-25', status:'done', inWeek:true,
+        discoveredBy:'mom', deadlineKeptBy:'mom', scheduledBy:'mom', executedBy:'dad', followedUpBy:'mom', evidenceIds:['e7'] }
+    ],
+
+    handovers:[],
+
+    /* ── 看护规则：AI 只出草稿，必须人工确认才激活（PRD 4.6.1） ── */
+    careRules:[
+      { id:'cr1', subjectId:'grandma', title:'血压药', schedule:'每天 08:00 / 20:00', requireAck:true,
+        ackTimeoutSec:60, escalationChain:[{level:1,to:['dad'],delay:0},{level:2,to:['mom','dad'],delay:0}],
+        primaryCaregiverId:'dad', createdFromEvidenceId:'e6', confirmedBy:'dad', confirmedAt:'08-20 19:34', status:'active' },
+      { id:'cr2', subjectId:'grandma', title:'每周量一次血压并记录', schedule:'每周日 09:00', requireAck:true,
+        ackTimeoutSec:60, escalationChain:[{level:1,to:['dad'],delay:0}],
+        primaryCaregiverId:'dad', createdFromEvidenceId:'e6', confirmedBy:null, confirmedAt:null, status:'draft' }
+    ],
+    careEvents:[],
+
+    /* ── 会话 ── */
+    chats:{ dm_mom:[], dm_dad:[], dm_grandma:[], family:[] },
+
+    audit:[],
+    ui:{
+      mom:{ tab:'map', sheet:null, toast:null },
+      dad:{ tab:'duty', sheet:null, toast:null },
+      grandma:{ sheet:null, toast:null }
+    },
+    flags:{ aiAnalysis:{mom:true,dad:true,grandma:true}, dadAway:false, reportSeen:false },
+    step:0,
+    ackTimeoutMs:60000
+  };
+
+  /* ── 会话初始内容 ── */
+  S.chats.family = [
+    { id:'m1', t:'sep',  text:'8 月 25 日 周一' },
+    { id:'m2', from:'mom', kind:'text', text:'今晚我加班，饭在锅里，你俩先吃' },
+    { id:'m3', from:'dad', kind:'text', text:'行，我把碗洗了' },
+    { id:'m4', from:'mom', kind:'text', text:'奶奶那个复查你有空顺便看一下吧' },
+    { id:'m5', from:'dad', kind:'text', text:'好，你安排好告诉我时间' }
+  ];
+  S.chats.dm_grandma = [
+    { id:'g1', t:'sep', text:'今天 上午 8:14' },
+    { id:'g2', from:'agent', kind:'text', text:'奶奶早上好。昨天睡得还行吗？' }
+  ];
+  S.chats.dm_mom = [
+    { id:'mm1', t:'sep', text:'今天 上午 7:50' },
+    { id:'mm2', from:'agent', kind:'text', text:'早。你昨天说的换季衣物，建国周末已经收了，这条我从你的待办里去掉了。' }
+  ];
+  S.chats.dm_dad = [
+    { id:'dd1', t:'sep', text:'8 月 20 日 晚上 7:30' },
+    { id:'dd2', from:'dad', kind:'text', text:'奶奶血压药一天两次，饭后吃，别忘了' },
+    { id:'dd3', from:'agent', kind:'card', card:'ruleDraft', ruleId:'cr1' }
+  ];
+}
+
+/* ═══════════════════════════ 派生计算（不写死数字） ═══════════════════════════ */
+const domainOf = id => S.domains.find(d => d.id === id);
+const evOf = id => S.evidence.find(e => e.id === id);
+const liveEv = ids => (ids||[]).filter(i => { const e = evOf(i); return e && !e.deleted; });
+const taskEvidenceMissing = t => (t.evidenceIds||[]).length > 0 && liveEv(t.evidenceIds).length === 0;
+
+/* 「这周，有哪些事一直只有你在记得？」
+   = 该成员独自承担全部四项隐形劳动，且所属责任域没有交给别人 */
+function onlyIRemember(memberId){
+  return S.tasks.filter(t => {
+    if (t.status === 'done') return false;
+    const d = domainOf(t.domainId);
+    if (d && d.ownerId && d.ownerId !== memberId) return false;
+    return INVISIBLE.every(f => t[f] === memberId);
+  });
+}
+
+/* 本周责任集中度：由 tasks 的五阶段字段现场统计 */
+function weeklyReport(){
+  const rows = STAGES.map(([field,label]) => {
+    const row = { field, label, counts:{} };
+    Object.keys(MEM).forEach(m => row.counts[m] = 0);
+    S.tasks.filter(t => t.inWeek).forEach(t => {
+      if (t[field] && row.counts[t[field]] !== undefined) row.counts[t[field]]++;
+    });
+    return row;
+  });
+  /* 指标（PRD 4.4.3） */
+  const invisibleBy = {}, allBy = {};
+  Object.keys(MEM).forEach(m => { invisibleBy[m] = 0; allBy[m] = 0; });
+  S.tasks.filter(t => t.inWeek).forEach(t => {
+    STAGES.forEach(([f]) => {
+      if (!t[f]) return;
+      allBy[t[f]]++;
+      if (INVISIBLE.includes(f)) invisibleBy[t[f]]++;
+    });
+  });
+  const totalInvisible = Object.values(invisibleBy).reduce((a,b)=>a+b,0);
+  const topId = Object.keys(invisibleBy).sort((a,b)=>invisibleBy[b]-invisibleBy[a])[0];
+  const ownerless = S.domains.filter(d => !d.ownerId).length;
+  const execOnly = Object.keys(MEM).filter(m =>
+    allBy[m] > 0 && invisibleBy[m] === 0 && S.domains.filter(d=>d.ownerId===m).length === 0);
+  return {
+    rows,
+    invisibleShare: m => allBy[m] ? Math.round(invisibleBy[m]/allBy[m]*100) : 0,
+    concentration: totalInvisible ? Math.round(invisibleBy[topId]/totalInvisible*100) : 0,
+    topId, ownerless, execOnly, invisibleBy, allBy
+  };
+}
+</script>
+
+<script>
+"use strict";
+/* ═══════════════════════════════════════════════════════════════════════════
+   渲染层
+   ═══════════════════════════════════════════════════════════════════════════ */
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const A = (act, extra='') => `data-act="${act}" ${extra}`;
+
+const ICONS = {
+  map:'<svg viewBox="0 0 24 24"><path d="M3 9.5 12 3l9 6.5V21H3z"/><path d="M9 21v-7h6v7"/></svg>',
+  todo:'<svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>',
+  chat:'<svg viewBox="0 0 24 24"><path d="M21 11.6a8 8 0 1 1-4-6.9"/><path d="M3.2 20.4 4.7 16"/></svg>',
+  me:'<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.4"/><path d="M5 20.5c1.2-4 3.7-5.6 7-5.6s5.8 1.6 7 5.6"/></svg>',
+  care:'<svg viewBox="0 0 24 24"><path d="M12 20.5S4 15.6 4 10.2A4.2 4.2 0 0 1 12 8a4.2 4.2 0 0 1 8 2.2c0 5.4-8 10.3-8 10.3z"/></svg>',
+  duty:'<svg viewBox="0 0 24 24"><path d="M5 4h11l3 3v13H5z"/><path d="M8.5 12.5l2 2 4-4.5"/></svg>'
+};
+
+function statusbar(time){
+  return `<div class="statusbar"><span>${time}</span><span class="r">●●●&nbsp; ⏻&nbsp;84%</span></div>`;
+}
+function navbar(title, sub, opts={}){
+  return `<div class="navbar">
+    <button class="nb" ${opts.back ? A(opts.back) : 'disabled'} aria-label="返回">${opts.back?'‹':''}</button>
+    <div class="nt">${esc(title)}${sub?`<small>${esc(sub)}</small>`:''}</div>
+    <button class="nr" ${opts.more ? A(opts.more) : 'disabled'} aria-label="更多">${opts.more?'⋯':''}</button>
+  </div>`;
+}
+function tabbar(who, tabs, cur){
+  return `<div class="tabbar">${tabs.map(t=>`
+    <button class="${t.k===cur?'on':''}" ${A('tab', `data-who="${who}" data-tab="${t.k}"`)}>
+      <span class="${t.dot?'badgedot':''}">${ICONS[t.i]}</span>${t.n}
+    </button>`).join('')}</div>`;
+}
+function evBtn(id){
+  const e = evOf(id); if (!e) return '';
+  return `<button class="ev ${e.deleted?'gone':''}" ${A('ev', `data-ev="${id}"`)}>
+    ◷ ${esc(nameOf(e.speakerId))} ${esc(e.occurredAt)}</button>`;
+}
+function evList(ids){ return (ids||[]).map(evBtn).join(''); }
+function stageChips(t, viewer){
+  return `<div class="stages">${STAGES.map(([f,l])=>{
+    const v = t[f];
+    const cls = !v ? '' : (v===viewer ? 'me' : 'you');
+    return `<span class="stg ${cls}">${l}·${v?esc(nameOf(v)):'—'}</span>`;
+  }).join('')}</div>`;
+}
+
+/* ─────────────────── 聊天渲染 ─────────────────── */
+function renderChat(chatId, viewer){
+  return S.chats[chatId].map(m => {
+    if (m.t === 'sep')  return `<div class="timesep"><span>${esc(m.text)}</span></div>`;
+    if (m.t === 'sys')  return `<div class="syssep"><span>${esc(m.text)}</span></div>`;
+    const mine = m.from === viewer;
+    const isAgent = m.from === 'agent';
+    const av = isAgent ? `<div class="av ai">记</div>` : `<div class="av">${esc(nameOf(m.from))}</div>`;
+    const showWho = chatId === 'family' && !isAgent;
+    const inner = m.kind === 'card' ? renderCard(m, viewer) : bubble(m);
+    return `<div class="msg ${mine?'me':''}">${av}
+      <div class="wrapb ${m.kind==='card'?'wide':''}">
+        ${showWho?`<span class="who">${esc(nameOf(m.from))}</span>`:''}
+        ${inner}
+      </div></div>`;
+  }).join('');
+}
+function bubble(m){
+  if (m.voice) {
+    const bars = [7,11,15,9,13,6,10,14,8].map(h=>`<i style="height:${h}px"></i>`).join('');
+    return `<div class="bubble"><span class="voice">◉ <span class="wave">${bars}</span> ${m.voice}″</span>
+      <div style="font-size:calc(var(--fs) - 4px);opacity:.8;margin-top:6px">${esc(m.text)}</div></div>`;
+  }
+  return `<div class="bubble">${esc(m.text).replace(/\n/g,'<br>')}</div>`;
+}
+
+/* ─────────────────── 卡片消息 ─────────────────── */
+function renderCard(m, viewer){
+  switch (m.card) {
+
+    /* 同意门：私聊 → 家庭库的唯一通道（PRD 4.3.2） */
+    case 'consent': {
+      const e = evOf(m.evId);
+      if (m.resolved) {
+        const label = { space:'已告诉家里人', members:'只告诉了女儿', self:'没有告诉任何人' }[m.resolved];
+        return `<div class="cardmsg ${m.resolved==='self'?'':'good'}">
+          <div class="ck">同意门 · 已处理</div>
+          <div class="ct">${label}</div>
+          <div class="cf">${m.resolved==='self'
+            ? '这句话只留在你和我之间，没有进家里的记录，也不会出现在任何报告里。'
+            : `写入家庭库时标注「${esc(nameOf(e.speakerId))}本人授权」，visibility = ${m.resolved==='space'?'space':'members:[妈妈]'}。`}</div>
+        </div>`;
+      }
+      return `<div class="cardmsg">
+        <div class="ck">◔ 需要你决定</div>
+        <div class="ct">要不要把这件事告诉家里人？</div>
+        <div class="quote">「${esc(e.raw)}」</div>
+        <div class="opts">
+          <button class="opt primary" ${A('consent',`data-mid="${m.id}" data-v="space"`)}><span class="ico">✓</span>告诉家里人</button>
+          <button class="opt" ${A('consent',`data-mid="${m.id}" data-v="members"`)}><span class="ico">◔</span>只告诉女儿</button>
+          <button class="opt ghost" ${A('consent',`data-mid="${m.id}" data-v="self"`)}><span class="ico">·</span>先别说</button>
+        </div>
+        <div class="cf">你说「先别说」，这句话就只留在我们俩之间。你随时可以改主意。</div>
+      </div>`;
+    }
+
+    /* 责任集中度报告 */
+    case 'report':
+      return `<div class="cardmsg">
+        <div class="ck">本周报告 · 8/19 – 8/25</div>
+        <div class="ct">本周责任集中度</div>
+        <div class="cb" style="margin-top:10px">${reportTable()}</div>
+        <button class="btn sm" style="margin-top:11px" ${A('sheet',`data-who="${viewer}" data-sheet="report"`)}>看完整报告与指标</button>
+      </div>`;
+
+    /* 交接提议 / 交接卡 */
+    case 'handover': {
+      const h = S.handovers.find(x => x.id === m.hid);
+      const d = domainOf(h.domainId);
+      const st = handoverStatus(h);
+      return `<div class="cardmsg ${st.key==='accepted'?'good':(st.key==='blocked'?'alert':'')}">
+        <div class="ck">责任交接 · ${h.id}</div>
+        <div class="ct">${m.propose ? `要不要把「${esc(d.name)}」整块交给${esc(nameOf(h.toId))}？` : esc(d.name)}</div>
+        <div class="cb">${m.propose
+          ? '不是把「陪奶奶去一次医院」分给他，是把发现、记时间、安排、执行、跟进整块交给他。'
+          : `${esc(nameOf(h.fromId))} → ${esc(nameOf(h.toId))}`}</div>
+        <div class="spill ${st.key}"><span class="d"></span>${st.label}</div>
+        <button class="btn sm primary" style="margin-top:11px" ${A('sheet',`data-who="${viewer}" data-sheet="handover:${h.id}"`)}>打开交接包</button>
+      </div>`;
+    }
+
+    /* 看护规则草稿 → 必须人工确认才激活 */
+    case 'ruleDraft': {
+      const r = S.careRules.find(x => x.id === m.ruleId);
+      const active = r.status === 'active';
+      return `<div class="cardmsg ${active?'good':''}">
+        <div class="ck">看护规则草稿 · 抽取自你这句话</div>
+        <div class="ct">${esc(r.title)}</div>
+        <div class="cb">
+          时间：${esc(r.schedule)}<br>
+          需要奶奶回应：${r.requireAck?'是':'否'} · 超时 ${r.ackTimeoutSec} 秒<br>
+          升级链：奶奶本人 → L1 ${r.escalationChain[0].to.map(nameOf).join('、')}${r.escalationChain[1]?` → L2 ${r.escalationChain[1].to.map(nameOf).join('、')}`:''}
+        </div>
+        ${evBtn(r.createdFromEvidenceId)}
+        ${active
+          ? `<div class="cf">✓ ${esc(nameOf(r.confirmedBy))}于 ${esc(r.confirmedAt)} 确认激活。之后的定时、超时、升级全部由确定性程序执行。</div>`
+          : `<div class="opts"><button class="opt primary" ${A('activateRule',`data-rule="${r.id}"`)}><span class="ico">✓</span>确认并激活</button>
+             <button class="opt ghost" ${A('editRule')}><span class="ico">✎</span>需要改一下</button></div>
+             <div class="cf">我不会自己激活。没有人确认，这条规则就一直是草稿。</div>`}
+      </div>`;
+    }
+
+    /* 看护提醒（发给被看护人本人） */
+    case 'careRemind': {
+      const ce = S.careEvents.find(x => x.id === m.ceid);
+      const r = S.careRules.find(x => x.id === ce.careRuleId);
+      const done = ['acked','handled','closed'].includes(ce.state);
+      return `<div class="cardmsg ${done?'good':''}">
+        <div class="ck">${done?'✓ 已记录':'该吃药了'}</div>
+        <div class="ct">${esc(r.title)} · ${esc(ce.slot)}</div>
+        <div class="cb">${done ? '好，我记下了。你不用再管这件事。' : '饭后吃。吃完点一下下面的按钮就行。'}</div>
+        ${done ? '' : `<div class="opts">
+          <button class="opt primary ackbig" ${A('ack',`data-ce="${ce.id}"`)}><span class="ico">✓</span>我吃了</button>
+          <button class="opt" ${A('ackLater',`data-ce="${ce.id}"`)}><span class="ico">◷</span>等一会儿再吃</button>
+        </div>`}
+        <div class="cf">${done?'':'不用打字，点一下，或者按住说一句话都可以。'}</div>
+      </div>`;
+    }
+
+    /* 升级通知 */
+    case 'escalate': {
+      const ce = S.careEvents.find(x => x.id === m.ceid);
+      const r = S.careRules.find(x => x.id === ce.careRuleId);
+      const L = m.level;
+      return `<div class="cardmsg alert">
+        <div class="ck">升级 L${L} · 确定性状态机</div>
+        <div class="ct">${esc(nameOf(r.subjectId))}没有回应${esc(r.title)}提醒</div>
+        <div class="cb">${L===1
+          ? `已通知主看护人${esc(nameOf(r.primaryCaregiverId))}。若仍无响应，将升级到其他家庭成员。`
+          : '已通知其他家庭成员。建议有人打个电话或到现场确认一下。'}</div>
+        ${machineTrace(ce)}
+        ${L===2 ? `<div class="cf">系统不判断奶奶发生了什么，只建议有人去看一眼。最后一跳永远是「让家人到现场」。</div>` : ''}
+        <button class="btn sm primary" style="margin-top:10px" ${A('handleCare',`data-ce="${ce.id}"`)}>我来处理</button>
+      </div>`;
+    }
+
+    case 'careClosed': {
+      const ce = S.careEvents.find(x => x.id === m.ceid);
+      return `<div class="cardmsg good">
+        <div class="ck">闭环 · closed</div>
+        <div class="ct">${esc(m.text)}</div>
+        ${machineTrace(ce)}
+        <div class="cf">本次提醒、超时、每一级升级、闭环全部写入 CareEvent。这一段代码里没有任何模型调用。</div>
+      </div>`;
+    }
+
+    /* 换个说法（交接沟通助手 · PRD 4.8） */
+    case 'rewrite':
+      return `<div class="cardmsg">
+        <div class="ck">交接沟通助手 · 只改你还没发出的话</div>
+        <div class="cb" style="margin-top:0">
+          <div style="font-size:11.5px;color:var(--dim);margin-bottom:5px">你原来想发：</div>
+          <div class="quote" style="border-left-color:var(--warn)">「${esc(m.before)}」</div>
+          <div style="font-size:11.5px;color:var(--dim);margin:10px 0 5px">换个说法（事实 + 我的需求 + 具体请求）：</div>
+          <div class="quote">「${esc(m.after)}」</div>
+        </div>
+        <div class="opts">
+          <button class="opt primary" ${A('sendRewrite',`data-mid="${m.id}"`)}><span class="ico">↗</span>用这句发送</button>
+          <button class="opt ghost" ${A('keepOriginal',`data-mid="${m.id}"`)}><span class="ico">·</span>还是发我原来那句</button>
+        </div>
+        <div class="cf">我只改你自己的表达。不会评价对方，不会替你去说，也不保存任何「矛盾记录」。</div>
+      </div>`;
+  }
+  return '';
+}
+
+function machineTrace(ce){
+  const order = ['scheduled','notified','ack_timeout','escalated_L1','escalated_L2','handled','closed'];
+  const idx = order.indexOf(ce.state);
+  return `<div class="machine">${order.map((s,i)=>{
+    const on = i <= idx;
+    const warn = on && (s==='ack_timeout' || s.startsWith('escalated'));
+    return `<span class="mst ${on?(warn?'warn':'on'):''}">${s}</span>`;
+  }).join('')}</div>`;
+}
+
+/* ─────────────────── 报告表（由 tasks 现场统计） ─────────────────── */
+function reportTable(){
+  const r = weeklyReport();
+  return `<div class="rep"><table>
+    <thead><tr><th>工作阶段</th><th>妈妈</th><th>爸爸</th></tr></thead>
+    <tbody>${r.rows.map(row=>{
+      const a = row.counts.mom, b = row.counts.dad, tot = a+b;
+      return `<tr>
+        <td>${row.label}<div class="bar">
+          <i class="a" style="width:${tot?a/tot*100:0}%"></i><i class="b" style="width:${tot?b/tot*100:0}%"></i></div></td>
+        <td><b>${a}</b></td><td><b>${b}</b></td></tr>`;
+    }).join('')}</tbody>
+  </table>
+  <p class="narr">本周家庭协调工作集中在一位成员身上。执行任务有所分担，但发现、安排与跟进尚未形成完整的责任所有权。</p>
+  </div>`;
+}
+
+/* ═══════════════════════ 妈妈（primary）══════════════════════ */
+function screenMom(){
+  const u = S.ui.mom, tabs = [
+    {k:'map', n:'责任地图', i:'map'},
+    {k:'todo',n:'待办', i:'todo'},
+    {k:'chat',n:'对话', i:'chat', dot:S.chats.family.some(m=>m.unread)},
+    {k:'me',  n:'我', i:'me'}
+  ];
+  let head, body;
+  if (u.tab === 'map')  { head = navbar('都记得','林家 · 3 位成员',{more:'noop'}); body = momMap(); }
+  if (u.tab === 'todo') { head = navbar('待办','按责任域分组，不是平铺清单'); body = momTodo(); }
+  if (u.tab === 'chat') { head = navbar('对话','1:1 与家庭群'); body = chatList('mom'); }
+  if (u.tab === 'me')   { head = navbar('我','隐私与数据控制'); body = privacyCenter('mom'); }
+  if (u.tab === 'dm')   { head = navbar('都记得','你的 1:1 对话',{back:'backMom'}); body = `<div class="body chat">${renderChat('dm_mom','mom')}</div>` + inputbar('mom'); }
+  if (u.tab === 'group'){ head = navbar('林家（3）','都记得 · 家庭群',{back:'backMom'}); body = `<div class="body chat">${renderChat('family','mom')}</div>` + inputbar('mom',true); }
+  const showTabs = !['dm','group'].includes(u.tab);
+  return statusbar('9:41') + head + body + (showTabs ? tabbar('mom', tabs, u.tab) : '') + overlay('mom');
+}
+
+function momMap(){
+  const list = onlyIRemember('mom');
+  const r = weeklyReport();
+  const obs = S.signals.filter(s => s.status === 'observing');
+  return `<div class="body">
+    <div class="hero">
+      <div class="q">这周，有哪些事<br>一直只有你在记得？</div>
+      <div class="cnt"><b id="momCount" class="${S.ui.mom.pop?'pop':''}">${list.length}</b>
+        <span>件事的发现、记住时间、<br>安排和跟进都落在你身上</span></div>
+    </div>
+
+    <div class="sec">
+      <div class="sechead"><span class="eyebrow">责任域</span><span class="eyebrow">${S.domains.length} 个</span></div>
+      ${S.domains.map(d => domainCard(d,'mom')).join('')}
+    </div>
+
+    <div class="sec">
+      <div class="sechead"><span class="eyebrow">本周责任集中度</span><span class="eyebrow">8/19 – 8/25</span></div>
+      <div class="card">
+        ${reportTable()}
+        <button class="btn sm" style="margin-top:11px" ${A('sheet','data-who="mom" data-sheet="report"')}>指标与修正入口</button>
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="sechead"><span class="eyebrow">见证 Agent 没有建任务的内容</span><span class="eyebrow">${obs.length} 条</span></div>
+      <div class="obs">
+        ${obs.map(s=>`<div class="oi"><q>「${esc(evOf(s.evidenceIds[0]).raw)}」</q><br>
+          <em>置信度 ${(s.confidence*100).toFixed(0)}% · 低于阈值，只入待观察池</em> — ${esc(s.text.replace(/^[^（]*（/,'').replace(/）$/,''))}</div>`).join('')}
+      </div>
+    </div>
+  </div>`;
+}
+
+function domainCard(d, viewer){
+  const ts = S.tasks.filter(t => t.domainId === d.id && t.status !== 'done');
+  const badge = !d.ownerId ? `<span class="badge none">无主人</span>`
+    : d.ownerId === viewer ? `<span class="badge mine">主人：你</span>`
+    : `<span class="badge other">主人：${esc(nameOf(d.ownerId))}</span>`;
+  const missing = ts.some(taskEvidenceMissing);
+  return `<button class="card dcard ${d.leaving?'leaving':''} ${d.entering?'entering':''}"
+      ${A('sheet',`data-who="${viewer}" data-sheet="domain:${d.id}"`)} style="width:100%;text-align:left">
+    <div class="r1"><div class="nm">${esc(d.name)}</div>${badge}</div>
+    <div class="meta">下一步：${esc(d.nextAction)}<br>
+      ${ts.length} 项未完成 · 关联 ${liveEv(d.evidenceIds).length} 条证据${d.handedOverAt?` · ${esc(d.handedOverAt)} 已交接`:''}</div>
+    ${missing?`<div class="meta" style="color:var(--warn)">⚠ 有结论的证据被删除，待重算</div>`:''}
+    ${evList(d.evidenceIds.slice(0,2))}
+  </button>`;
+}
+
+function momTodo(){
+  const groups = S.domains.map(d => ({ d, ts: S.tasks.filter(t =>
+    t.domainId===d.id && t.status!=='done' && (!d.ownerId || d.ownerId==='mom')) }))
+    .filter(g => g.ts.length);
+  if (!groups.length) return `<div class="body"><div class="empty">
+    <span class="big">这里空了</span>你负责的事都有主人，或者都做完了。</div></div>`;
+  return `<div class="body">
+    ${groups.map(g=>`<div class="sec">
+      <div class="sechead"><span class="eyebrow">${esc(g.d.name)}</span>
+        <span class="badge ${g.d.ownerId?'mine':'none'}">${g.d.ownerId?'主人：你':'无主人'}</span></div>
+      ${g.ts.map(t=>`<div class="card">
+        <div class="r1" style="display:flex;justify-content:space-between;gap:9px">
+          <div class="nm" style="font-size:13.5px">${esc(t.title)}</div>
+          ${t.dueAt?`<span class="badge ${t.dueAt<'08-28'?'warn':'mine'}">${esc(t.dueAt)}</span>`:''}
+        </div>
+        ${stageChips(t,'mom')}
+        ${taskEvidenceMissing(t)?`<div class="meta" style="color:var(--warn);font-size:11.5px;margin-top:8px">⚠ 证据已删除，此结论待重算</div>`:evList(t.evidenceIds)}
+      </div>`).join('')}
+    </div>`).join('')}
+  </div>`;
+}
+
+function chatList(who){
+  const rows = who === 'mom'
+    ? [['dm','都记得','记','你的 1:1 对话，内容默认不进家庭库'],
+       ['group','林家（3）','群','家庭群 · Agent 在这里发提醒和报告']]
+    : [['dm','都记得','记','你的 1:1 对话'],
+       ['group','林家（3）','群','家庭群']];
+  return `<div class="body">
+    ${rows.map(([k,n,ic,sub])=>`<button class="prow" ${A('tab',`data-who="${who}" data-tab="${k}"`)}>
+      <div class="pi" style="${ic==='记'?'background:var(--primary);color:var(--primary-ink);font-family:var(--serif);font-size:15px':''}">${ic}</div>
+      <div class="pt"><b>${esc(n)}</b><span>${esc(sub)}</span></div>
+      <div class="pa">›</div></button>`).join('')}
+    <div class="railnote" style="margin-top:12px;font-size:11.5px;color:var(--dim);background:var(--surface2);padding:12px;border-radius:var(--radius);line-height:1.7">
+      聊天是输入面，不是首页。你的 1:1 内容默认<b style="color:var(--text)">不进</b>家庭库，
+      每一条要进去之前我都会先问你。
+    </div>
+  </div>`;
+}
+
+function inputbar(who, group){
+  return `<div class="inputbar">
+    <button class="ic" aria-label="语音">◉</button>
+    <div class="ib" ${A('compose',`data-who="${who}" data-group="${group?1:0}"`)}>${group?'说点什么…':'跟我说说'}</div>
+    <button class="ic" aria-label="表情">☺</button>
+    <button class="ic" ${A('plus',`data-who="${who}"`)} aria-label="更多">＋</button>
+  </div>`;
+}
+
+/* ═══════════════════════ 爸爸（partner）══════════════════════ */
+function screenDad(){
+  const u = S.ui.dad, pend = S.handovers.filter(h => h.toId==='dad' && !h.toConfirmedAt).length;
+  const tabs = [
+    {k:'duty', n:'我的责任', i:'duty', dot:pend>0},
+    {k:'care', n:'看护', i:'care', dot:S.careRules.some(r=>r.status==='draft')},
+    {k:'chat', n:'对话', i:'chat'},
+    {k:'me',   n:'我', i:'me'}
+  ];
+  let head, body;
+  if (u.tab === 'duty') { head = navbar('我负责的','partner · 共同生活成员'); body = dadDuty(); }
+  if (u.tab === 'care') { head = navbar('看护','规则与事件留痕'); body = dadCare(); }
+  if (u.tab === 'chat') { head = navbar('对话','1:1 与家庭群'); body = chatList('dad'); }
+  if (u.tab === 'me')   { head = navbar('我','隐私与数据控制'); body = privacyCenter('dad'); }
+  if (u.tab === 'dm')   { head = navbar('都记得','你的 1:1 对话',{back:'backDad'}); body = `<div class="body chat">${renderChat('dm_dad','dad')}</div>` + inputbar('dad'); }
+  if (u.tab === 'group'){ head = navbar('林家（3）','都记得 · 家庭群',{back:'backDad'}); body = `<div class="body chat">${renderChat('family','dad')}</div>` + inputbar('dad',true); }
+  const showTabs = !['dm','group'].includes(u.tab);
+  return statusbar('9:41') + head + body + (showTabs ? tabbar('dad', tabs, u.tab) : '') + overlay('dad');
+}
+
+function dadDuty(){
+  const pending = S.handovers.filter(h => h.toId === 'dad' && !h.toConfirmedAt);
+  const mine = S.domains.filter(d => d.ownerId === 'dad');
+  return `<div class="body">
+    ${pending.length ? `<div class="sec">
+      <div class="sechead"><span class="eyebrow">待你确认的交接</span><span class="badge warn">${pending.length}</span></div>
+      ${pending.map(h=>{
+        const d = domainOf(h.domainId), st = handoverStatus(h);
+        return `<button class="card" ${A('sheet',`data-who="dad" data-sheet="handover:${h.id}"`)} style="width:100%;text-align:left">
+          <div class="r1" style="display:flex;justify-content:space-between;gap:9px">
+            <div class="nm">${esc(d.name)}</div><span class="badge ${st.key==='blocked'?'warn':'mine'}">${st.short}</span></div>
+          <div class="meta">${esc(nameOf(h.fromId))}想把这一整块交给你 · ${h.missingInfo.filter(x=>!x.filled).length} 项信息未确定</div>
+          <div class="meta" style="margin-top:6px;color:var(--warn)">${st.key==='blocked'?'信息补齐前，所有权不会转移到你身上':'等你确认接收'}</div>
+        </button>`;
+      }).join('')}
+    </div>` : ''}
+
+    <div class="sec">
+      <div class="sechead"><span class="eyebrow">我拥有的责任域</span><span class="eyebrow">${mine.length} 个</span></div>
+      ${mine.length ? mine.map(d=>domainCard(d,'dad')).join('')
+        : `<div class="empty" style="padding:22px 12px"><span class="big" style="font-size:18px">你还没有拥有任何一整块</span>
+           目前你承担的是执行。发现、记时间、安排和跟进还在别人身上。</div>`}
+    </div>
+
+    <div class="sec">
+      <div class="sechead"><span class="eyebrow">我承担的单项</span></div>
+      ${S.tasks.filter(t=>t.executedBy==='dad').map(t=>`<div class="card">
+        <div class="nm" style="font-size:13.5px">${esc(t.title)}</div>
+        ${stageChips(t,'dad')}
+        <div class="meta" style="margin-top:7px">${INVISIBLE.every(f=>t[f]!=='dad')
+          ? '你执行了这件事，但发现、记时间、安排、跟进都不是你。这就是「分了工，没分隐形劳动」。' : ''}</div>
+      </div>`).join('')}
+    </div>
+  </div>`;
+}
+
+function dadCare(){
+  const rules = S.careRules;
+  const events = S.careEvents.slice().reverse();
+  return `<div class="body">
+    ${S.flags.dadAway ? `<div class="okbox"><b>你已声明「现在有急事」</b>
+      本时段的看护规则临时移交：提醒直接发给奶奶本人，妈妈作为备份进入待命。时段结束后自动恢复。</div>` : ''}
+    <div class="sec">
+      <div class="sechead"><span class="eyebrow">看护规则</span><span class="eyebrow">${rules.length} 条</span></div>
+      ${rules.map(r=>`<div class="card cr">
+        <div class="r1" style="display:flex;justify-content:space-between;gap:9px">
+          <div class="crt">${esc(r.title)}</div>
+          <span class="badge ${r.status==='active'?'ok':'warn'}">${r.status==='active'?'active':'draft · 未激活'}</span>
+        </div>
+        <div class="crm">${esc(r.schedule)} · 需奶奶回应 · 超时 ${r.ackTimeoutSec} 秒<br>
+          升级链：奶奶本人 → ${r.escalationChain.map(l=>`L${l.level} ${l.to.map(nameOf).join('、')}`).join(' → ')}</div>
+        ${evBtn(r.createdFromEvidenceId)}
+        ${r.status==='active'
+          ? `<div class="crm" style="margin-top:8px">✓ ${esc(nameOf(r.confirmedBy))} ${esc(r.confirmedAt)} 确认激活</div>`
+          : `<button class="btn sm primary" style="margin-top:10px" ${A('activateRule',`data-rule="${r.id}"`)}>确认并激活这条规则</button>`}
+      </div>`).join('')}
+    </div>
+
+    <div class="sec">
+      <div class="sechead"><span class="eyebrow">临时不在</span></div>
+      <button class="btn ${S.flags.dadAway?'':'primary'}" ${A('toggleAway')}>
+        ${S.flags.dadAway?'我回来了，恢复看护':'我现在有急事，两小时内不在'}</button>
+    </div>
+
+    <div class="sec">
+      <div class="sechead"><span class="eyebrow">看护事件留痕 · CareEvent</span><span class="eyebrow">${events.length} 条</span></div>
+      ${events.length ? events.map(ce=>{
+        const r = S.careRules.find(x=>x.id===ce.careRuleId);
+        return `<div class="card">
+          <div class="r1" style="display:flex;justify-content:space-between;gap:9px">
+            <div class="nm" style="font-size:13.5px">${esc(r.title)} · ${esc(ce.slot)}</div>
+            <span class="badge ${ce.state==='closed'?'ok':(ce.state==='unresolved'?'warn':'mine')}">${esc(ce.state)}</span></div>
+          ${machineTrace(ce)}
+          <div class="meta" style="margin-top:8px">${ce.log.map(l=>esc(l)).join('<br>')}</div>
+        </div>`;
+      }).join('') : `<div class="empty" style="padding:20px 12px">还没有看护事件。走到 Demo 第 6 步会产生一条完整链路。</div>`}
+    </div>
+  </div>`;
+}
+
+/* ═══════════════════════ 奶奶（subject）══════════════════════ */
+function screenGrandma(){
+  const aiOff = !S.flags.aiAnalysis.grandma;
+  return statusbar('9:41')
+    + navbar('都记得', aiOff ? 'AI 分析已关闭 · 仍可聊天' : '随时可以跟我说话', {more:'grandmaMore'})
+    + `<div class="body chat">${renderChat('dm_grandma','grandma')}</div>`
+    + `<div class="voicebar">
+        <button class="holdtalk" ${A('grandmaTalk')}>◉ 按住说话</button>
+        <div class="alt">
+          <button ${A('grandmaType')}>打字</button>
+          <button ${A('grandmaPhoto')}>拍照片</button>
+        </div>
+      </div>`
+    + overlay('grandma');
+}
+
+/* ═══════════════════════ 隐私中心（PRD 4.9.2 每项都要有入口）══════════════════════ */
+function privacyCenter(who){
+  const on = S.flags.aiAnalysis[who];
+  const m = MEM[who];
+  return `<div class="body">
+    <div class="card" style="display:flex;gap:12px;align-items:center">
+      <div class="pi" style="width:44px;height:44px;border-radius:var(--radius-sm);background:var(--surface2);display:grid;place-items:center;font-size:15px;font-weight:600">${esc(m.short)}</div>
+      <div><div class="nm">${esc(m.name)}</div>
+        <div class="meta">${esc(m.role)} · capacityState：${esc(m.capacityState)}<br>已于 ${esc(m.consentAt)} 完成授权确认</div></div>
+    </div>
+
+    <div class="sec" style="margin-top:16px">
+      <div class="sechead"><span class="eyebrow">数据分层</span></div>
+      <div class="card" style="font-size:11.5px;line-height:1.75;color:var(--dim)">
+        <b style="color:var(--text)">L0 原始证据</b> 聊天原文、语音、截图 —— 留在这台手机里，只有你能看<br>
+        <b style="color:var(--text)">L1 结论</b> 信号、责任域、任务、交接、看护记录 —— 进家庭库，按 visibility 控制<br>
+        <b style="color:var(--text)">L2 模型输入</b> 发给大模型的最小必要片段 —— 姓名换成「妈妈」「奶奶」，手机号地址屏蔽
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="sechead"><span class="eyebrow">你的权利</span></div>
+      <button class="prow" ${A('sheet',`data-who="${who}" data-sheet="evidence"`)}>
+        <div class="pi">◷</div><div class="pt"><b>每条结论来自哪句原话</b><span>证据溯源 · 可单条删除并联动重算</span></div><div class="pa">›</div></button>
+      <button class="prow" ${A('exportData',`data-who="${who}"`)}>
+        <div class="pi">↓</div><div class="pt"><b>导出我的数据</b><span>JSON · 含证据、结论、审计记录</span></div><div class="pa">›</div></button>
+      <button class="prow" ${A('toggleAI',`data-who="${who}"`)}>
+        <div class="pi">◑</div><div class="pt"><b>AI 分析</b><span>${on?'开启中 · 关闭后保留纯聊天能力':'已关闭 · 只聊天，不再产生新信号'}</span></div>
+        <div class="switch ${on?'on':''}"><i></i></div></button>
+      <button class="prow" ${A('revoke',`data-who="${who}"`)}>
+        <div class="pi">⊘</div><div class="pt"><b>撤回授权</b><span>此后不再产生新信号，已有结论可单独处理</span></div><div class="pa">›</div></button>
+      <button class="prow" ${A('sheet',`data-who="${who}" data-sheet="audit"`)}>
+        <div class="pi">≡</div><div class="pt"><b>操作留痕</b><span>AuditLog · ${S.audit.length} 条</span></div><div class="pa">›</div></button>
+      <button class="prow danger" ${A('sheet',`data-who="${who}" data-sheet="delspace"`)}>
+        <div class="pi">⌫</div><div class="pt"><b>删除整个家庭空间</b><span>一键 · 需二次确认 · 不可恢复</span></div><div class="pa">›</div></button>
+    </div>
+
+    <div class="sec">
+      <div class="sechead"><span class="eyebrow">安全边界</span></div>
+      <div class="warnbox"><b>本产品不是医疗设备</b>
+        不提供诊断，不替代急救，不做用药剂量建议，不做症状判断。
+        涉及自伤、家暴、急性医疗症状时，我不会生成任务，而会提示联系专业资源。</div>
+    </div>
+  </div>`;
+}
+</script>
+
+<script>
+"use strict";
+/* ═══════════════════════════════════════════════════════════════════════════
+   交接状态机（PRD 4.5.2）
+   硬性规则：信息不完备 或 任一方未确认 → 状态停在 blocked，所有权不转移
+   ═══════════════════════════════════════════════════════════════════════════ */
+function handoverStatus(h){
+  if (h.status === 'accepted')  return { key:'done',    label:'ACCEPTED · 已交接',        short:'已交接' };
+  if (h.status === 'declined')  return { key:'blocked', label:'DECLINED · 已拒绝',        short:'已拒绝' };
+  const miss = h.missingInfo.filter(x => !x.filled).length;
+  if (miss > 0)                 return { key:'blocked', label:`BLOCKED · 缺 ${miss} 项信息`, short:`blocked · 缺 ${miss} 项` };
+  if (!h.fromConfirmedAt)       return { key:'blocked', label:'BLOCKED · 等提出方确认移交', short:'blocked · 等对方' };
+  if (!h.toConfirmedAt)         return { key:'pending', label:'PENDING_ACK · 等你确认接收', short:'等你确认' };
+  return { key:'done', label:'ACCEPTED · 已交接', short:'已交接' };
+}
+/* 两个确认时间戳都非空才能进 accepted —— 缺一不可 */
+function tryAccept(h){
+  const miss = h.missingInfo.filter(x => !x.filled).length;
+  if (miss === 0 && h.fromConfirmedAt && h.toConfirmedAt && h.status !== 'accepted') {
+    h.status = 'accepted';
+    const d = domainOf(h.domainId);
+    d.ownerId = h.toId;
+    d.entering = true;
+    audit(h.toId, 'handover.accepted', 'Handover', h.id, {ownerId:null}, {ownerId:h.toId});
+    return true;
+  }
+  return false;
+}
+
+function audit(actorId, action, targetType, targetId, before, after){
+  S.audit.unshift({ id:'a'+(S.audit.length+1), actorId, action, targetType, targetId,
+    before, after, at:nowStamp() });
+}
+function nowStamp(){
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}`;
+}
+function pushMsg(chatId, msg){
+  msg.id = msg.id || 'x' + Math.random().toString(36).slice(2,8);
+  S.chats[chatId].push(msg);
+  return msg;
+}
+function toast(who, title, text, warnish){
+  S.ui[who].toast = { title, text, warnish };
+  render();
+  clearTimeout(S.ui[who]._tt);
+  S.ui[who]._tt = setTimeout(()=>{ S.ui[who].toast = null; render(); }, 4600);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   看护升级链 —— 确定性状态机，此函数内没有任何模型调用
+   scheduled → notified → acked → closed
+                        → ack_timeout → escalated_L1 → escalated_L2 → handled → closed
+                                      → unresolved（留痕，不静默消失）
+   ═══════════════════════════════════════════════════════════════════════════ */
+function careStart(ruleId, slot){
+  const r = S.careRules.find(x => x.id === ruleId);
+  if (r.status !== 'active') { toast('dad','规则未激活','这条看护规则还是草稿，需要有人确认才会生效。',true); return null; }
+  const ce = { id:'ce'+(S.careEvents.length+1), careRuleId:ruleId, slot, state:'scheduled',
+    notifiedAt:null, ackedAt:null, escalationLevel:0, escalatedTo:[], closedAt:null, log:[] };
+  S.careEvents.push(ce);
+  ce.state = 'notified'; ce.notifiedAt = nowStamp();
+  ce.log.push(`${ce.notifiedAt}  notified → 提醒已发给${nameOf(r.subjectId)}本人`);
+  pushMsg('dm_grandma', { from:'agent', kind:'card', card:'careRemind', ceid:ce.id });
+  pushMsg('family', { t:'sys', text:`${r.title} · ${slot} 已直接提醒${nameOf(r.subjectId)}本人。等待她回应，超时 ${Math.round(S.ackTimeoutMs/1000)} 秒后升级。` });
+  audit('system', 'care.notified', 'CareEvent', ce.id, null, {state:'notified'});
+  startCountdown(ce);
+  render();
+  return ce;
+}
+function startCountdown(ce){
+  clearInterval(careTimer);
+  ce.deadline = Date.now() + S.ackTimeoutMs;
+  careTimer = setInterval(() => {
+    if (!['notified'].includes(ce.state)) { clearInterval(careTimer); return; }
+    const left = Math.ceil((ce.deadline - Date.now())/1000);
+    const el = document.getElementById('cd-' + ce.id);
+    if (el) el.textContent = left > 0 ? left + ' 秒' : '0 秒';
+    if (left <= 0) { clearInterval(careTimer); careTimeout(ce); }
+  }, 250);
+}
+function careTimeout(ce){
+  const r = S.careRules.find(x => x.id === ce.careRuleId);
+  ce.state = 'ack_timeout';
+  ce.log.push(`${nowStamp()}  ack_timeout → 超过 ${r.ackTimeoutSec} 秒无回应（阈值判定，纯程序）`);
+  audit('system','care.ack_timeout','CareEvent',ce.id,{state:'notified'},{state:'ack_timeout'});
+  render();
+  timers.push(setTimeout(()=>escalate(ce,1), 900));
+}
+function escalate(ce, level){
+  if (['handled','closed','acked'].includes(ce.state)) return;
+  const r = S.careRules.find(x => x.id === ce.careRuleId);
+  const link = r.escalationChain.find(l => l.level === level);
+  if (!link) {
+    ce.state = 'unresolved';
+    ce.log.push(`${nowStamp()}  unresolved → 升级链走完仍无人处理，留痕不消失`);
+    render(); return;
+  }
+  ce.state = 'escalated_L' + level;
+  ce.escalationLevel = level;
+  ce.escalatedTo = link.to.slice();
+  ce.log.push(`${nowStamp()}  escalated_L${level} → 通知 ${link.to.map(nameOf).join('、')}`);
+  audit('system','care.escalated','CareEvent',ce.id,{level:level-1},{level});
+  pushMsg('family', { from:'agent', kind:'card', card:'escalate', ceid:ce.id, level });
+  link.to.forEach(m => { if (S.chats['dm_'+m]) pushMsg('dm_'+m, { from:'agent', kind:'card', card:'escalate', ceid:ce.id, level }); });
+  render();
+  if (level < r.escalationChain.length) timers.push(setTimeout(()=>escalate(ce, level+1), 1900));
+}
+function careAck(ceid, byGrandma){
+  const ce = S.careEvents.find(x => x.id === ceid);
+  if (!ce || ['closed'].includes(ce.state)) return;
+  clearInterval(careTimer); timers.forEach(clearTimeout); timers = [];
+  const r = S.careRules.find(x => x.id === ce.careRuleId);
+  if (byGrandma) {
+    ce.state = 'acked'; ce.ackedAt = nowStamp();
+    ce.log.push(`${ce.ackedAt}  acked → ${nameOf(r.subjectId)}本人一次点击完成回应`);
+  } else {
+    ce.state = 'handled';
+    ce.log.push(`${nowStamp()}  handled → ${nameOf('dad')}打电话确认，奶奶已服药`);
+  }
+  ce.state = 'closed'; ce.closedAt = nowStamp();
+  ce.log.push(`${ce.closedAt}  closed → 本次闭环`);
+  audit(byGrandma ? 'grandma' : 'dad', 'care.closed', 'CareEvent', ce.id, {state:'escalated'}, {state:'closed'});
+  const txt = byGrandma ? `${nameOf(r.subjectId)}回应「我吃了」，已闭环` : '爸爸确认奶奶已服药，已闭环';
+  pushMsg('family', { from:'agent', kind:'card', card:'careClosed', ceid:ce.id, text:txt });
+  render();
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   底部抽屉 sheet
+   ═══════════════════════════════════════════════════════════════════════════ */
+function overlay(who){
+  const u = S.ui[who];
+  const t = u.toast;
+  const toastHtml = t ? `<div class="toast show ${t.warnish?'warnish':''}"><b>${esc(t.title)}</b>${esc(t.text)}</div>` : '';
+  if (!u.sheet) return toastHtml + `<div class="scrim"></div><div class="sheet"></div>`;
+  const s = sheetContent(who, u.sheet);
+  return toastHtml
+    + `<div class="scrim show" ${A('closeSheet',`data-who="${who}"`)}></div>
+       <div class="sheet show">
+         <div class="sh"><div class="st">${esc(s.title)}${s.sub?`<small>${esc(s.sub)}</small>`:''}</div>
+           <button ${A('closeSheet',`data-who="${who}"`)} aria-label="关闭">✕</button></div>
+         <div class="sb">${s.body}</div>
+       </div>`;
+}
+
+function sheetContent(who, key){
+  const [kind, arg] = key.split(':');
+
+  if (kind === 'report') {
+    const r = weeklyReport();
+    return { title:'本周责任集中度', sub:'8/19 – 8/25 · 由 Task 五阶段字段统计', body:`
+      ${reportTable()}
+      <div class="card" style="margin-top:12px">
+        <div class="eyebrow" style="margin-bottom:9px">指标</div>
+        <div class="mtr"><span>妈妈的隐形劳动占比</span><b>${r.invisibleShare('mom')}%</b></div>
+        <div class="mtr"><span>爸爸的隐形劳动占比</span><b>${r.invisibleShare('dad')}%</b></div>
+        <div class="mtr"><span>协调集中度</span><b>${r.concentration}%</b></div>
+        <div class="mtr"><span>无主责任域数</span><b>${r.ownerless}</b></div>
+        <div class="mtr"><span>仅执行参与</span><b>${r.execOnly.length?r.execOnly.map(nameOf).join('、'):'无'}</b></div>
+      </div>
+      <div class="card">
+        <div class="eyebrow" style="margin-bottom:9px">这张表怎么来的</div>
+        <p style="font-size:12px;line-height:1.75;color:var(--dim)">
+          每个 Task 上有五个一等字段：<b style="color:var(--text)">discoveredBy / deadlineKeptBy / scheduledBy / executedBy / followedUpBy</b>。
+          它们由 AI 从证据里推断出草稿，落库后由你确认或修正。这张表是对这些字段的计数，不是模型现场生成的文案。
+        </p>
+      </div>
+      <div class="card">
+        <div class="eyebrow" style="margin-bottom:9px">归属推断错了？</div>
+        <p style="font-size:12px;line-height:1.7;color:var(--dim);margin-bottom:10px">一键修正，修正动作写入 AuditLog。</p>
+        ${S.tasks.filter(t=>t.inWeek).map(t=>`<div style="padding:9px 0;border-top:1px solid var(--line)">
+          <div style="font-size:12.5px;font-weight:600">${esc(t.title)}</div>
+          ${stageChips(t, who)}
+          <button class="btn sm" style="margin-top:8px" ${A('fixStage',`data-task="${t.id}"`)}>把「实际执行」改成${t.executedBy==='dad'?'妈妈':'爸爸'}</button>
+        </div>`).join('')}
+      </div>
+      <div class="warnbox" style="margin-top:12px"><b>这里不出现的东西</b>
+        没有总分、没有等级、没有排名，不给任何成员标红。数字只用来呈现分布。
+        公平也不是机械五五开 —— 妈妈当前 capacityState 是「加班期」，这是交接建议的输入。</div>
+    `};
+  }
+
+  if (kind === 'handover') {
+    const h = S.handovers.find(x => x.id === arg);
+    const d = domainOf(h.domainId);
+    const st = handoverStatus(h);
+    const miss = h.missingInfo.filter(x => !x.filled);
+    const isTo = who === h.toId, isFrom = who === h.fromId;
+    return { title:'交接包', sub:`${h.id} · ${d.name}`, body:`
+      <div class="hpk">
+        <div class="hh">
+          <div class="t">${esc(d.name)}</div>
+          <div class="flow">
+            <span class="av2">${esc(nameOf(h.fromId))}</span>移交
+            <span class="ar">──→</span>
+            接手<span class="av2">${esc(nameOf(h.toId))}</span>
+          </div>
+          <div class="spill ${st.key}"><span class="d"></span>${st.label}</div>
+        </div>
+        <div class="hs"><h5>这一整块包含什么</h5><p>${esc(h.packet.scope)}</p></div>
+        <div class="hs"><h5>历史记录</h5><ul>${h.packet.history.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>
+        <div class="hs"><h5>关键约束</h5><ul>${h.packet.constraints.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>
+        <div class="hs"><h5>相关联系人</h5><ul>${h.packet.contacts.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>
+        <div class="hs ${miss.length?'miss':''}">
+          <h5>未确定事项 · ${miss.length?miss.length+' 项':'已补齐'}</h5>
+          <ul>${h.missingInfo.map(x=>`<li class="${x.filled?'filled':''}">${esc(x.q)}${x.filled?` — ${esc(x.a)}`:''}</li>`).join('')}</ul>
+          ${miss.length?`<p style="font-size:11.5px;color:var(--warn);margin-top:8px">这就是状态停在 blocked 的原因。</p>`:''}
+        </div>
+        <div class="hs"><h5>接手后第一件事</h5><p>${esc(h.packet.nextStep)}</p></div>
+        <div class="hs"><h5>证据链 · 每条结论都能溯源</h5>${evList(h.packet.evidenceIds)}</div>
+        <div class="hact">
+          ${miss.length ? `<button class="btn primary" ${A('fillInfo',`data-h="${h.id}" data-who="${who}"`)}>补齐这 ${miss.length} 项信息</button>` : ''}
+          ${!miss.length && isFrom && !h.fromConfirmedAt ? `<button class="btn primary" ${A('confirmFrom',`data-h="${h.id}"`)}>我确认把这一整块移交出去</button>` : ''}
+          ${!miss.length && isTo && !h.toConfirmedAt ? `<button class="btn primary" ${A('confirmTo',`data-h="${h.id}"`)}>我确认接收这一整块</button>` : ''}
+          ${isTo && !h.toConfirmedAt && h.status!=='accepted' ? `<button class="btn" ${A('decline',`data-h="${h.id}"`)}>我现在接不了</button>` : ''}
+          ${h.status==='accepted' ? `<div class="okbox" style="margin:0"><b>所有权已转移</b>
+            ${esc(nameOf(h.fromId))}确认于 ${esc(h.fromConfirmedAt)}，${esc(nameOf(h.toId))}确认于 ${esc(h.toConfirmedAt)}。
+            两个时间戳缺一不可。此后该责任域的全部提醒发给${esc(nameOf(h.toId))}，${esc(nameOf(h.fromId))}不再收到催办。
+            这条记录不可删除，只能归档。</div>` : ''}
+        </div>
+        <p class="hnote">${miss.length || !h.fromConfirmedAt || !h.toConfirmedAt
+          ? '信息补齐、且双方都确认之前，所有权不转移。责任不允许落到地上。'
+          : '交接完成。记录已写入 AuditLog。'}</p>
+      </div>
+    `};
+  }
+
+  if (kind === 'domain') {
+    const d = domainOf(arg);
+    const ts = S.tasks.filter(t => t.domainId === d.id);
+    const sigs = S.signals.filter(s => s.domainId === d.id);
+    const canPropose = !d.ownerId || d.ownerId === who;
+    return { title:d.name, sub:`Domain ${d.id} · owner = ${d.ownerId ? nameOf(d.ownerId) : 'null'}`, body:`
+      ${!d.ownerId ? `<div class="warnbox"><b>这个责任域目前没有主人</b>
+        ownerId 为空本身就是要报告的结论。五个阶段现在全部落在${esc(nameOf('mom'))}身上。</div>` : ''}
+      <div class="card"><div class="eyebrow" style="margin-bottom:7px">下一步动作</div>
+        <p style="font-size:13px;line-height:1.65">${esc(d.nextAction)}</p></div>
+
+      <div class="sec" style="margin-top:14px">
+        <div class="sechead"><span class="eyebrow">聚合了哪些零散信号</span><span class="eyebrow">${sigs.length} 条</span></div>
+        <div class="card">${sigs.map(s=>`<div style="padding:9px 0;border-top:1px solid var(--line)">
+          <div style="font-size:12.5px;line-height:1.6">「${esc(evOf(s.evidenceIds[0]).raw)}」</div>
+          <div style="font-size:11px;color:var(--dim);margin-top:4px">→ ${esc(s.text)} · 置信度 ${(s.confidence*100).toFixed(0)}% · ${esc(s.promptVersion)}</div>
+        </div>`).join('')}
+        <p style="font-size:11.5px;color:var(--dim);line-height:1.7;margin-top:11px;padding-top:10px;border-top:1px solid var(--line)">
+          这些不是 ${sigs.length} 个独立任务。它们同属一个责任域。</p></div>
+      </div>
+
+      <div class="sec">
+        <div class="sechead"><span class="eyebrow">任务与五阶段归属</span><span class="eyebrow">${ts.length} 项</span></div>
+        ${ts.map(t=>`<div class="card">
+          <div style="display:flex;justify-content:space-between;gap:9px">
+            <div class="nm" style="font-size:13px">${esc(t.title)}</div>
+            <span class="badge ${t.status==='done'?'ok':'mine'}">${t.status==='done'?'done':(t.dueAt||'无期限')}</span></div>
+          ${stageChips(t, who)}
+          ${taskEvidenceMissing(t)
+            ? `<div style="font-size:11.5px;color:var(--warn);margin-top:8px">⚠ 支撑证据已被删除，此结论已失效待重算</div>`
+            : evList(t.evidenceIds)}
+        </div>`).join('')}
+      </div>
+
+      ${canPropose && !S.handovers.some(h=>h.domainId===d.id && h.status!=='declined') ? `
+      <button class="btn primary" ${A('propose',`data-domain="${d.id}" data-who="${who}"`)}>把这一整块交接给爸爸</button>
+      <p class="hnote" style="padding-top:9px">交接的是整块责任，不是一次执行。</p>` : ''}
+    `};
+  }
+
+  if (kind === 'evidence') {
+    return { title:'证据溯源', sub:'L0 原始证据留在端内 · 可单条删除', body:`
+      <div class="warnbox"><b>删除会联动</b>
+        删掉一条证据，引用它的信号和任务会被标记为「证据缺失」并等待重算，不会留下没有出处的结论。</div>
+      ${S.evidence.map(e=>{
+        const used = S.tasks.filter(t=>(t.evidenceIds||[]).includes(e.id)).length
+                   + S.signals.filter(s=>(s.evidenceIds||[]).includes(e.id)).length;
+        return `<div class="evrow ${e.deleted?'deleted':''}">
+          <div class="eh"><span>${esc(nameOf(e.speakerId))} · ${esc(e.sourceType)}</span><span>${esc(e.occurredAt)}</span></div>
+          <div class="raw">${esc(e.raw)}</div>
+          <div class="src">visibility：${esc(e.visibility)} · 被 ${used} 条结论引用 · rawRef 指向端内存储</div>
+          ${e.deleted
+            ? `<div style="font-size:11.5px;color:var(--warn);margin-top:8px">已删除。引用它的结论已标记为待重算。</div>`
+            : `<button class="btn sm danger" style="margin-top:9px" ${A('delEv',`data-ev="${e.id}" data-who="${who}"`)}>删除这条证据</button>`}
+        </div>`;
+      }).join('')}
+    `};
+  }
+
+  if (kind === 'audit') {
+    return { title:'操作留痕', sub:`AuditLog · ${S.audit.length} 条`, body:
+      S.audit.length ? S.audit.map(a=>`<div class="card">
+        <div style="display:flex;justify-content:space-between;gap:9px">
+          <div style="font-size:12.5px;font-weight:600">${esc(a.action)}</div>
+          <span style="font-size:11px;color:var(--dim);font-variant-numeric:tabular-nums">${esc(a.at)}</span></div>
+        <div style="font-size:11.5px;color:var(--dim);line-height:1.6;margin-top:5px">
+          ${esc(nameOf(a.actorId))} · ${esc(a.targetType)} ${esc(a.targetId)}<br>
+          ${a.before?`before：${esc(JSON.stringify(a.before))}<br>`:''}${a.after?`after：${esc(JSON.stringify(a.after))}`:''}</div>
+      </div>`).join('')
+      : `<div class="empty">还没有操作记录。</div>`
+    };
+  }
+
+  if (kind === 'delspace') {
+    return { title:'删除整个家庭空间', sub:'不可恢复', body:`
+      <div class="warnbox"><b>这个操作会删除</b>
+        3 位成员的全部结论、${S.evidence.length} 条证据指针、${S.domains.length} 个责任域、
+        ${S.tasks.length} 个任务、${S.careRules.length} 条看护规则和全部看护事件。<br><br>
+        交接记录不可删除，只能归档 —— 这一条即使删空间也保留，用于责任追溯。</div>
+      <button class="btn danger" ${A('confirmDelSpace',`data-who="${who}"`)}>我确认删除，我知道不可恢复</button>
+      <button class="btn" ${A('closeSheet',`data-who="${who}"`)}>取消</button>
+    `};
+  }
+
+  if (kind === 'grandmaMenu') {
+    return { title:'我的设置', sub:'字大一点 · 只有三项', body:`
+      <button class="prow" ${A('toggleAI','data-who="grandma"')}>
+        <div class="pi">◑</div><div class="pt"><b style="font-size:17px">让它帮我记事</b>
+        <span style="font-size:14px">${S.flags.aiAnalysis.grandma?'开着 · 关了也还能聊天':'关了 · 现在只聊天'}</span></div>
+        <div class="switch ${S.flags.aiAnalysis.grandma?'on':''}"><i></i></div></button>
+      <button class="prow" ${A('sheet','data-who="grandma" data-sheet="evidence"')}>
+        <div class="pi">◷</div><div class="pt"><b style="font-size:17px">我说过的话</b>
+        <span style="font-size:14px">看看有哪些被记下来了，可以删</span></div><div class="pa">›</div></button>
+      <button class="prow" ${A('hideFromSon','data-who="grandma"')}>
+        <div class="pi">⊘</div><div class="pt"><b style="font-size:17px">这件事别告诉我儿子</b>
+        <span style="font-size:14px">我有权不共享。系统必须听我的</span></div><div class="pa">›</div></button>
+    `};
+  }
+  return { title:'', body:'' };
+}
+</script>
+
+<script>
+"use strict";
+/* ═══════════════════════════════════════════════════════════════════════════
+   动作分发
+   ═══════════════════════════════════════════════════════════════════════════ */
+const ACT = {
+  tab(d){ const w = d.who; if (S.ui[w]) { S.ui[w].tab = d.tab; S.ui[w].sheet = null; } render(); },
+  backMom(){ S.ui.mom.tab = 'chat'; render(); },
+  backDad(){ S.ui.dad.tab = 'chat'; render(); },
+  noop(){},
+  sheet(d){ S.ui[d.who].sheet = d.sheet; render(); },
+  closeSheet(d){ S.ui[d.who].sheet = null; render(); },
+
+  /* ── 同意门（PRD 4.3.2）── */
+  consent(d){
+    const m = S.chats.dm_grandma.find(x => x.id === d.mid);
+    if (!m || m.resolved) return;
+    m.resolved = d.v;
+    const e = evOf(m.evId);
+    e.visibility = d.v === 'space' ? 'space' : (d.v === 'members' ? 'members:[mom]' : 'self');
+    const label = { space:'告诉家里人', members:'只告诉女儿', self:'先别说' }[d.v];
+    pushMsg('dm_grandma', { from:'grandma', kind:'text', text:label });
+    audit('grandma', 'consent.' + d.v, 'Evidence', e.id, {visibility:'self'}, {visibility:e.visibility});
+
+    if (d.v === 'self') {
+      pushMsg('dm_grandma', { from:'agent', kind:'text',
+        text:'好，那就只留在我们俩之间。它不会进家里的记录，也不会出现在任何报告里。' });
+      toast('grandma','没有进家庭库','奶奶有权拒绝共享。这条内容 visibility = self，不计入任何报告。');
+    } else {
+      pushMsg('dm_grandma', { from:'agent', kind:'text',
+        text: d.v === 'space'
+          ? '好。我把「腿疼」和「快到复查时间」放进家里的记录，标注是你本人同意的。你随时可以让我撤回。'
+          : '好。这件事只有你女儿能看到，其他人看不到。' });
+      /* 进入家庭库：信号转 confirmed，责任域获得新证据 */
+      const sig = S.signals.find(s => s.id === 's1');
+      sig.status = 'confirmed';
+      const dom = domainOf('d_health');
+      if (!dom.evidenceIds.includes(e.id)) dom.evidenceIds.push(e.id);
+      pushMsg('family', { from:'agent', kind:'text',
+        text:`奶奶本人同意分享一条健康相关的情况：腿疼加重，且骨科复查快到期。已归入「奶奶的近期健康照护」，visibility = ${d.v==='space'?'space':'care_related'}。` });
+      toast('mom','家庭库新增一条结论','来源是奶奶本人授权，不是后台读取。可点开看原话。');
+    }
+    render();
+  },
+
+  /* ── 奶奶侧 ── */
+  grandmaTalk(){
+    if (S.chats.dm_grandma.some(m => m.evId === 'e1')) {
+      pushMsg('dm_grandma', { from:'grandma', kind:'text', voice:6, text:'今天好一些了，就是还不太敢下楼' });
+      pushMsg('dm_grandma', { from:'agent', kind:'text', text:'知道了。这句我先不往家里传，你要是想说，随时告诉我。' });
+    } else { demoStep2(); }
+    render();
+  },
+  grandmaType(){ toast('grandma','可以打字','老人侧默认语音优先，打字是备选。一次回应从不需要打字完成。'); },
+  grandmaPhoto(){
+    pushMsg('dm_grandma', { from:'grandma', kind:'text', text:'[照片] 医院给的一张单子' });
+    pushMsg('dm_grandma', { from:'agent', kind:'text', text:'我看到了。上面写的是复查时间。要不要我把这个时间告诉家里人？' });
+    render();
+  },
+  grandmaMore(){ S.ui.grandma.sheet = 'grandmaMenu'; render(); },
+  hideFromSon(){
+    S.ui.grandma.sheet = null;
+    pushMsg('dm_grandma', { from:'grandma', kind:'text', text:'这件事别告诉我儿子' });
+    pushMsg('dm_grandma', { from:'agent', kind:'text',
+      text:'好，我记住了。这一类的事我不会让他看到，也不会在群里提。你要是改主意再跟我说。' });
+    audit('grandma','consent.restrict','Member','grandma',null,{excluded:['dad']});
+    toast('grandma','系统必须遵守','被看护人有权拒绝共享。这是本产品和老人监控的分界线。');
+    render();
+  },
+
+  /* ── 交接 ── */
+  propose(d){
+    const dom = domainOf(d.domain);
+    const h = {
+      id:'H-021', domainId:dom.id, fromId:'mom', toId:'dad',
+      status:'pending_info', fromConfirmedAt:null, toConfirmedAt:null,
+      missingInfo:[
+        { q:'上次的检查报告存在哪里', a:null, filled:false },
+        { q:'复查是否需要空腹', a:null, filled:false }
+      ],
+      packet:{
+        scope:'发现症状变化、记住复查时间、挂号与陪诊、保存报告、两周后复诊。不是「陪奶奶去一次医院」。',
+        history:['7 月 15 日市三院骨科门诊，医生嘱一个月后复查','上次是妈妈陪诊，报告由妈妈收着'],
+        constraints:['奶奶不愿空腹出门，偏好下午号','只去市三院，其他医院她不肯去','妈妈当前 capacityState 为「加班期」'],
+        contacts:['市三院骨科 · 李医生','社区医院 · 家庭医生张护士'],
+        nextStep:'本周内挂市三院骨科下午号，挂号后把时间直接同步给奶奶本人。',
+        evidenceIds:['e1','e2','e3','e4','e8']
+      }
+    };
+    S.handovers.push(h);
+    audit('mom','handover.proposed','Handover',h.id,null,{status:'pending_info'});
+    S.ui.mom.sheet = 'handover:' + h.id;
+    pushMsg('dm_dad', { from:'agent', kind:'card', card:'handover', hid:h.id, propose:true });
+    pushMsg('dm_mom', { from:'agent', kind:'card', card:'handover', hid:h.id, propose:true });
+    S.ui.dad.tab = 'duty';
+    toast('dad','有一块责任要交给你','不是一次执行，是整块。缺 2 项信息，现在是 blocked。');
+    render();
+  },
+  fillInfo(d){
+    const h = S.handovers.find(x => x.id === d.h);
+    const answers = ['在客厅电视柜第二个抽屉，蓝色文件袋','不需要空腹，李医生说这次只看片子'];
+    h.missingInfo.forEach((x,i) => { x.filled = true; x.a = answers[i]; });
+    h.status = 'pending_ack';
+    audit(d.who, 'handover.info_filled', 'Handover', h.id, {missing:2}, {missing:0});
+    toast(d.who,'信息已补齐','但所有权还没转移。双方各自确认之前，状态仍然不是 accepted。');
+    render();
+  },
+  confirmFrom(d){
+    const h = S.handovers.find(x => x.id === d.h);
+    h.fromConfirmedAt = nowStamp();
+    audit('mom','handover.from_confirmed','Handover',h.id,null,{fromConfirmedAt:h.fromConfirmedAt});
+    /* 谁最后确认都一样：只要两个时间戳齐全就走完整的所有权转移 */
+    if (tryAccept(h)) afterAccepted(h);
+    else toast('mom','还差一步','你已确认移交。还需要爸爸确认接收，两个时间戳缺一不可。');
+    render();
+  },
+  confirmTo(d){
+    const h = S.handovers.find(x => x.id === d.h);
+    h.toConfirmedAt = nowStamp();
+    audit('dad','handover.to_confirmed','Handover',h.id,null,{toConfirmedAt:h.toConfirmedAt});
+    if (tryAccept(h)) afterAccepted(h);
+    else toast('dad','还差一步','你已确认接收。还需要妈妈确认移交，所有权才转移。');
+    render();
+  },
+  decline(d){
+    const h = S.handovers.find(x => x.id === d.h);
+    h.status = 'declined';
+    audit('dad','handover.declined','Handover',h.id,null,{status:'declined'});
+    toast('mom','爸爸暂时接不了','所有权留在原处，责任没有落地。系统不会假装交接成功了。',true);
+    render();
+  },
+
+  /* ── 看护 ── */
+  activateRule(d){
+    const r = S.careRules.find(x => x.id === d.rule);
+    r.status = 'active'; r.confirmedBy = 'dad'; r.confirmedAt = nowStamp();
+    audit('dad','carerule.activated','CareRule',r.id,{status:'draft'},{status:'active'});
+    toast('dad','规则已激活','从这一刻起，定时、超时、升级全部由确定性程序执行，没有模型参与。');
+    render();
+  },
+  editRule(){ toast('dad','可以改','抽取只是草稿。改完仍然需要你点一次确认才会激活。'); },
+  ack(d){ careAck(d.ce, true); toast('grandma','已记录','一次点击就够了。你不用再管这件事。'); },
+  ackLater(d){
+    const ce = S.careEvents.find(x => x.id === d.ce);
+    ce.log.push(`${nowStamp()}  snooze → 奶奶选择稍后，超时计时继续`);
+    toast('grandma','好，我等会儿再问你一次','计时还在走。到点没回应我会告诉家里人。');
+  },
+  handleCare(d){ careAck(d.ce, false); },
+  toggleAway(){
+    S.flags.dadAway = !S.flags.dadAway;
+    audit('dad', S.flags.dadAway?'care.temp_handover':'care.temp_restore','Member','dad',null,{away:S.flags.dadAway});
+    if (S.flags.dadAway) {
+      pushMsg('family', { t:'sys', text:'爸爸声明「我现在有急事，两小时内不在」· 本时段看护临时移交：提醒直接发给奶奶本人，妈妈进入待命' });
+      pushMsg('dm_mom', { from:'agent', kind:'text', text:'本时段由你兜底。奶奶的吃药提醒仍会先发给她本人，如果她没回应，我会直接找你。' });
+      toast('mom','本时段由你兜底','爸爸临时不在。全过程留痕，时段结束后自动恢复。');
+    } else {
+      pushMsg('family', { t:'sys', text:'爸爸已恢复看护，妈妈解除待命' });
+    }
+    render();
+  },
+
+  /* ── 隐私与数据控制 ── */
+  ev(d){
+    const e = evOf(d.ev);
+    const who = d.who || currentSheetOwner() || 'mom';
+    S.ui[who].sheet = 'evidence';
+    toast(who,'证据溯源',`${nameOf(e.speakerId)} ${e.occurredAt}：「${e.raw}」`);
+    render();
+  },
+  delEv(d){
+    const e = evOf(d.ev);
+    e.deleted = true;
+    const hitTasks = S.tasks.filter(t => (t.evidenceIds||[]).includes(e.id) && taskEvidenceMissing(t));
+    S.signals.filter(s => (s.evidenceIds||[]).includes(e.id)).forEach(s => {
+      if (liveEv(s.evidenceIds).length === 0) s.status = 'evidence_missing';
+    });
+    audit(d.who,'evidence.deleted','Evidence',e.id,{deleted:false},{deleted:true, invalidatedTasks:hitTasks.length});
+    toast(d.who,'已删除并联动',`${hitTasks.length} 条结论因为失去全部证据被标记为待重算，不会留下没有出处的结论。`,true);
+    render();
+  },
+  toggleAI(d){
+    S.flags.aiAnalysis[d.who] = !S.flags.aiAnalysis[d.who];
+    audit(d.who,'ai_analysis.toggled','Member',d.who,null,{on:S.flags.aiAnalysis[d.who]});
+    toast(d.who, S.flags.aiAnalysis[d.who]?'AI 分析已开启':'AI 分析已关闭',
+      S.flags.aiAnalysis[d.who]?'重新开始从对话中识别家庭事务。':'纯聊天能力保留，不再产生新信号。');
+    render();
+  },
+  revoke(d){
+    audit(d.who,'consent.revoked','Member',d.who,null,{consent:false});
+    S.flags.aiAnalysis[d.who] = false;
+    toast(d.who,'授权已撤回','此后不再产生新信号。已有结论你可以逐条删除，也可以保留。',true);
+    render();
+  },
+  exportData(d){
+    const payload = { space:S.space, member:MEM[d.who],
+      evidence:S.evidence.filter(e=>e.speakerId===d.who),
+      domains:S.domains, tasks:S.tasks, handovers:S.handovers,
+      careRules:S.careRules, careEvents:S.careEvents, audit:S.audit };
+    const blob = new Blob([JSON.stringify(payload,null,2)], {type:'application/json'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `dujide-${d.who}-export.json`;
+    a.click(); URL.revokeObjectURL(a.href);
+    audit(d.who,'data.exported','Member',d.who,null,null);
+    toast(d.who,'已导出','JSON 文件已下载。含你的证据、结论和审计记录。');
+  },
+  confirmDelSpace(d){
+    const keptHandovers = S.handovers.filter(h => h.status === 'accepted').length;
+    audit(d.who,'space.deleted','Space',S.space.id,null,{archivedHandovers:keptHandovers});
+    const kept = S.audit.slice();
+    seed();
+    S.audit = kept;
+    S.ui.mom.tab = 'me'; S.ui.mom.sheet = 'audit';
+    toast('mom','空间已删除并重建为演示态',`${keptHandovers} 条已接受的交接记录按规则归档保留，其余数据已清空。`,true);
+    render();
+  },
+
+  /* ── 沟通助手（PRD 4.8）── */
+  plus(d){
+    if (d.who !== 'mom') { toast(d.who,'更多','截图补录、手动转发、语音都在这里。'); return; }
+    pushMsg('dm_mom', { from:'agent', kind:'card', card:'rewrite',
+      before:'你从来不管妈的事', after:'妈下周三要复查，我这周排不开。你能不能接下这次的挂号和陪诊？' });
+    S.ui.mom.tab = 'dm';
+    toast('mom','换个说法','只作用在你还没发出的那条消息上。不评价对方，不替你去说。');
+    render();
+  },
+  sendRewrite(d){
+    const m = S.chats.dm_mom.find(x => x.id === d.mid);
+    S.chats.dm_mom = S.chats.dm_mom.filter(x => x.id !== d.mid);
+    pushMsg('family', { from:'mom', kind:'text', text:m.after });
+    S.ui.mom.tab = 'group';
+    audit('mom','rewrite.used','Message',d.mid,{text:m.before},{text:m.after});
+    render();
+  },
+  keepOriginal(d){
+    const m = S.chats.dm_mom.find(x => x.id === d.mid);
+    S.chats.dm_mom = S.chats.dm_mom.filter(x => x.id !== d.mid);
+    pushMsg('family', { from:'mom', kind:'text', text:m.before });
+    S.ui.mom.tab = 'group';
+    render();
+  },
+  compose(d){
+    if (d.who === 'mom' && Number(d.group)) {
+      toast('mom','试试 ＋ 按钮','里面有「换个说法」。它只改你自己还没发出的那句。');
+    } else { toast(d.who,'输入面','原型里用预置内容演示，真实版本接大模型 API。'); }
+  },
+
+  /* ── 报告归属修正 ── */
+  fixStage(d){
+    const t = S.tasks.find(x => x.id === d.task);
+    const before = t.executedBy;
+    t.executedBy = before === 'dad' ? 'mom' : 'dad';
+    audit(currentSheetOwner()||'mom','task.stage_corrected','Task',t.id,
+      {executedBy:before},{executedBy:t.executedBy});
+    toast(currentSheetOwner()||'mom','已修正并写入 AuditLog','报告表是对字段的计数，改字段表就变。不是模型现场编的文案。');
+    render();
+  }
+};
+function currentSheetOwner(){ return Object.keys(S.ui).find(k => S.ui[k] && S.ui[k].sheet); }
+
+/* 事件委托 */
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-act]');
+  if (!el) return;
+  const fn = ACT[el.dataset.act];
+  if (!fn) return;
+  e.preventDefault(); e.stopPropagation();
+  fn({ ...el.dataset });
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Demo 脚本 · PRD 第 8 章七步
+   ═══════════════════════════════════════════════════════════════════════════ */
+function afterAccepted(h){
+  const d = domainOf(h.domainId);
+  /* 提醒转移：原主责任人首页条目消失，此后提醒发给新主人 */
+  pushMsg('dm_dad', { from:'agent', kind:'text',
+    text:`「${d.name}」现在是你的了。第一件事：本周内挂市三院骨科下午号，挂完把时间直接同步给奶奶本人。之后这一块的提醒都发给你。` });
+  pushMsg('dm_mom', { from:'agent', kind:'text',
+    text:`「${d.name}」已经交给爸爸了。这一块的提醒此后不再发给你，我也不会再催你。` });
+  pushMsg('family', { from:'agent', kind:'text',
+    text:`「${d.name}」的所有权已转移给爸爸。双方确认时间戳齐全，记录已归档。` });
+  S.ui.dad.sheet = null;
+  d.leaving = true;
+  render();
+  setTimeout(() => {
+    d.leaving = false; d.entering = true;
+    S.ui.mom.pop = true;
+    render();
+    toast('mom','这一条从你的首页消失了','「只有你在记得」少了一块。提醒此后发给爸爸，你不需要再追问。');
+    setTimeout(()=>{ S.ui.mom.pop = false; d.entering = false; }, 900);
+  }, 620);
+}
+
+const STEPS = [
+  { t:'家庭群里三条普通消息', d:'先建立反差：<em>这家人已经分好工了</em>', spot:'mom', run(){
+      S.ui.mom.tab = 'group'; S.ui.dad.tab = 'group';
+      stageText('先看这家人已经「分好工」了',
+        '妈妈加班、爸爸洗碗、复查「你有空顺便看一下」。看起来分担了。问题藏在最后两句里：他确实会做，但要等她安排。');
+  }},
+  { t:'奶奶在自己手机上说「腿又疼了」', d:'一次演完两件事：<em>同意门</em> + 老人侧的独立价值', spot:'grandma', run(){
+      demoStep2();
+      stageText('数据从哪来：奶奶自己说的',
+        '不导出聊天记录，不读位置。奶奶本来就在用能说话的 AI，家庭事务的沉淀是 1:1 对话的自然副产品。注意 Agent 问的那一句 —— 那是同意门。');
+  }},
+  { t:'弹出本周责任集中度表', d:'念中性叙述那句话，<em>不指责任何人</em>', spot:'mom', run(){
+      S.ui.mom.tab = 'map';
+      pushMsg('family', { from:'agent', kind:'card', card:'report' });
+      S.flags.reportSeen = true;
+      stageText('本周责任集中度',
+        '执行任务确实分担了 2:1。但发现、记住截止时间、制定安排、跟进结果是 3:0。这四项就是隐形劳动，现有的家务 App 全部只切分第 4 步。');
+  }},
+  { t:'提议把「奶奶这次复查」整块交给爸爸', d:'交接卡生成 → <em>缺信息，状态是 blocked</em>', spot:'dad', run(){
+      ACT.propose({ domain:'d_health', who:'mom' });
+      S.ui.dad.tab = 'duty'; S.ui.dad.sheet = 'handover:H-021';
+      stageText('这一秒千万别跳：BLOCKED',
+        '交接包里「未确定事项」还有 2 项没补齐，所以状态停在 blocked，所有权不转移。绝不能出现「以为交出去了其实没人管」。');
+  }},
+  { t:'补齐信息，爸爸确认', d:'<em>妈妈那一侧的提醒条当场消失</em>', spot:'mom', run(){
+      const h = S.handovers.find(x => x.id === 'H-021');
+      ACT.fillInfo({ h:h.id, who:'dad' });
+      h.fromConfirmedAt = nowStamp();
+      audit('mom','handover.from_confirmed','Handover',h.id,null,{fromConfirmedAt:h.fromConfirmedAt});
+      S.ui.mom.tab = 'map';
+      setTimeout(()=>{ ACT.confirmTo({ h:h.id }); }, 500);
+      stageText('情绪落点一：责任真的走掉了',
+        '双方确认时间戳齐全，状态才进 accepted。看妈妈那屏：「奶奶的近期健康照护」滑走，计数掉了一块。这不是标记完成，是所有权换人。');
+  }},
+  { t:'吃药场景：60 秒无回应 → 自动升级 → 闭环', d:'确定性状态机，<em>这一段没有一行 LLM</em>', spot:'grandma', run(){
+      S.flags.dadAway = true;
+      pushMsg('family', { t:'sys', text:'爸爸声明「我现在开会，两小时内不在」· 本时段看护临时移交，妈妈进入待命' });
+      S.ui.grandma.sheet = null;
+      S.ui.dad.tab = 'care'; S.ui.mom.tab = 'group';
+      careStart('cr1','晚 20:00');
+      stageText('看护升级链：提醒先给本人',
+        `不是先通知看护人，是先提醒奶奶自己 —— 那才是这个功能的意义。超时阈值 ${Math.round(S.ackTimeoutMs/1000)} 秒（演示速度开关），到点后 L1 找爸爸、L2 找其他家人，最后一跳永远是「让家人到现场确认」。`);
+  }},
+  { t:'回到妈妈首页', d:'「只有你在记得」<em>从 7 条变成 2 条</em>', spot:'mom', run(){
+      S.ui.mom.tab = 'map'; S.ui.mom.sheet = null; S.ui.grandma.sheet = null;
+      S.ui.mom.pop = true;
+      setTimeout(()=>{ S.ui.mom.pop = false; render(); }, 900);
+      const n = onlyIRemember('mom').length;
+      stageText('情绪落点二：从 7 到 ' + n,
+        '不是任务被完成了，是整块责任有了主人。产品名就是这个问题被解决之后的状态 —— 都记得。');
+  }}
+];
+
+function demoStep2(){
+  const ev = evOf('e1');
+  ev.occurredAt = '今天 08:15';
+  pushMsg('dm_grandma', { from:'grandma', kind:'text', voice:8, text:'腿这两天又疼了，下楼有点吃力' });
+  pushMsg('dm_grandma', { from:'agent', kind:'text', text:'我记下了。上个月医生说过一个月后再看一次，快到时间了。' });
+  pushMsg('dm_grandma', { from:'agent', kind:'card', card:'consent', evId:'e1' });
+  render();
+}
+
+function stageText(title, desc){
+  document.getElementById('stageTitle').textContent = title;
+  document.getElementById('stageDesc').innerHTML = desc;
+}
+
+function renderSteps(){
+  document.getElementById('steps').innerHTML = STEPS.map((s,i)=>{
+    const state = i < S.step ? 'done' : (i === S.step ? 'active' : '');
+    return `<button class="step" data-state="${state}" data-i="${i}">
+      <span class="n">${i<S.step?'✓':i+1}</span>
+      <span class="tx"><span class="tt">${s.t}</span><span class="dd">${s.d}</span></span>
+    </button>`;
+  }).join('');
+  document.getElementById('stepPos').textContent = `${S.step} / ${STEPS.length}`;
+  document.getElementById('nextStep').textContent = S.step >= STEPS.length ? '已走完 ✓' : `下一步 ▸ ${STEPS[S.step].t.slice(0,8)}…`;
+  document.getElementById('nextStep').disabled = S.step >= STEPS.length;
+}
+function runStep(i){
+  if (i < 0 || i >= STEPS.length) return;
+  S.step = i + 1;
+  STEPS[i].run();
+  spotlight(STEPS[i].spot);
+  renderSteps(); render();
+}
+function spotlight(who){
+  ['mom','dad','grandma'].forEach(k => {
+    const el = document.getElementById('ph-' + k);
+    if (el) el.classList.toggle('spot', document.getElementById('spotlight').checked && k === who);
+  });
+}
+
+document.getElementById('steps').addEventListener('click', e => {
+  const b = e.target.closest('.step'); if (!b) return;
+  runStep(Number(b.dataset.i));
+});
+document.getElementById('nextStep').addEventListener('click', () => runStep(S.step));
+document.getElementById('resetAll').addEventListener('click', () => {
+  clearInterval(careTimer); timers.forEach(clearTimeout); timers = [];
+  const ms = S.ackTimeoutMs;
+  seed(); S.ackTimeoutMs = ms;
+  stageText('先看这家人已经「分好工」了','点左边的「下一步」按脚本走，也可以直接在手机上点任何按钮自己探索。');
+  spotlight(null); renderSteps(); render();
+});
+document.getElementById('speedSegs').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  [...e.currentTarget.children].forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+  S.ackTimeoutMs = Number(b.dataset.ms);
+  S.careRules.forEach(r => r.ackTimeoutSec = Math.round(S.ackTimeoutMs/1000));
+  render();
+});
+document.getElementById('bigfont').addEventListener('change', e => {
+  document.body.classList.toggle('bigfont', e.target.checked);
+});
+document.getElementById('spotlight').addEventListener('change', () => {
+  const cur = STEPS[S.step-1];
+  spotlight(cur ? cur.spot : null);
+});
+
+/* ═══════════════════════════ 主渲染 ═══════════════════════════ */
+function render(){
+  const keep = {};
+  ['scr-mom','scr-dad','scr-grandma'].forEach(id => {
+    const b = document.querySelector('#'+id+' .body');
+    if (b) keep[id] = b.scrollTop;
+  });
+  document.getElementById('scr-mom').innerHTML = screenMom();
+  document.getElementById('scr-dad').innerHTML = screenDad();
+  document.getElementById('scr-grandma').innerHTML = screenGrandma();
+  /* 聊天页滚到底，其他页保持位置 */
+  ['scr-mom','scr-dad','scr-grandma'].forEach(id => {
+    const b = document.querySelector('#'+id+' .body');
+    if (!b) return;
+    if (b.classList.contains('chat')) b.scrollTop = b.scrollHeight;
+    else if (keep[id] !== undefined) b.scrollTop = keep[id];
+  });
+  /* 倒计时占位 */
+  const live = S.careEvents.find(c => c.state === 'notified');
+  if (live) {
+    const host = document.querySelector('#scr-grandma .cardmsg .cf');
+    if (host && !document.getElementById('cd-'+live.id)) {
+      host.insertAdjacentHTML('beforeend',
+        `<br><span style="color:var(--warn);font-weight:600">还有 <span id="cd-${live.id}" class="countdown">${Math.round(S.ackTimeoutMs/1000)} 秒</span> 我就去问家里人</span>`);
+    }
+  }
+  renderAudit();
+}
+function renderAudit(){
+  const el = document.getElementById('auditList');
+  el.innerHTML = S.audit.length
+    ? S.audit.slice(0,14).map(a=>`<div class="a"><b>${esc(a.action)}</b> <i>${esc(a.at)}</i><br>${esc(nameOf(a.actorId))} · ${esc(a.targetType)} ${esc(a.targetId)}</div>`).join('')
+    : `<div class="empty" style="padding:0;text-align:left;font-size:11.5px;font-style:italic;color:var(--page-dim)">还没有操作。每次同意、交接、删除、修正都会在这里留痕。</div>`;
+}
+
+/* 启动 */
+seed();
+renderSteps();
+render();
+
+/* 调试句柄：路演现场可在控制台直接查数据，证明报告不是写死的文案
+   例：DJD.weeklyReport().rows  /  DJD.onlyIRemember('mom')  /  DJD.S.tasks */
+window.DJD = {
+  get S(){ return S; },
+  weeklyReport, onlyIRemember, handoverStatus, domainOf, taskEvidenceMissing,
+  careStart, render, seed, STAGES, INVISIBLE, MEM
+};
+</script>
+</body>
+</html>
