@@ -129,6 +129,19 @@ def dispatch_id_from_receipt(receipt: Mapping[str, Any]) -> str | None:
     return None
 
 
+def settle_worker(root: Path, action: str, dispatch: str, dry_run: bool = False) -> dict[str, Any]:
+    """Record cleanup failures without losing an otherwise valid task acceptance."""
+    try:
+        return orca(root, ["orchestration", action, "--dispatch", dispatch], action, dry_run)
+    except FleetError as exc:
+        return {
+            "ok": False,
+            "action": action,
+            "dispatch_id": dispatch,
+            "error": str(exc),
+        }
+
+
 def repo_selector(root: Path, cfg: Mapping[str, Any], dry_run: bool = False) -> str:
     configured = cfg.get("repo_selector", "auto")
     if isinstance(configured, str) and configured not in ("", "auto"):
@@ -252,16 +265,20 @@ def do_start_coordinator(root: Path, cfg: Mapping[str, Any], args: argparse.Name
 def build_state(plan: Mapping[str, Any], run_id: str, run_dir: Path, selector: str, base_ref: str, base_sha: str, branch: str) -> dict[str, Any]:
     tasks: dict[str, Any] = {}
     waves: list[dict[str, Any]] = []
+    workspace_suffix = str(plan.get("workspace_suffix") or "").strip()
     for wave in plan["waves"]:
         ids = []
         for task in wave["tasks"]:
             tid = task["id"]
             ids.append(tid)
+            workspace_name = f"trk-{task['track']}-{tid.lower()}"
+            if workspace_suffix:
+                workspace_name += f"-{workspace_suffix}"
             tasks[tid] = {
                 **task,
                 "wave": wave["id"],
                 "status": "planned",
-                "workspace_name": f"trk-{task['track']}-{tid.lower()}",
+                "workspace_name": workspace_name,
                 "orca_task_id": None,
                 "dispatch_id": None,
                 "branch": None,
@@ -568,7 +585,7 @@ def do_accept(root: Path, cfg: Mapping[str, Any], args: argparse.Namespace) -> i
     dispatch = task.get("dispatch_id")
     if dispatch:
         action = "worker-retain" if args.retain else "worker-release"
-        evidence["settlement"] = orca(root, ["orchestration", action, "--dispatch", dispatch], action, args.dry_run)
+        evidence["settlement"] = settle_worker(root, action, dispatch, args.dry_run)
     evidence_path = Path(state["run_dir"]) / "evidence" / f"{args.task}-accepted.json"
     save_json(evidence_path, evidence)
     update_waves(state)

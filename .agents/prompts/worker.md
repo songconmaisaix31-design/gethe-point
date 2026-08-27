@@ -43,7 +43,10 @@ python scripts/worker_finish.py \
   --dispatch-id <ORCA_DISPATCH_ID> \
   --base <BASE_SHA> \
   --outcome succeeded \
-  --summary "完成内容、验证结果和剩余限制"
+  --summary "Implementation, verification, and remaining limits" \
+  --verify-only
 ```
 
-失败也必须调用一次，使用 `--outcome failed`。发送 `worker_done` 后停止修改，等待新的 Dispatch。
+`--verify-only` writes a non-secret receipt and does not send a signal. Then use the exact supervised `worker_done` command injected by the Orca Dispatch preamble. Preserve its `--from`, `--dispatch-id`, and `--dispatch-capability` arguments; populate the other fields from the verified receipt. Never print, copy, persist, or report the capability value.
+
+Failures follow the same sequence with `--outcome failed`. Send `worker_done` exactly once, then stop modifying the worktree and wait for another Dispatch.

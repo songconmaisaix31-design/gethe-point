@@ -10,7 +10,7 @@ SCRIPTS = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(SCRIPTS))
 
 from common import FleetError  # noqa: E402
-from fleet import dispatch_id_from_receipt, do_launch  # noqa: E402
+from fleet import build_state, dispatch_id_from_receipt, do_launch, settle_worker  # noqa: E402
 
 
 class DispatchReceiptTests(unittest.TestCase):
@@ -33,6 +33,43 @@ class DispatchReceiptTests(unittest.TestCase):
         receipt = {"result": {"effects": [{"kind": "dispatch_input"}]}}
 
         self.assertIsNone(dispatch_id_from_receipt(receipt))
+
+
+class WorkspaceNamingTests(unittest.TestCase):
+    def test_explicit_suffix_makes_retry_workspaces_distinct(self):
+        plan = {
+            "objective": "test",
+            "workspace_suffix": "v2",
+            "waves": [
+                {
+                    "id": "foundation",
+                    "base": {"type": "ref", "value": "origin/main"},
+                    "tasks": [{"id": "FOUND-001", "track": "foundation"}],
+                }
+            ],
+        }
+
+        state = build_state(
+            plan,
+            "run_test",
+            Path("run"),
+            "id:repo_test",
+            "origin/main",
+            "0" * 40,
+            "fleet-control-test",
+        )
+
+        self.assertEqual(state["tasks"]["FOUND-001"]["workspace_name"], "trk-foundation-found-001-v2")
+
+
+class WorkerSettlementTests(unittest.TestCase):
+    @patch("fleet.orca", side_effect=FleetError("tab_not_found"))
+    def test_cleanup_failure_is_recorded_without_raising(self, _orca):
+        receipt = settle_worker(Path("."), "worker-release", "ctx_281af24e0d31")
+
+        self.assertFalse(receipt["ok"])
+        self.assertEqual(receipt["dispatch_id"], "ctx_281af24e0d31")
+        self.assertIn("tab_not_found", receipt["error"])
 
 
 class LaunchAuthorizationTests(unittest.TestCase):

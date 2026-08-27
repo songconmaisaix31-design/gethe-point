@@ -316,6 +316,12 @@ def validate_plan(plan: Mapping[str, Any], cfg: Mapping[str, Any]) -> list[str]:
         errors.append("schema_version must be 1")
     if not isinstance(plan.get("objective"), str) or not plan["objective"].strip():
         errors.append("objective must be non-empty")
+    workspace_suffix = plan.get("workspace_suffix")
+    if workspace_suffix is not None and (
+        not isinstance(workspace_suffix, str)
+        or re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{0,23})", workspace_suffix) is None
+    ):
+        errors.append("workspace_suffix must be 1-24 lowercase letters, digits, or hyphens")
     waves = plan.get("waves")
     if not isinstance(waves, list) or not waves:
         return errors + ["waves must be a non-empty list"]

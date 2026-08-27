@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify a worker branch and send exactly one Orca worker_done message."""
+"""Verify a worker branch and prepare or send one Orca worker_done message."""
 from __future__ import annotations
 
 import argparse
@@ -51,6 +51,32 @@ def valid_dispatch_id(value: str) -> bool:
     return re.fullmatch(r"(?:ctx|dispatch)_[0-9a-fA-F]{6,}", value) is not None
 
 
+def worker_done_payload(
+    logical_task: str,
+    task_id: str,
+    dispatch_id: str,
+    outcome: str,
+    track: str,
+    branch: str,
+    head_sha: str,
+    summary: str,
+    files: list[str],
+) -> dict[str, str]:
+    """Build the non-secret fields required by the supervised completion signal."""
+    return {
+        "type": "worker_done",
+        "subject": f"[{logical_task}] {outcome}",
+        "body": (
+            f"logical_task={logical_task}; track={track}; branch={branch}; sha={head_sha}; "
+            f"summary={summary}"
+        ),
+        "task_id": task_id,
+        "dispatch_id": dispatch_id,
+        "outcome": outcome,
+        "files_modified": files_argument(files),
+    }
+
+
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--logical-task", required=True)
@@ -61,6 +87,11 @@ def main() -> int:
     p.add_argument("--summary", required=True)
     p.add_argument("--allow-empty", action="store_true")
     p.add_argument("--no-run-checks", action="store_true")
+    p.add_argument(
+        "--verify-only",
+        action="store_true",
+        help="write a non-secret verification receipt; send with the exact Orca-injected preamble command",
+    )
     p.add_argument("--json", action="store_true")
     args = p.parse_args()
     try:
@@ -143,27 +174,19 @@ def finish(args: argparse.Namespace) -> int:
         if upstream_sha != head_sha:
             raise FleetError(f"HEAD is not fully pushed: HEAD={head_sha}, {upstream}={upstream_sha}")
 
-    body = (
-        f"logical_task={args.logical_task}; track={track}; branch={branch}; sha={head_sha}; "
-        f"summary={args.summary}"
+    payload = worker_done_payload(
+        args.logical_task,
+        args.task_id,
+        args.dispatch_id,
+        args.outcome,
+        track,
+        branch,
+        head_sha,
+        args.summary,
+        files,
     )
-    cp = run(
-        [
-            "orca", "orchestration", "send",
-            "--type", "worker_done",
-            "--subject", f"[{args.logical_task}] {args.outcome}",
-            "--body", body,
-            "--task-id", args.task_id,
-            "--dispatch-id", args.dispatch_id,
-            "--outcome", args.outcome,
-            "--files-modified", files_argument(files),
-            "--json",
-        ],
-        cwd=root,
-    )
-    receipt = parse_json(cp.stdout, "orca orchestration send")
     result = {
-        "sent_at": now(),
+        "verified_at": now(),
         "logical_task_id": args.logical_task,
         "orca_task_id": args.task_id,
         "dispatch_id": args.dispatch_id,
@@ -176,8 +199,35 @@ def finish(args: argparse.Namespace) -> int:
         "files": files,
         "checks": check_receipts,
         "integration": integration,
-        "orca_receipt": receipt,
+        "worker_done": payload,
     }
+    if args.verify_only:
+        verified_marker = git_path(root, f"orca-worker-verified-{args.dispatch_id}.json")
+        save_json(verified_marker, result)
+        if args.json:
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+        else:
+            print(f"worker verified: {args.logical_task} {args.outcome} {branch}@{head_sha}")
+            print(f"receipt: {verified_marker}")
+        return 0
+
+    cp = run(
+        [
+            "orca", "orchestration", "send",
+            "--type", payload["type"],
+            "--subject", payload["subject"],
+            "--body", payload["body"],
+            "--task-id", payload["task_id"],
+            "--dispatch-id", payload["dispatch_id"],
+            "--outcome", payload["outcome"],
+            "--files-modified", payload["files_modified"],
+            "--json",
+        ],
+        cwd=root,
+    )
+    receipt = parse_json(cp.stdout, "orca orchestration send")
+    result["sent_at"] = now()
+    result["orca_receipt"] = receipt
     save_json(marker, result)
     if args.json:
         print(json.dumps(result, ensure_ascii=False, indent=2))

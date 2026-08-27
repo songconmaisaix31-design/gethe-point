@@ -7,11 +7,14 @@ Generated: 2026-08-27
 Verified: 2026-08-27
 
 - Parsed the active Fleet config and 19-task overall plan and compiled all 9 Python files.
-- Passed 23 unit/integration tests, including fail-closed launch authorization, exact current/legacy Dispatch receipt parsing and worker completion validation, rejection of the `dispatch_input` effect name, non-overlapping track ownership, active-base consistency, required root `.gitignore` ownership, Windows-safe subprocess decoding, branch recognition, active/example plan validation, and integration merge gates.
+- Passed 27 unit/integration tests, including fail-closed launch authorization, exact current/legacy Dispatch receipt parsing, non-secret supervised completion payloads, retry-safe workspace naming, cleanup-failure evidence, rejection of the `dispatch_input` effect name, non-overlapping track ownership, active-base consistency, required root `.gitignore` ownership and generated-artifact rules, Windows-safe subprocess decoding, branch recognition, active/example plan validation, and integration merge gates.
 - Proved that both a draft plan and an approved-but-unauthorized plan are rejected before repository selection, fetch, or any Orca call.
 - Validated `.agents/plans/current.json` with `ok: true` and no errors.
 - Passed `fleet.py doctor` against the live local Orca runtime with all 14 tracks recognized and no plan errors.
 - Confirmed local and global `core.hooksPath` remain unset.
+- Confirmed the active retry uses explicit workspace suffix `v2`, so historical failed worktrees remain preserved without colliding with new Workers.
+- Confirmed Worker verification can emit a non-secret receipt before the exact Orca-injected supervised command sends `worker_done`; dispatch capabilities are never stored by repository automation.
+- Confirmed a Worker cleanup failure is recorded separately and no longer prevents an otherwise valid task acceptance from being persisted.
 - This section is control-plane preflight evidence only; Run, Task, Dispatch, Worker, product, browser, database, deployment, and official-acceptance evidence must be recorded separately when produced.
 
 ## Upstream archive baseline

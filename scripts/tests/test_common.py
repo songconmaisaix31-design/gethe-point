@@ -88,11 +88,23 @@ class PlanTests(unittest.TestCase):
         self.assertEqual(self.plan["waves"][0]["base"]["value"], self.cfg["base_ref"])
 
     def test_foundation_owns_reproducible_root_gitignore(self):
+        root = Path(__file__).resolve().parents[2]
         foundation = self.cfg["tracks"]["foundation"]
         found_task = self.plan["waves"][0]["tasks"][0]
+        ignore_rules = (root / ".gitignore").read_text(encoding="utf-8").splitlines()
 
         self.assertIn(".gitignore", foundation["allow"])
         self.assertIn(".gitignore", found_task["write_paths"])
+        self.assertIn("node_modules/", ignore_rules)
+        self.assertIn("__pycache__/", ignore_rules)
+
+    def test_workspace_suffix_rejects_unsafe_or_ambiguous_names(self):
+        plan = json.loads(json.dumps(self.plan))
+        plan["workspace_suffix"] = "Retry V2"
+
+        errors = validate_plan(plan, self.cfg)
+
+        self.assertTrue(any("workspace_suffix" in error for error in errors))
 
     def test_parallel_overlap_is_rejected(self):
         plan = json.loads(json.dumps(self.plan))

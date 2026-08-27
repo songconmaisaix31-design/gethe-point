@@ -3,6 +3,7 @@
   "plan_id": "we-remember-mvp-overall-v1",
   "plan_status": "approved",
   "launch_authorized": true,
+  "workspace_suffix": "v2",
   "planning_date": "2026-08-27",
   "objective": "Build and verify the We Remember MVP from one requested-kit control lineage with consent-first privacy, persisted five-stage responsibility, blocked two-party handover, deterministic care, and a reproducible fixture demo",
   "base_ref": "origin/songconmaisaix31-design/we-remember-requested-fleet-v2",
