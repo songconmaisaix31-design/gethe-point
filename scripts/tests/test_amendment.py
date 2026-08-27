@@ -1310,6 +1310,385 @@ class StateLockConcurrencyTests(unittest.TestCase):
         save_json_mock.assert_not_called()
 
 
+class ResolutionChainTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.run_dir = Path(self.temp.name) / "run"
+        self.run_dir.mkdir()
+        self.state_path = self.run_dir / "state.json"
+
+    def tearDown(self):
+        self.temp.cleanup()
+
+    def chain_state(self) -> dict:
+        source = task_state(
+            "CONTRACT-001",
+            "contracts",
+            "repair",
+            "completed",
+            "trk-contracts-contract-001",
+            ["packages/contracts/**"],
+        )
+        source["head_sha"] = "a" * 40
+        intermediate = task_state(
+            "CONTRACT-CORR-001",
+            "contracts",
+            "repair",
+            "failed",
+            "trk-contracts-contract-corr-001",
+            ["packages/contracts/**"],
+        )
+        terminal = task_state(
+            "CONTRACT-CORR-002",
+            "contracts",
+            "repair",
+            "completed",
+            "trk-contracts-contract-corr-002",
+            ["packages/contracts/**"],
+        )
+        terminal["head_sha"] = "c" * 40
+        return {
+            "schema_version": 1,
+            "run_id": "run_chain123",
+            "objective": "resolve chained replacements",
+            "created_at": "2026-08-28T00:00:00Z",
+            "updated_at": "2026-08-28T00:00:00Z",
+            "run_dir": str(self.run_dir),
+            "repo_selector": "id:repo_test",
+            "coordinator_branch": "fleet-control-test",
+            "initial_base_ref": "origin/main",
+            "initial_base_sha": "0" * 40,
+            "waves": [
+                {
+                    "id": "repair",
+                    "description": "repair",
+                    "depends_on": [],
+                    "base": {"type": "ref", "value": "origin/main"},
+                    "tasks": ["CONTRACT-001", "CONTRACT-CORR-001", "CONTRACT-CORR-002"],
+                    "status": "failed",
+                    "dispatched_at": "2026-08-28T00:00:00Z",
+                    "completed_at": None,
+                }
+            ],
+            "tasks": {
+                "CONTRACT-001": source,
+                "CONTRACT-CORR-001": intermediate,
+                "CONTRACT-CORR-002": terminal,
+            },
+            "resolutions": {
+                "CONTRACT-001": {
+                    "corrected_by": "CONTRACT-CORR-001",
+                    "amendment_id": "repair-contract-001",
+                    "recorded_at": "2026-08-28T01:00:00Z",
+                },
+                "CONTRACT-CORR-001": {
+                    "superseded_by": "CONTRACT-CORR-002",
+                    "amendment_id": "repair-contract-002",
+                    "recorded_at": "2026-08-28T02:00:00Z",
+                },
+            },
+        }
+
+    def one_hop_state(self, relation: str) -> dict:
+        state = self.chain_state()
+        source_status = "completed" if relation == "corrected_by" else "failed"
+        state["tasks"]["CONTRACT-001"] = task_state(
+            "CONTRACT-001",
+            "contracts",
+            "repair",
+            source_status,
+            "trk-contracts-contract-001",
+            ["packages/contracts/**"],
+        )
+        state["waves"][0]["tasks"] = ["CONTRACT-001", "CONTRACT-CORR-002"]
+        state["resolutions"] = {
+            "CONTRACT-001": {
+                relation: "CONTRACT-CORR-002",
+                "amendment_id": "repair-contract-001",
+                "recorded_at": "2026-08-28T01:00:00Z",
+            }
+        }
+        return state
+
+    def test_valid_one_hop_output_is_exactly_compatible(self):
+        for relation in ("corrected_by", "superseded_by"):
+            with self.subTest(relation=relation):
+                state = self.one_hop_state(relation)
+                self.assertEqual(
+                    fleet_module.resolution_view(state, "CONTRACT-001"),
+                    {
+                        "relation": relation,
+                        "replacement_task": "CONTRACT-CORR-002",
+                        "replacement_sha": "c" * 40,
+                        "accepted": True,
+                        "amendment_id": "repair-contract-001",
+                    },
+                )
+
+    def test_valid_one_hop_pending_output_and_status_are_exactly_compatible(self):
+        state = self.one_hop_state("superseded_by")
+        state["tasks"]["CONTRACT-CORR-002"].update({"status": "pending", "head_sha": None})
+
+        self.assertEqual(
+            fleet_module.resolution_view(state, "CONTRACT-001"),
+            {
+                "relation": "superseded_by",
+                "replacement_task": "CONTRACT-CORR-002",
+                "replacement_sha": None,
+                "accepted": False,
+                "amendment_id": "repair-contract-001",
+            },
+        )
+        self.assertIn(
+            "| CONTRACT-001 | contracts | failed | unresolved_failure | "
+            "`superseded_by:CONTRACT-CORR-002@pending` |",
+            status_markdown(state),
+        )
+
+    def test_chain_resolves_both_sources_to_terminal_task(self):
+        state = self.chain_state()
+
+        self.assertEqual(
+            fleet_module.resolution_view(state, "CONTRACT-001"),
+            {
+                "relation": "corrected_by",
+                "replacement_task": "CONTRACT-CORR-002",
+                "replacement_sha": "c" * 40,
+                "accepted": True,
+                "amendment_id": "repair-contract-001",
+            },
+        )
+        self.assertEqual(
+            fleet_module.resolution_view(state, "CONTRACT-CORR-001"),
+            {
+                "relation": "superseded_by",
+                "replacement_task": "CONTRACT-CORR-002",
+                "replacement_sha": "c" * 40,
+                "accepted": True,
+                "amendment_id": "repair-contract-002",
+            },
+        )
+        view = fleet_module.status_view(state)
+        self.assertEqual(view["tasks"]["CONTRACT-001"]["effective_status"], "completed")
+        self.assertEqual(view["tasks"]["CONTRACT-CORR-001"]["effective_status"], "resolved_failure")
+
+    def test_nonterminal_statuses_fail_closed(self):
+        for status in ("planned", "dispatched", "pending", "failed"):
+            with self.subTest(status=status):
+                state = self.chain_state()
+                state["tasks"]["CONTRACT-CORR-002"]["status"] = status
+                self.assertFalse(fleet_module.resolution_view(state, "CONTRACT-001")["accepted"])
+
+    def test_invalid_terminal_shas_fail_closed(self):
+        for value in (None, "", "c" * 39, "c" * 41, "g" * 40):
+            with self.subTest(value=value):
+                state = self.chain_state()
+                state["tasks"]["CONTRACT-CORR-002"]["head_sha"] = value
+                self.assertFalse(fleet_module.resolution_view(state, "CONTRACT-001")["accepted"])
+
+    def test_missing_malformed_and_ambiguous_edges_fail_closed(self):
+        cases = []
+
+        missing = self.chain_state()
+        del missing["tasks"]["CONTRACT-CORR-002"]
+        missing["waves"][0]["tasks"].remove("CONTRACT-CORR-002")
+        cases.append(("missing task", missing))
+
+        non_object = self.chain_state()
+        non_object["resolutions"]["CONTRACT-CORR-001"] = []
+        cases.append(("non-object edge", non_object))
+
+        ambiguous = self.chain_state()
+        ambiguous["resolutions"]["CONTRACT-CORR-001"] = {
+            "corrected_by": "CONTRACT-CORR-002",
+            "superseded_by": "CONTRACT-CORR-002",
+        }
+        cases.append(("ambiguous edge", ambiguous))
+
+        empty = self.chain_state()
+        empty["resolutions"]["CONTRACT-CORR-001"]["superseded_by"] = ""
+        cases.append(("empty target", empty))
+
+        non_string = self.chain_state()
+        non_string["resolutions"]["CONTRACT-CORR-001"]["superseded_by"] = 42
+        cases.append(("non-string target", non_string))
+
+        for name, state in cases:
+            with self.subTest(case=name):
+                result = fleet_module.resolution_view(state, "CONTRACT-001")
+                self.assertIsNotNone(result)
+                self.assertFalse(result["accepted"])
+
+    def test_zero_relationship_and_malformed_first_edges_fail_closed(self):
+        cases = (
+            ("zero relationships", {}, "resolution must contain exactly one relationship"),
+            ("non-object", [], "resolution edge must be an object"),
+            (
+                "ambiguous",
+                {
+                    "corrected_by": "CONTRACT-CORR-002",
+                    "superseded_by": "CONTRACT-CORR-002",
+                },
+                "resolution must contain exactly one relationship",
+            ),
+            ("empty target", {"corrected_by": ""}, "resolution target must be a non-empty string"),
+            ("non-string target", {"corrected_by": 42}, "resolution target must be a non-empty string"),
+        )
+        for name, edge, error in cases:
+            with self.subTest(case=name):
+                state = self.chain_state()
+                state["resolutions"]["CONTRACT-001"] = edge
+                self.assertEqual(
+                    fleet_module.resolution_view(state, "CONTRACT-001"),
+                    {"accepted": False, "error": error},
+                )
+
+    def test_incompatible_source_lifecycle_fails_closed(self):
+        cases = []
+        corrected_failed = self.one_hop_state("corrected_by")
+        corrected_failed["tasks"]["CONTRACT-001"]["status"] = "failed"
+        cases.append(("corrected failed source", corrected_failed))
+
+        superseded_completed = self.one_hop_state("superseded_by")
+        superseded_completed["tasks"]["CONTRACT-001"]["status"] = "completed"
+        cases.append(("superseded completed source", superseded_completed))
+
+        for name, state in cases:
+            with self.subTest(case=name):
+                self.assertFalse(fleet_module.resolution_view(state, "CONTRACT-001")["accepted"])
+
+    def test_self_and_multi_task_cycles_fail_closed(self):
+        self_cycle = self.one_hop_state("corrected_by")
+        self_cycle["resolutions"]["CONTRACT-001"]["corrected_by"] = "CONTRACT-001"
+
+        multi_cycle = self.chain_state()
+        multi_cycle["resolutions"]["CONTRACT-CORR-001"]["superseded_by"] = "CONTRACT-001"
+
+        for name, state in (("self", self_cycle), ("multi", multi_cycle)):
+            with self.subTest(cycle=name):
+                self.assertFalse(fleet_module.resolution_view(state, "CONTRACT-001")["accepted"])
+
+    def test_malformed_top_level_mappings_fail_closed(self):
+        for field in ("tasks", "resolutions"):
+            with self.subTest(field=field):
+                state = self.chain_state()
+                state[field] = []
+                result = fleet_module.resolution_view(state, "CONTRACT-001")
+                self.assertIsNotNone(result)
+                self.assertFalse(result["accepted"])
+                with self.assertRaisesRegex(FleetError, f"state {field} must be an object"):
+                    fleet_module.status_view(state)
+
+    def test_status_markdown_renders_terminal_replacement(self):
+        markdown = status_markdown(self.chain_state())
+        self.assertIn("corrected_by:CONTRACT-CORR-002@cccccccccccc", markdown)
+        self.assertIn("superseded_by:CONTRACT-CORR-002@cccccccccccc", markdown)
+
+    def test_finalize_rejects_all_unresolved_chain_classes_with_override(self):
+        cases = []
+
+        for status in ("planned", "dispatched", "pending", "failed"):
+            state = self.chain_state()
+            state["tasks"]["CONTRACT-CORR-002"]["status"] = status
+            cases.append((f"{status} terminal", state))
+
+        missing = self.chain_state()
+        del missing["tasks"]["CONTRACT-CORR-002"]
+        missing["waves"][0]["tasks"].remove("CONTRACT-CORR-002")
+        cases.append(("missing task", missing))
+
+        non_object = self.chain_state()
+        non_object["resolutions"]["CONTRACT-CORR-001"] = None
+        cases.append(("non-object edge", non_object))
+
+        ambiguous = self.chain_state()
+        ambiguous["resolutions"]["CONTRACT-CORR-001"] = {
+            "corrected_by": "CONTRACT-CORR-002",
+            "superseded_by": "CONTRACT-CORR-002",
+        }
+        cases.append(("ambiguous edge", ambiguous))
+
+        empty = self.chain_state()
+        empty["resolutions"]["CONTRACT-CORR-001"]["superseded_by"] = ""
+        cases.append(("empty target", empty))
+
+        non_string = self.chain_state()
+        non_string["resolutions"]["CONTRACT-CORR-001"]["superseded_by"] = 42
+        cases.append(("non-string target", non_string))
+
+        for name, value in (
+            ("missing SHA", None),
+            ("short SHA", "c" * 39),
+            ("long SHA", "c" * 41),
+            ("non-hex SHA", "g" * 40),
+        ):
+            state = self.chain_state()
+            state["tasks"]["CONTRACT-CORR-002"]["head_sha"] = value
+            cases.append((name, state))
+
+        incompatible = self.chain_state()
+        incompatible["tasks"]["CONTRACT-CORR-001"]["status"] = "completed"
+        cases.append(("incompatible lifecycle", incompatible))
+
+        corrected_failed = self.one_hop_state("corrected_by")
+        corrected_failed["tasks"]["CONTRACT-001"]["status"] = "failed"
+        cases.append(("incompatible first lifecycle", corrected_failed))
+
+        self_cycle = self.one_hop_state("corrected_by")
+        self_cycle["resolutions"]["CONTRACT-001"]["corrected_by"] = "CONTRACT-001"
+        cases.append(("self-cycle", self_cycle))
+
+        multi_cycle = self.chain_state()
+        multi_cycle["resolutions"]["CONTRACT-CORR-001"]["superseded_by"] = "CONTRACT-001"
+        cases.append(("multi-task cycle", multi_cycle))
+
+        malformed_mapping = self.chain_state()
+        malformed_mapping["resolutions"] = []
+        cases.append(("malformed resolutions mapping", malformed_mapping))
+
+        malformed_tasks = self.chain_state()
+        malformed_tasks["tasks"] = []
+        cases.append(("malformed tasks mapping", malformed_tasks))
+
+        for name, state in cases:
+            with self.subTest(case=name):
+                save_json(self.state_path, state)
+                with patch("builtins.print"), self.assertRaises(FleetError):
+                    do_finalize(argparse.Namespace(state=self.state_path, allow_incomplete=True, json=True))
+                self.assertFalse((self.run_dir / "RELEASE_MANIFEST.json").exists())
+
+    def test_successful_manifest_records_terminal_replacement(self):
+        save_json(self.state_path, self.chain_state())
+
+        with patch("builtins.print"):
+            self.assertEqual(
+                do_finalize(argparse.Namespace(state=self.state_path, allow_incomplete=False, json=True)),
+                0,
+            )
+
+        manifest = json.loads((self.run_dir / "RELEASE_MANIFEST.json").read_text(encoding="utf-8"))
+        source_resolution = manifest["tasks"]["CONTRACT-001"]["resolution"]
+        self.assertEqual(source_resolution["replacement_task"], "CONTRACT-CORR-002")
+        self.assertEqual(source_resolution["replacement_sha"], "c" * 40)
+        self.assertEqual(manifest["tasks"]["CONTRACT-001"]["effective_status"], "completed")
+        self.assertEqual(manifest["tasks"]["CONTRACT-CORR-001"]["effective_status"], "resolved_failure")
+        self.assertEqual(
+            manifest["resolved_failures"],
+            [
+                {
+                    "task": "CONTRACT-CORR-001",
+                    "relation": "superseded_by",
+                    "replacement_task": "CONTRACT-CORR-002",
+                    "replacement_sha": "c" * 40,
+                    "accepted": True,
+                    "amendment_id": "repair-contract-002",
+                }
+            ],
+        )
+        self.assertEqual(manifest["unresolved_failures"], [])
+        self.assertEqual(manifest["unresolved_resolutions"], [])
+
+
 class ResolutionFinalizationTests(unittest.TestCase):
     setUp = AmendmentTests.setUp
     tearDown = AmendmentTests.tearDown
