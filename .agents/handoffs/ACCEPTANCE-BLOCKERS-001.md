@@ -53,6 +53,21 @@
 - DATA-001 storage: shared evidence enum `available | deleted` is also used by `signals.evidence_state`.
 - Required correction: a signal-specific enum, forward migration, Drizzle snapshot, catalog evidence, and disposable PostgreSQL test.
 
+## Rejected control-plane Attempt
+
+### AUTO-REPAIR-001
+
+- Evidence SHA: `c4797ad076e049935ea16a9e9e7d036e3c30a08b`
+- Mechanical evidence: exact remote SHA, clean worktree, scope gate, 57 Python tests, compilation, plan validation, and Fleet doctor passed.
+- Reasons: unlocked check-then-replace CAS loses concurrent state updates; state, STATUS, and receipt can half-commit and replay as success; unrelated undispatched nodes can be patched; failed sources incorrectly accept `corrected_by`.
+- Required replacement proof: shared cross-process state locking, single-snapshot hash and parse, journal-first deterministic recovery, transitive-downstream enforcement, strict resolution semantics, and process/failure-injection tests.
+
+## QA dependency closure
+
+- `QA-REPAIR-001` must own `packages/testkit/package.json` and declare `@we-remember/contracts` through the public workspace package boundary.
+- `FOUND-CORR-001` must run after QA, own only the root lockfile update, and prove `pnpm install --frozen-lockfile` plus `pnpm run check:qa-core` from the committed dependency graph.
+- `INT-001` must use `FOUND-CORR-001` as its base so the accepted QA ancestry and reproducible lockfile are present before integration.
+
 ## Gate
 
-`INT-001` remains blocked until every replacement and correction named in ADR 0003, including `CONV-REPAIR-001` and `QA-REPAIR-001`, is independently accepted by exact remote SHA.
+`INT-001` remains blocked until `AUTO-REPAIR-002` and every replacement and correction named in ADR 0003, including `CONV-REPAIR-001`, `QA-REPAIR-001`, and `FOUND-CORR-001`, is independently accepted by exact remote SHA.
