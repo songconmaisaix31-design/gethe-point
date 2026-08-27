@@ -1,5 +1,6 @@
 // Generated from Unicode 17.0.0 CaseFolding.txt (statuses C and F).
 // Source SHA-256: ff8d8fefbf123574205085d6714c36149eb946d717a0c585c27f0f4ef58c4183.
+// Copyright 2025 Unicode, Inc.; see https://www.unicode.org/terms_of_use.html.
 // Do not replace this table with locale casing or upper/lowercase closure.
 
 export const UNICODE_CASE_FOLDING_VERSION = "17.0.0";
