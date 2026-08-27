@@ -35,6 +35,12 @@
 - Reason: the exact scope omits `apps/web/next-env.d.ts`; a test-only renderer is not accepted as proof that the required Next.js app runs.
 - Required replacement proof: fresh owned runtime path plus real browser checks at both frozen viewports.
 
+### QA-001
+
+- Evidence SHA: `cf864638a7d196f1370dcb6d732eed41a9aaafac`
+- Reasons: evidence deletion reverses accepted ownership while claiming preservation; report rows disagree with task facts; scenarios mix unrelated ID graphs; reminder migration crosses domain boundaries; testkit bypasses the contracts public package boundary.
+- Required replacement proof: one coherent fixture graph, derived reports and receipts, public package imports, and cross-entity invariant tests that fail on identity or ownership drift.
+
 ## Cross-track correction
 
 - `Signal.evidenceState` contract: `available | evidence_missing`.
@@ -43,4 +49,4 @@
 
 ## Gate
 
-`INT-001` remains blocked until every replacement and correction named in ADR 0003 is independently accepted by exact remote SHA.
+`INT-001` remains blocked until every replacement and correction named in ADR 0003, including `QA-REPAIR-001`, is independently accepted by exact remote SHA.

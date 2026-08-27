@@ -15,6 +15,7 @@ Independent acceptance found defects that mechanical scope and test gates did no
 - `CARE-001` accepts a caller-backdated acknowledgement after the server clock has passed the deadline and discards the validated handling resolution.
 - `PRIV-001` returns an export authorization error outside the frozen API contract.
 - `DATA-001` cannot persist the contract's `Signal.evidenceState = evidence_missing` value.
+- `QA-001` contains cross-entity fixture contradictions that allow shape-only tests to pass false business facts.
 
 The original Tasks and Dispatches are immutable evidence. Reopening them, editing their contracts, or overwriting their acceptance receipts would make the Run impossible to audit. The current Fleet Kit cannot append replacement waves, express supersession, or finalize a resolved failed Attempt.
 
@@ -33,12 +34,12 @@ The original Tasks and Dispatches are immutable evidence. Reopening them, editin
 ```text
 AUTO-REPAIR-001
   -> Wave A from DATA-001: CONTRACT-CORR-001 + RESP-REPAIR-001
-      -> Wave B from CONTRACT-CORR-001: DATA-CORR-001 + EXPR-REPAIR-001
-          -> Wave C from DATA-CORR-001: CARE-REPAIR-001 + PRIV-REPAIR-001
+  -> Wave B from CONTRACT-CORR-001: DATA-CORR-001 + EXPR-REPAIR-001
+  -> Wave C from DATA-CORR-001: CARE-REPAIR-001 + PRIV-REPAIR-001 + QA-REPAIR-001
   -> amended INT-001 after all accepted core and replacement SHAs
 ```
 
-`CONTRACT-CORR-001` freezes server-observed care timing and a persisted/audited safe resolution. `DATA-CORR-001` adds the signal-specific evidence-state storage, care resolution storage, forward migrations, and catalog proof. `CARE-REPAIR-001` enforces one PostgreSQL lock order and adds a representative concurrency regression. The experience, responsibility, care, and privacy replacements use fresh Task IDs, Dispatches, worktrees, branches, and receipts.
+`CONTRACT-CORR-001` freezes server-observed care timing and a persisted/audited safe resolution. `DATA-CORR-001` adds the signal-specific evidence-state storage, care resolution storage, forward migrations, and catalog proof. `CARE-REPAIR-001` enforces one PostgreSQL lock order and adds a representative concurrency regression. The experience, responsibility, care, privacy, and QA replacements use fresh Task IDs, Dispatches, worktrees, branches, and receipts.
 
 ## Integration dependency set
 
@@ -51,9 +52,9 @@ The amended but still undispatched `INT-001` must use `DATA-CORR-001` as its bas
 - `HAND-001`
 - `CARE-REPAIR-001`
 - `PRIV-REPAIR-001`
-- `QA-001`
+- `QA-REPAIR-001`
 
-Rejected EXPR, RESP, CARE, and PRIV SHAs must not enter integration. `DATA-001` and `CONTRACT-001` remain ancestors and historical accepted gates, while their corrections become the active integration lineage.
+Rejected EXPR, RESP, CARE, PRIV, and QA SHAs must not enter integration. `DATA-001` and `CONTRACT-001` remain ancestors and historical accepted gates, while their corrections become the active integration lineage.
 
 ## Consequences
 
