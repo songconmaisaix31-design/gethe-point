@@ -1,0 +1,12 @@
+{
+  "ok": true,
+  "run": {
+    "id": "run_6f548c6156cc",
+    "coordinator_handle": "term_5eafc3f3-3648-43a3-b4f1-052e2277ff5a",
+    "created_at": "2026-08-27T01:51:30Z"
+  },
+  "runtime": {
+    "id": "5d2bdb04-39e3-4c32-b1b3-2e10b1a8a885",
+    "version": "1.4.188"
+  }
+}
