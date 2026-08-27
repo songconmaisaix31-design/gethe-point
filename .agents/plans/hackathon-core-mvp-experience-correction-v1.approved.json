@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "amendment_id": "hackathon-core-mvp-experience-correction-v1",
+  "description": "Replace the rejected Experience attempt with a focused HTTP transport and route correction while preserving the accepted Style A implementation.",
+  "plan_status": "approved",
+  "launch_authorized": true,
+  "run_id": "run_9905fa756757",
+  "parent_plan_sha256": "3c09e2a6cd22fa6aa0debcce6572b6fef731e2b24126de09e684e05993d3c623",
+  "state_sha256": "f78d042ab86fbe3c603334a067cb945e02086105addcfaab7b8f030fe5bb2688",
+  "automation": {
+    "branch": "fleet-control-mvp-repair-v3",
+    "sha": "057ab1f0dfa4f23b38bfa25362f3571aa6db99fc"
+  },
+  "workspace_suffix": "mvp-corr2",
+  "append_waves": [
+    {
+      "id": "hackathon-experience-correction",
+      "description": "Preserve the validated Style A experience and replace only the local-only runtime seam and missing canonical route.",
+      "depends_on": [
+        "MVP-BASE-001",
+        "MVP-QA-002"
+      ],
+      "base": {
+        "type": "task",
+        "task": "MVP-BASE-001"
+      },
+      "tasks": [
+        {
+          "id": "MVP-EXPR-002",
+          "title": "Connect the core experience to the accepted HTTP seam",
+          "track": "experience",
+          "write_paths": [
+            "apps/web/next-env.d.ts",
+            "apps/web/next.config.*",
+            "apps/web/tsconfig.json",
+            "apps/web/public/**",
+            "apps/web/src/app/(ui)/**",
+            "apps/web/src/app/globals.css",
+            "apps/web/src/app/layout.tsx",
+            "apps/web/src/app/page.tsx",
+            "apps/web/src/components/**",
+            "apps/web/src/features/**",
+            "apps/web/tests/**"
+          ],
+          "spec": "Start from exact accepted MVP-BASE-001 SHA 25f00004f83185be3d987424b28f627f3854b35d after MVP-QA-002 is accepted. Do not merge or cherry-pick rejected Experience candidate 70338ef07670b4e62eb0b6633c76beb6997ee0f3; it may be read only as a failed design reference. Recreate its independently validated Style A layout, Chinese copy, action sequence, responsive code, tests, and card depth without failed commit ancestry. Fix exactly two integration blockers. First, the production FixtureExperience entry must default to a fixed typed HTTP ExperienceClient that consumes the accepted MVP-QA-002 state and command seam. The client must use the accepted fixed Fixture endpoints and exact accepted request and response shapes, must never place role, actor, space, scenario, content, private text, or guessed identifiers in ordinary command bodies, and must fail closed on non-2xx or malformed responses. Keep any in-memory client only as an explicitly injected test dependency; do not use it as the production default and do not add a 404 fallback. Second, add apps/web/src/app/(ui)/fixtures/mvp-core/page.tsx and make both / and /fixtures/mvp-core render the same shared FixtureExperience component. Do not create API routes, server state, authentication, backend adapters, or a parallel wire contract in this lane. Preserve the exact Style A colors, system fonts, 18px by 16px core-card padding, compact rail, three phone-proportioned desktop surfaces, one active mobile surface, vertical title/body-or-evidence/state/action zones, exact 补齐上次检查结果 copy, truth labels, and core journey. Verification remains code-only: no browser or container UI operation in this task.",
+          "acceptance": [
+            "The task starts from exact accepted MVP-BASE-001 SHA 25f00004f83185be3d987424b28f627f3854b35d, contains HAND-001 as an ancestor, and contains neither rejected Experience commit 70338ef07670b4e62eb0b6633c76beb6997ee0f3 nor another failed Attempt as an ancestor",
+            "The production FixtureExperience path defaults to a fixed typed HTTP client matching the accepted MVP-QA-002 seam; an in-memory client can be used only through explicit test injection and there is no 404 or network-error fallback to local success",
+            "Ordinary command bodies follow the accepted QA-002 strict command shapes and contain no role, actor, space, scenario, content, private text, or guessed target identifiers; non-2xx and malformed responses keep the current snapshot unchanged and surface a recoverable or terminal error",
+            "No API route, server session, database adapter, auth implementation, or backend state machine is added under the Experience allowlist",
+            "Both / and /fixtures/mvp-core render the same shared FixtureExperience component, with the canonical route implemented at apps/web/src/app/(ui)/fixtures/mvp-core/page.tsx",
+            "The validated Style A source constraints are preserved exactly: #F4F1EA, #FFFFFF, #1F1C17, #33513F, #8A5A3B, #9C4E22, system fonts, no remote runtime assets, compact rail, and three phone-proportioned desktop surfaces",
+            "Core cards retain 18px vertical and 16px horizontal padding with distinct vertical title, body or evidence, state, and action zones rather than shallow horizontal strips; mobile code shows only one active role surface",
+            "The visible core action remains exactly 补齐上次检查结果, the consent-report-blocked-awaiting-two-confirmations-accepted journey remains reachable, and Fixture, Local Demo, and Not Production Acceptance stay visible",
+            "Frozen install and check:experience pass, focused tests prove the HTTP default and injection boundary, scope is clean, and the branch is pushed with remote SHA parity; no browser claim is made by this task"
+          ],
+          "checks": [
+            "pnpm install --frozen-lockfile --ignore-scripts",
+            "pnpm run check:experience"
+          ],
+          "agent": "codex",
+          "setup": "skip"
+        }
+      ]
+    }
+  ],
+  "update_waves": [
+    {
+      "id": "hackathon-integration",
+      "depends_on": [
+        "MVP-BASE-001",
+        "MVP-CONV-001",
+        "MVP-RESP-001",
+        "MVP-EXPR-002",
+        "MVP-QA-002"
+      ]
+    }
+  ],
+  "update_tasks": [
+    {
+      "id": "MVP-INT-001",
+      "spec": "Start from the exact accepted MVP-BASE-001 SHA and verify accepted HAND-001 SHA 59e4bcb98be9d21432a92d02e7d01962bc4451cb is already an ancestor. Fetch and cleanly merge --no-ff only the exact accepted remote SHAs for MVP-CONV-001, MVP-RESP-001, replacement MVP-EXPR-002, and replacement MVP-QA-002. Abort on conflict or unexpected ancestry, and verify rejected commits 70338ef07670b4e62eb0b6633c76beb6997ee0f3 and e5e2cebd039ee9a9627fa7b819d3b6a3153aa8c7 are not ancestors. Add only integration-owned Fixture sessions, public command and query composition, database adapters, API routes, and demo documentation. Bind the Experience-owned fixed HTTP client to the QA-owned accepted seam without modifying either product lane. The page may establish an allowlisted local Fixture session, but ordinary command bodies must omit role, actor, space, scenario, content, private text, and guessed identifiers; derive identity and canonical data from the server-owned session. Unknown sessions and tampered requests fail closed with zero writes. Wire the canonical journey through the real Next.js UI, public handlers, and PostgreSQL, including SupplyHandoverInfo from the exact 补齐上次检查结果 action before either confirmation. Keep provider behavior deterministic and credential-free. Do not patch product modules sideways or claim production readiness.",
+      "acceptance": [
+        "HAND-001 is an ancestor of the exact MVP-BASE-001 integration base; each of the four accepted product SHAs including MVP-EXPR-002 and MVP-QA-002 is an exact second parent of a clean no-ff merge, and rejected commits 70338ef07670b4e62eb0b6633c76beb6997ee0f3 and e5e2cebd039ee9a9627fa7b819d3b6a3153aa8c7 are not ancestors",
+        "The Experience-owned HTTP client reaches the integration-owned API routes through the accepted QA-002 seam with no local success fallback",
+        "The canonical private message has zero shared rows before consent and creates one derived shared signal after same-speaker consent",
+        "Through real handlers, a partner Fixture session cannot read or share a guessed private-message identifier; ordinary command bodies cannot select subject role, actor, space, scenario, content, or private text, responses contain no raw text, and shared rows remain zero",
+        "Unknown sessions and tampered identity, scenario, content, or target fields are rejected and persist zero writes",
+        "The report reads the persisted five-stage fields through real query handlers",
+        "Missing information and one-sided confirmation keep the handover blocked with owner and reminder unchanged",
+        "The exact visible 补齐上次检查结果 action invokes SupplyHandoverInfo, moves blocked to awaiting_confirmations, and leaves owner and reminder unchanged",
+        "After both confirmations, owner and future reminder move atomically and both role views retain the new state after reload",
+        "The flow runs through the real Next.js runtime and disposable PostgreSQL rather than disconnected static mocks",
+        "The @mvp-core browser run exercises the subject step at 390x844 and the compact rail plus three phone-proportioned role surfaces at 1440x900 with exact Style A variables, visible primary actions, vertically structured core cards, and no blocking overlap or clipping",
+        "Fixture, Local Demo, and Not Production Acceptance labels remain visible and documentation makes no live-model, production-auth, deployment, release, or official-acceptance claim",
+        "No-consent, blocked, one-sided, wrong-role, and tampered-session negative browser cases pass with zero forbidden mutation"
+      ]
+    }
+  ],
+  "resolutions": [
+    {
+      "task": "MVP-EXPR-001",
+      "superseded_by": "MVP-EXPR-002"
+    }
+  ]
+}
