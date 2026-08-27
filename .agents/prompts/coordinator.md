@@ -66,6 +66,90 @@ python scripts/fleet.py accept \
 
 保留失败证据，决定重试、缩小任务、替换 Agent 或阻断后续 Wave；不得掩盖失败历史。
 
+## Append-only amendments
+
+Never reopen, edit, or re-accept a failed logical Task. A failed Attempt keeps its original
+Task ID, Dispatch ID, outcome, branch, receipt, and evidence forever; only a fresh logical
+Task can replace it. Record the relationship in the amendment as `superseded_by` for a
+failed Attempt or `corrected_by` for a terminal Attempt whose accepted baseline needs a
+forward correction.
+
+An amendment is an approved JSON object with this contract:
+
+```json
+{
+  "schema_version": 1,
+  "amendment_id": "repair-core-001",
+  "description": "Append fresh repair Attempts and retarget undispatched integration.",
+  "plan_status": "approved",
+  "launch_authorized": true,
+  "run_id": "run_example",
+  "parent_plan_sha256": "<64 lowercase hex characters for run_dir/plan.json>",
+  "state_sha256": "<64 lowercase hex characters for the exact current state.json>",
+  "automation": {
+    "branch": "trk-automation-auto-repair-001-v2",
+    "sha": "<40 character accepted automation SHA>"
+  },
+  "workspace_suffix": "repair-v1",
+  "append_waves": [
+    {
+      "id": "repair-example",
+      "description": "Fresh replacement Attempt",
+      "depends_on": ["DATA-001"],
+      "base": {"type": "task", "task": "DATA-001"},
+      "tasks": [
+        {
+          "id": "EXPR-REPAIR-001",
+          "title": "Repair the rejected experience Attempt",
+          "track": "experience",
+          "write_paths": ["apps/web/next-env.d.ts", "apps/web/src/components/**"],
+          "spec": "Use the approved repair handoff.",
+          "acceptance": ["Prove the replacement with the required runtime checks."],
+          "checks": ["pnpm run check:experience"]
+        }
+      ]
+    }
+  ],
+  "update_waves": [
+    {
+      "id": "alpha-integration",
+      "depends_on": ["DATA-001", "EXPR-REPAIR-001"],
+      "base": {"type": "task", "task": "DATA-001"}
+    }
+  ],
+  "update_tasks": [
+    {
+      "id": "INT-001",
+      "spec": "Integrate only the accepted replacement dependency SHAs."
+    }
+  ],
+  "resolutions": [
+    {"task": "EXPR-001", "superseded_by": "EXPR-REPAIR-001"}
+  ]
+}
+```
+
+`append_waves` must contain only fresh wave, logical Task, and workspace identities.
+`update_waves` may change only `description`, `depends_on`, and `base` on a wave that has
+never been dispatched. `update_tasks` may change only `title`, `spec`, `acceptance`,
+`checks`, and `write_paths` on a Task that has never been dispatched. Any stale hash,
+historical Task/Dispatch field, duplicate workspace, overlapping write path, invalid DAG,
+or unresolved identity fails before a state or Orca write.
+
+Always validate the exact current absolute state path first:
+
+```bash
+python scripts/fleet.py amend --state <absolute-state.json> --amendment <amendment.json> --dry-run --json
+python scripts/fleet.py amend --state <absolute-state.json> --amendment <amendment.json> --json
+```
+
+`amend` atomically updates only local Run state and writes a unique receipt containing the
+before/after state hashes; it never creates or dispatches an Orca Task. Review the applied
+status, then call `advance` separately. Reapplying the identical amendment is a no-op;
+reusing its ID with different bytes fails closed. Finalization treats the historical
+outcome as failed and reports `resolved_failure` only after the named replacement has been
+accepted with a full remote SHA.
+
 ## 完成标准
 
 只有以下条件全部满足，才接受 Worker：

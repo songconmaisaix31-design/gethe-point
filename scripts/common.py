@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import fnmatch
+import hashlib
 import json
 import os
 import re
@@ -85,6 +86,18 @@ def load_json(path: Path) -> Any:
         raise FleetError(f"missing file: {path}") from exc
     except json.JSONDecodeError as exc:
         raise FleetError(f"invalid JSON {path}:{exc.lineno}:{exc.colno}: {exc.msg}") from exc
+
+
+def sha256_file(path: Path) -> str:
+    """Hash exact file bytes for compare-and-swap preconditions and evidence."""
+    digest = hashlib.sha256()
+    try:
+        with path.open("rb") as source:
+            for chunk in iter(lambda: source.read(1024 * 1024), b""):
+                digest.update(chunk)
+    except FileNotFoundError as exc:
+        raise FleetError(f"missing file: {path}") from exc
+    return digest.hexdigest()
 
 
 def save_json(path: Path, value: Any) -> None:

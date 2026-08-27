@@ -101,6 +101,7 @@
     "experience": {
       "description": "Role-specific responsive web experience built against fixed contract fixtures first",
       "allow": [
+        "apps/web/next-env.d.ts",
         "apps/web/next.config.*",
         "apps/web/tsconfig.json",
         "apps/web/public/**",

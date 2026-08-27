@@ -48,6 +48,8 @@
 - A failed Worker launch must not block its independent siblings. Persist the failed Dispatch receipt and Task ID, continue the rest of the parallel wave, then recover the failed task only after querying its exact Dispatch, terminal, setup, and worktree state.
 - `agent_prompt_stalled` can be caused by Codex startup prompts, MCP startup latency, or a long-lived TUI transcript rather than repository code. Clear only an idle unsent composer, reuse the exact task and worktree, and use `--retry-of`; never replay a mutation after `runtime_unavailable` before querying state.
 - In `run_a6e82cb7623f`, the seven core tracks were launched from DATA SHA `b5ce8994ddc233ec086c1e9059b8c921e63e1cf7`. CARE required `task-update --status ready` plus `dispatch --inject` after repeated supervised startup stalls; its active Dispatch is live but appears as `unsupervised` in `worker-read`, so preserve that limitation in acceptance evidence and do not describe it as a normal supervised Worker launch.
+- Run recovery is append-only: apply an approved amendment only against exact parent-plan and state SHA-256 preconditions, append fresh logical Task/workspace identities, and patch only downstream contracts that have never been dispatched. Never hand-edit active state or reopen a historical failed Attempt.
+- A failed Attempt remains `failed`; `resolved_failure` is an output-only effective status backed by an explicit `corrected_by` or `superseded_by` relationship and a completed replacement with a full accepted remote SHA. Amendment dry-runs do not write state or mutate Orca, and application receipts preserve before/after state hashes without modifying the original plan snapshot.
 
 ## Secret handling
 

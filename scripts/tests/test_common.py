@@ -87,6 +87,9 @@ class PlanTests(unittest.TestCase):
         self.assertEqual(self.plan["base_ref"], self.cfg["base_ref"])
         self.assertEqual(self.plan["waves"][0]["base"]["value"], self.cfg["base_ref"])
 
+    def test_experience_track_owns_next_runtime_declaration(self):
+        self.assertIn("apps/web/next-env.d.ts", self.cfg["tracks"]["experience"]["allow"])
+
     def test_foundation_owns_reproducible_root_gitignore(self):
         root = Path(__file__).resolve().parents[2]
         foundation = self.cfg["tracks"]["foundation"]

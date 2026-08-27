@@ -201,6 +201,14 @@ class DispatchRecoveryTests(unittest.TestCase):
         _base,
         _spec,
     ):
+        self.wave["depends_on"] = ["DATA-001"]
+        self.state["tasks"]["DATA-001"] = {
+            "id": "DATA-001",
+            "track": "data",
+            "status": "completed",
+            "orca_task_id": "task_data123",
+            "head_sha": "a" * 40,
+        }
         first_calls = []
 
         def first_orca(_root, args, _label, _dry_run=False, **_kwargs):
@@ -244,6 +252,10 @@ class DispatchRecoveryTests(unittest.TestCase):
         self.assertFalse(any(call[:2] == ["orchestration", "task-create"] for call in second_calls))
         self.assertFalse(any(call[:2] == ["orchestration", "worker-start"] for call in second_calls))
         worker_start = next(call for call in first_calls if call[:2] == ["orchestration", "worker-start"])
+        task_create = next(call for call in first_calls if call[:2] == ["orchestration", "task-create"])
+        self.assertEqual(task_create[task_create.index("--run") + 1], "run_test")
+        self.assertEqual(task_create[task_create.index("--from") + 1], "term_coordinator")
+        self.assertEqual(json.loads(task_create[task_create.index("--deps") + 1]), ["task_data123"])
         self.assertEqual(worker_start[worker_start.index("--run") + 1], "run_test")
         self.assertEqual(worker_start[worker_start.index("--from") + 1], "term_coordinator")
         self.assertEqual(worker_start[worker_start.index("--repo") + 1], "id:repo_test")

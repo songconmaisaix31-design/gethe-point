@@ -3,19 +3,17 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import json
-import os
 import re
-import shutil
 import sys
 from pathlib import Path
 from typing import Any, Mapping
 
 sys.dont_write_bytecode = True
 
-from common import (
+from common import (  # noqa: E402
     FleetError,
-    branch_context,
     changed_files,
     command_exists,
     commit_subject,
@@ -33,11 +31,60 @@ from common import (
     parse_json,
     run,
     save_json,
+    sha256_file,
     scope_violations,
     slug,
     timestamp,
     validate_plan,
     walk,
+)
+
+
+AMENDMENT_FIELDS = {
+    "schema_version",
+    "amendment_id",
+    "description",
+    "plan_status",
+    "launch_authorized",
+    "run_id",
+    "parent_plan_sha256",
+    "state_sha256",
+    "automation",
+    "workspace_suffix",
+    "append_waves",
+    "update_waves",
+    "update_tasks",
+    "resolutions",
+}
+NEW_WAVE_FIELDS = {"id", "description", "depends_on", "base", "tasks"}
+NEW_TASK_FIELDS = {
+    "id",
+    "title",
+    "track",
+    "write_paths",
+    "spec",
+    "acceptance",
+    "checks",
+    "agent",
+    "setup",
+    "worktree_mode",
+    "model",
+    "effort",
+}
+WAVE_PATCH_FIELDS = {"id", "description", "depends_on", "base"}
+TASK_PATCH_FIELDS = {"id", "title", "spec", "acceptance", "checks", "write_paths"}
+UNDISPATCHED_TASK_FIELDS = (
+    "orca_task_id",
+    "dispatch_id",
+    "branch",
+    "base_ref",
+    "base_sha",
+    "head_sha",
+    "summary",
+    "dispatched_at",
+    "completed_at",
+    "last_dispatch_id",
+    "last_dispatch_error",
 )
 
 
@@ -62,10 +109,16 @@ def cli() -> argparse.ArgumentParser:
     c.add_argument("--dry-run", action="store_true")
     c.add_argument("--json", action="store_true")
 
-    l = sub.add_parser("launch")
-    l.add_argument("plan", type=Path)
-    l.add_argument("--dry-run", action="store_true")
-    l.add_argument("--json", action="store_true")
+    launch = sub.add_parser("launch")
+    launch.add_argument("plan", type=Path)
+    launch.add_argument("--dry-run", action="store_true")
+    launch.add_argument("--json", action="store_true")
+
+    amend = sub.add_parser("amend")
+    amend.add_argument("--state", type=Path, required=True)
+    amend.add_argument("--amendment", type=Path, required=True)
+    amend.add_argument("--dry-run", action="store_true")
+    amend.add_argument("--json", action="store_true")
 
     i = sub.add_parser("inbox")
     i.add_argument("--state", type=Path, required=True)
@@ -382,6 +435,414 @@ def save_state(path: Path, state: dict[str, Any]) -> None:
     (path.parent / "STATUS.md").write_text(status_markdown(state), encoding="utf-8")
 
 
+def require_amendment_authorization(amendment: Mapping[str, Any]) -> None:
+    """Reject an amendment before it can write state or touch Orca."""
+    status = amendment.get("plan_status")
+    if status != "approved":
+        raise FleetError(f"amendment plan_status must be approved, got {status!r}")
+    if amendment.get("launch_authorized") is not True:
+        raise FleetError("amendment launch_authorized must be true")
+
+
+def amendment_id(amendment: Mapping[str, Any]) -> str:
+    unknown = sorted(set(amendment) - AMENDMENT_FIELDS)
+    if unknown:
+        raise FleetError("unknown amendment fields: " + ", ".join(unknown))
+    if amendment.get("schema_version") != 1:
+        raise FleetError("amendment schema_version must be 1")
+    value = amendment.get("amendment_id")
+    if not isinstance(value, str) or re.fullmatch(r"[A-Za-z0-9](?:[A-Za-z0-9_-]{0,63})", value) is None:
+        raise FleetError("amendment_id must be 1-64 letters, digits, underscores, or hyphens")
+    run_id = amendment.get("run_id")
+    if not isinstance(run_id, str) or re.fullmatch(r"run_[0-9a-zA-Z]+", run_id) is None:
+        raise FleetError("amendment run_id must be explicit")
+    for field in ("parent_plan_sha256", "state_sha256"):
+        digest = amendment.get(field)
+        if not isinstance(digest, str) or re.fullmatch(r"[0-9a-fA-F]{64}", digest) is None:
+            raise FleetError(f"amendment {field} must be a full SHA-256")
+    automation = amendment.get("automation")
+    if not isinstance(automation, dict) or set(automation) != {"branch", "sha"}:
+        raise FleetError("amendment automation must contain only branch and sha")
+    if not isinstance(automation["branch"], str) or not automation["branch"].strip():
+        raise FleetError("amendment automation.branch must be non-empty")
+    if not isinstance(automation["sha"], str) or re.fullmatch(r"[0-9a-fA-F]{40}", automation["sha"]) is None:
+        raise FleetError("amendment automation.sha must be a full Git SHA")
+    suffix = amendment.get("workspace_suffix")
+    if suffix is not None and (
+        not isinstance(suffix, str)
+        or re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{0,23})", suffix) is None
+    ):
+        raise FleetError("amendment workspace_suffix must be 1-24 lowercase letters, digits, or hyphens")
+    return value
+
+
+def object_list(value: Any, label: str) -> list[dict[str, Any]]:
+    if value is None:
+        return []
+    if not isinstance(value, list) or not all(isinstance(item, dict) for item in value):
+        raise FleetError(f"amendment {label} must be an object list")
+    return [dict(item) for item in value]
+
+
+def task_never_dispatched(task: Mapping[str, Any]) -> bool:
+    return task.get("status") == "planned" and all(task.get(field) is None for field in UNDISPATCHED_TASK_FIELDS)
+
+
+def wave_never_dispatched(wave: Mapping[str, Any], state: Mapping[str, Any]) -> bool:
+    task_ids = wave.get("tasks")
+    return (
+        wave.get("status") in ("planned", "blocked")
+        and wave.get("dispatched_at") is None
+        and wave.get("completed_at") is None
+        and isinstance(task_ids, list)
+        and all(task_id in state["tasks"] and task_never_dispatched(state["tasks"][task_id]) for task_id in task_ids)
+    )
+
+
+def topological_waves(state: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+    waves = state.get("waves")
+    tasks = state.get("tasks")
+    if not isinstance(waves, list) or not isinstance(tasks, dict):
+        raise FleetError("state waves and tasks must be materialized")
+    wave_by_id: dict[str, Mapping[str, Any]] = {}
+    task_wave: dict[str, str] = {}
+    order: list[str] = []
+    for wave in waves:
+        if not isinstance(wave, dict) or not isinstance(wave.get("id"), str):
+            raise FleetError("state contains an invalid wave")
+        wid = str(wave["id"])
+        if wid in wave_by_id:
+            raise FleetError(f"duplicate wave id: {wid}")
+        wave_by_id[wid] = wave
+        order.append(wid)
+        task_ids = wave.get("tasks")
+        if not isinstance(task_ids, list) or not all(isinstance(item, str) for item in task_ids):
+            raise FleetError(f"wave {wid}: tasks must be a string list")
+        for tid in task_ids:
+            if tid not in tasks:
+                raise FleetError(f"wave {wid}: unknown task {tid}")
+            if tid in task_wave:
+                raise FleetError(f"task {tid} belongs to more than one wave")
+            task_wave[tid] = wid
+    missing = sorted(set(tasks) - set(task_wave))
+    if missing:
+        raise FleetError("tasks missing from waves: " + ", ".join(missing))
+
+    dependencies: dict[str, set[str]] = {}
+    for wid in order:
+        deps: set[str] = set()
+        raw = wave_by_id[wid].get("depends_on", [])
+        if not isinstance(raw, list) or not all(isinstance(item, str) for item in raw):
+            raise FleetError(f"wave {wid}: depends_on must be a string list")
+        for tid in raw:
+            owner = task_wave.get(tid)
+            if owner is None:
+                raise FleetError(f"wave {wid}: unknown dependency {tid}")
+            if owner == wid:
+                raise FleetError(f"wave {wid}: dependency {tid} is in the same wave")
+            deps.add(owner)
+        dependencies[wid] = deps
+
+    resolved: set[str] = set()
+    result: list[Mapping[str, Any]] = []
+    while len(result) < len(order):
+        ready = [wid for wid in order if wid not in resolved and dependencies[wid] <= resolved]
+        if not ready:
+            blocked = [wid for wid in order if wid not in resolved]
+            raise FleetError("amended wave graph contains a cycle: " + ", ".join(blocked))
+        for wid in ready:
+            resolved.add(wid)
+            result.append(wave_by_id[wid])
+    return result
+
+
+def validate_materialized_state(state: Mapping[str, Any], cfg: Mapping[str, Any]) -> None:
+    workspaces: dict[str, str] = {}
+    for tid, task in state["tasks"].items():
+        workspace = task.get("workspace_name")
+        if not isinstance(workspace, str) or not workspace:
+            raise FleetError(f"task {tid}: workspace_name must be non-empty")
+        if workspace in workspaces:
+            raise FleetError(f"duplicate workspace {workspace}: {workspaces[workspace]} and {tid}")
+        workspaces[workspace] = tid
+
+    ordered = topological_waves(state)
+    plan = {
+        "schema_version": 1,
+        "objective": state.get("objective"),
+        "waves": [
+            {
+                "id": wave["id"],
+                "description": wave.get("description", ""),
+                "depends_on": list(wave.get("depends_on", [])),
+                "base": dict(wave.get("base", {})),
+                "tasks": [state["tasks"][tid] for tid in wave["tasks"]],
+            }
+            for wave in ordered
+        ],
+    }
+    errors = validate_plan(plan, cfg)
+    if errors:
+        raise FleetError("amended DAG errors:\n- " + "\n- ".join(errors))
+
+
+def materialize_amendment(
+    state: Mapping[str, Any],
+    amendment: Mapping[str, Any],
+    cfg: Mapping[str, Any],
+    applied_at: str,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    candidate = copy.deepcopy(dict(state))
+    append_waves = object_list(amendment.get("append_waves"), "append_waves")
+    if not append_waves:
+        raise FleetError("amendment append_waves must contain at least one fresh wave")
+    update_wave_items = object_list(amendment.get("update_waves"), "update_waves")
+    update_task_items = object_list(amendment.get("update_tasks"), "update_tasks")
+    resolution_items = object_list(amendment.get("resolutions"), "resolutions")
+    suffix = str(amendment.get("workspace_suffix") or "")
+    suffix_text = f"-{suffix}" if suffix else ""
+    amendment_name = str(amendment["amendment_id"])
+
+    existing_wave_ids = {str(wave["id"]) for wave in candidate["waves"]}
+    existing_task_ids = set(candidate["tasks"])
+    appended_wave_ids: list[str] = []
+    appended_task_ids: list[str] = []
+    for wave in append_waves:
+        unknown = sorted(set(wave) - NEW_WAVE_FIELDS)
+        if unknown:
+            raise FleetError(f"new wave has forbidden fields: {', '.join(unknown)}")
+        wid = wave.get("id")
+        if not isinstance(wid, str) or not wid:
+            raise FleetError("new wave id must be non-empty")
+        if wid in existing_wave_ids or wid in appended_wave_ids:
+            raise FleetError(f"duplicate wave id: {wid}")
+        raw_tasks = wave.get("tasks")
+        if not isinstance(raw_tasks, list) or not raw_tasks or not all(isinstance(item, dict) for item in raw_tasks):
+            raise FleetError(f"new wave {wid}: tasks must be a non-empty object list")
+        wave_task_ids: list[str] = []
+        for raw_task in raw_tasks:
+            task = dict(raw_task)
+            unknown_task = sorted(set(task) - NEW_TASK_FIELDS)
+            if unknown_task:
+                raise FleetError(f"new task has forbidden fields: {', '.join(unknown_task)}")
+            tid = task.get("id")
+            if not isinstance(tid, str):
+                raise FleetError(f"new wave {wid}: task id must be a string")
+            if tid in existing_task_ids or tid in appended_task_ids:
+                raise FleetError(f"existing Task mutation is forbidden: {tid}")
+            track = task.get("track")
+            workspace_name = f"trk-{track}-{tid.lower()}{suffix_text}"
+            candidate["tasks"][tid] = {
+                **copy.deepcopy(task),
+                "wave": wid,
+                "status": "planned",
+                "workspace_name": workspace_name,
+                "orca_task_id": None,
+                "dispatch_id": None,
+                "branch": None,
+                "base_ref": None,
+                "base_sha": None,
+                "head_sha": None,
+                "summary": None,
+                "dispatched_at": None,
+                "completed_at": None,
+            }
+            appended_task_ids.append(tid)
+            wave_task_ids.append(tid)
+        candidate["waves"].append(
+            {
+                "id": wid,
+                "description": wave.get("description", ""),
+                "depends_on": copy.deepcopy(wave.get("depends_on", [])),
+                "base": copy.deepcopy(wave.get("base", {})),
+                "tasks": wave_task_ids,
+                "status": "planned",
+                "dispatched_at": None,
+                "completed_at": None,
+            }
+        )
+        appended_wave_ids.append(wid)
+
+    original_waves = {str(wave["id"]): wave for wave in state["waves"]}
+    updated_wave_ids: list[str] = []
+    for patch in update_wave_items:
+        unknown = sorted(set(patch) - WAVE_PATCH_FIELDS)
+        if unknown:
+            raise FleetError("existing wave mutation is forbidden: " + ", ".join(unknown))
+        wid = patch.get("id")
+        if not isinstance(wid, str) or wid not in original_waves:
+            raise FleetError(f"unknown existing wave: {wid}")
+        if wid in updated_wave_ids:
+            raise FleetError(f"duplicate wave update: {wid}")
+        if not wave_never_dispatched(original_waves[wid], state):
+            raise FleetError(f"downstream wave {wid} has already been dispatched")
+        if len(patch) == 1:
+            raise FleetError(f"wave update {wid} has no contract changes")
+        target = next(wave for wave in candidate["waves"] if wave["id"] == wid)
+        for field in WAVE_PATCH_FIELDS - {"id"}:
+            if field in patch:
+                target[field] = copy.deepcopy(patch[field])
+        updated_wave_ids.append(wid)
+
+    updated_task_ids: list[str] = []
+    for patch in update_task_items:
+        unknown = sorted(set(patch) - TASK_PATCH_FIELDS)
+        if unknown:
+            raise FleetError("existing Task or Dispatch mutation is forbidden: " + ", ".join(unknown))
+        tid = patch.get("id")
+        if not isinstance(tid, str) or tid not in state["tasks"]:
+            raise FleetError(f"unknown existing task: {tid}")
+        if tid in updated_task_ids:
+            raise FleetError(f"duplicate task update: {tid}")
+        if not task_never_dispatched(state["tasks"][tid]):
+            raise FleetError(f"downstream task {tid} has already been dispatched")
+        if len(patch) == 1:
+            raise FleetError(f"task update {tid} has no contract changes")
+        for field in TASK_PATCH_FIELDS - {"id"}:
+            if field in patch:
+                candidate["tasks"][tid][field] = copy.deepcopy(patch[field])
+        updated_task_ids.append(tid)
+
+    resolutions = candidate.get("resolutions", {})
+    if not isinstance(resolutions, dict):
+        raise FleetError("state resolutions must be an object")
+    candidate["resolutions"] = resolutions
+    recorded_resolutions: list[dict[str, str]] = []
+    for item in resolution_items:
+        unknown = sorted(set(item) - {"task", "corrected_by", "superseded_by"})
+        if unknown:
+            raise FleetError("resolution has forbidden fields: " + ", ".join(unknown))
+        source = item.get("task")
+        relations = [name for name in ("corrected_by", "superseded_by") if name in item]
+        if not isinstance(source, str) or source not in state["tasks"]:
+            raise FleetError(f"resolution source must be an existing task: {source}")
+        if len(relations) != 1:
+            raise FleetError(f"resolution {source} must contain exactly one of corrected_by or superseded_by")
+        relation = relations[0]
+        replacement = item.get(relation)
+        if not isinstance(replacement, str) or replacement not in appended_task_ids:
+            raise FleetError(f"resolution {source} must point to a fresh appended task")
+        if source in resolutions:
+            raise FleetError(f"resolution for {source} is immutable")
+        source_status = state["tasks"][source].get("status")
+        if relation == "superseded_by" and source_status != "failed":
+            raise FleetError(f"superseded task {source} must already be failed")
+        if relation == "corrected_by" and source_status not in ("completed", "failed"):
+            raise FleetError(f"corrected task {source} must have a terminal outcome")
+        record = {
+            relation: replacement,
+            "amendment_id": amendment_name,
+            "recorded_at": applied_at,
+        }
+        resolutions[source] = record
+        recorded_resolutions.append({"task": source, relation: replacement})
+
+    validate_materialized_state(candidate, cfg)
+    changes = {
+        "appended_waves": appended_wave_ids,
+        "appended_tasks": appended_task_ids,
+        "updated_waves": updated_wave_ids,
+        "updated_tasks": updated_task_ids,
+        "resolutions": recorded_resolutions,
+    }
+    return candidate, changes
+
+
+def do_amend(_root: Path, cfg: Mapping[str, Any], args: argparse.Namespace) -> int:
+    state_path, state = load_state(args.state)
+    amendment_path = args.amendment.resolve()
+    amendment = load_json(amendment_path)
+    if not isinstance(amendment, dict):
+        raise FleetError("amendment must be a JSON object")
+    require_amendment_authorization(amendment)
+    aid = amendment_id(amendment)
+    if amendment["run_id"] != state.get("run_id"):
+        raise FleetError(f"amendment run_id {amendment['run_id']} != state {state.get('run_id')}")
+
+    plan_path = state_path.parent / "plan.json"
+    parent_plan_hash = sha256_file(plan_path)
+    if parent_plan_hash.lower() != str(amendment["parent_plan_sha256"]).lower():
+        raise FleetError("parent plan SHA-256 precondition failed")
+    amendment_hash = sha256_file(amendment_path)
+    records = state.get("amendments", [])
+    if not isinstance(records, list):
+        raise FleetError("state amendments must be a list")
+    existing = next((record for record in records if isinstance(record, dict) and record.get("id") == aid), None)
+    if existing is not None:
+        if existing.get("source_sha256") != amendment_hash:
+            raise FleetError(f"amendment id {aid} was already applied with different content")
+        result = {
+            "ok": True,
+            "dry_run": bool(args.dry_run),
+            "amendment_id": aid,
+            "already_applied": True,
+            "state": str(state_path),
+            "receipt": existing.get("receipt"),
+        }
+        print(json.dumps(result, ensure_ascii=False, indent=2) if args.json else f"amendment already applied: {aid}")
+        return 0
+
+    state_before_hash = sha256_file(state_path)
+    if state_before_hash.lower() != str(amendment["state_sha256"]).lower():
+        raise FleetError("state SHA-256 precondition failed")
+    applied_at = now()
+    candidate, changes = materialize_amendment(state, amendment, cfg, applied_at)
+    evidence_path = state_path.parent / "evidence" / f"amendment-{aid}-{amendment_hash[:12]}.json"
+    if evidence_path.exists():
+        raise FleetError(f"amendment evidence already exists without a state record: {evidence_path}")
+    record = {
+        "id": aid,
+        "source": str(amendment_path),
+        "source_sha256": amendment_hash,
+        "parent_plan_sha256": parent_plan_hash,
+        "state_before_sha256": state_before_hash,
+        "automation": copy.deepcopy(amendment["automation"]),
+        "applied_at": applied_at,
+        "receipt": str(evidence_path),
+    }
+    candidate.setdefault("amendments", []).append(record)
+    result: dict[str, Any] = {
+        "ok": True,
+        "dry_run": bool(args.dry_run),
+        "amendment_id": aid,
+        "already_applied": False,
+        "state": str(state_path),
+        "parent_plan_sha256": parent_plan_hash,
+        "state_before_sha256": state_before_hash,
+        **changes,
+    }
+    if args.dry_run:
+        result["materialized"] = {
+            "waves": candidate["waves"],
+            "tasks": candidate["tasks"],
+            "resolutions": candidate.get("resolutions", {}),
+            "amendments": candidate.get("amendments", []),
+        }
+        print(json.dumps(result, ensure_ascii=False, indent=2) if args.json else f"amendment dry-run valid: {aid}")
+        return 0
+
+    # Recheck both inputs immediately before the single atomic state replacement.
+    if sha256_file(plan_path) != parent_plan_hash:
+        raise FleetError("parent plan changed while amendment was being validated")
+    if sha256_file(state_path) != state_before_hash:
+        raise FleetError("state changed while amendment was being validated")
+    save_state(state_path, candidate)
+    state_after_hash = sha256_file(state_path)
+    receipt = {
+        **result,
+        "dry_run": False,
+        "applied_at": applied_at,
+        "amendment_source": str(amendment_path),
+        "amendment_sha256": amendment_hash,
+        "automation": copy.deepcopy(amendment["automation"]),
+        "state_after_sha256": state_after_hash,
+    }
+    save_json(evidence_path, receipt)
+    result.update({"state_after_sha256": state_after_hash, "receipt": str(evidence_path)})
+    print(json.dumps(result, ensure_ascii=False, indent=2) if args.json else f"amendment applied: {aid}; receipt={evidence_path}")
+    return 0
+
+
 def wave_ready(wave: Mapping[str, Any], state: Mapping[str, Any]) -> bool:
     return wave["status"] == "planned" and all(state["tasks"][x]["status"] == "completed" for x in wave["depends_on"])
 
@@ -452,6 +913,13 @@ def dispatch_wave(root: Path, cfg: Mapping[str, Any], state: dict[str, Any], wav
     base_ref, base_sha = resolve_wave_base(root, state, wave, dry_run)
     selector = canonical_repo_selector(root, state["repo_selector"], dry_run)
     coordinator = run_coordinator_handle(root, state["run_id"], dry_run)
+    dependency_task_ids: list[str] = []
+    for dependency in wave["depends_on"]:
+        task_id = state["tasks"][dependency].get("orca_task_id")
+        if not isinstance(task_id, str) or not task_id.startswith("task_"):
+            raise FleetError(f"dependency {dependency} has no explicit Orca Task identity")
+        dependency_task_ids.append(task_id)
+    dependency_json = json.dumps(dependency_task_ids, separators=(",", ":"))
     orca(root, ["repo", "set-base-ref", "--repo", selector, "--ref", base_ref], f"set base for {wave['id']}", dry_run)
     evidence = Path(state["run_dir"]) / "evidence"
     defaults = cfg.get("worker_defaults", {})
@@ -466,7 +934,14 @@ def dispatch_wave(root: Path, cfg: Mapping[str, Any], state: dict[str, Any], wav
         if not task_id:
             create = orca(
                 root,
-                ["orchestration", "task-create", "--task-title", f"[{tid}] {task['title']}", "--spec", render_spec(root, cfg, state, task)],
+                [
+                    "orchestration", "task-create",
+                    "--task-title", f"[{tid}] {task['title']}",
+                    "--spec", render_spec(root, cfg, state, task),
+                    "--deps", dependency_json,
+                    "--run", state["run_id"],
+                    "--from", coordinator,
+                ],
                 f"create task {tid}",
                 dry_run,
             )
@@ -629,16 +1104,32 @@ def clean_branch(branch: str) -> str:
     return branch
 
 
+def acceptance_evidence_path(state: Mapping[str, Any], task_id: str, dispatch_id: str) -> Path:
+    safe_dispatch = re.sub(r"[^A-Za-z0-9_.-]+", "-", dispatch_id).strip("-")
+    if not safe_dispatch:
+        raise FleetError(f"task {task_id} has an invalid Dispatch identity")
+    return Path(state["run_dir"]) / "evidence" / f"{task_id}-acceptance-{safe_dispatch}.json"
+
+
 def do_accept(root: Path, cfg: Mapping[str, Any], args: argparse.Namespace) -> int:
     state_path, state = load_state(args.state)
     if args.task not in state["tasks"]:
         raise FleetError(f"unknown task: {args.task}")
     task = state["tasks"][args.task]
-    if task["status"] not in ("dispatched", "failed"):
+    if task["status"] == "failed":
+        raise FleetError(f"failed task {args.task} is immutable; append a fresh replacement task")
+    if task["status"] != "dispatched":
         raise FleetError(f"task {args.task} is not awaiting completion: {task['status']}")
+    dispatch = task.get("dispatch_id")
+    if not isinstance(dispatch, str) or not dispatch:
+        raise FleetError(f"task {args.task} has no Dispatch identity")
+    evidence_path = acceptance_evidence_path(state, args.task, dispatch)
+    if evidence_path.exists():
+        raise FleetError(f"acceptance evidence already exists for this Attempt: {evidence_path}")
     branch = args.branch or task.get("branch")
     evidence: dict[str, Any] = {
         "recorded_at": now(), "logical_task_id": args.task, "outcome": args.outcome,
+        "orca_task_id": task.get("orca_task_id"), "dispatch_id": dispatch,
         "summary": args.summary, "branch": branch, "provided_sha": args.sha,
     }
     if args.outcome == "succeeded":
@@ -683,11 +1174,8 @@ def do_accept(root: Path, cfg: Mapping[str, Any], args: argparse.Namespace) -> i
         })
     else:
         task.update({"status": "failed", "summary": args.summary, "completed_at": now()})
-    dispatch = task.get("dispatch_id")
-    if dispatch:
-        action = "worker-retain" if args.retain else "worker-release"
-        evidence["settlement"] = settle_worker(root, action, dispatch, args.dry_run)
-    evidence_path = Path(state["run_dir"]) / "evidence" / f"{args.task}-accepted.json"
+    action = "worker-retain" if args.retain else "worker-release"
+    evidence["settlement"] = settle_worker(root, action, dispatch, args.dry_run)
     save_json(evidence_path, evidence)
     update_waves(state)
     save_state(state_path, state)
@@ -705,40 +1193,147 @@ def do_advance(root: Path, cfg: Mapping[str, Any], args: argparse.Namespace) -> 
     return 0
 
 
+def resolution_view(state: Mapping[str, Any], task_id: str) -> dict[str, Any] | None:
+    resolutions = state.get("resolutions", {})
+    if not isinstance(resolutions, Mapping):
+        return None
+    resolution = resolutions.get(task_id)
+    if not isinstance(resolution, Mapping):
+        return None
+    relations = [name for name in ("corrected_by", "superseded_by") if name in resolution]
+    if len(relations) != 1 or not isinstance(resolution.get(relations[0]), str):
+        return {
+            "accepted": False,
+            "error": "resolution must contain exactly one relationship",
+        }
+    relation = relations[0]
+    replacement_id = str(resolution[relation])
+    replacement = state.get("tasks", {}).get(replacement_id)
+    replacement_sha = replacement.get("head_sha") if isinstance(replacement, Mapping) else None
+    accepted = (
+        isinstance(replacement, Mapping)
+        and replacement.get("status") == "completed"
+        and isinstance(replacement_sha, str)
+        and re.fullmatch(r"[0-9a-fA-F]{40}", replacement_sha) is not None
+    )
+    return {
+        "relation": relation,
+        "replacement_task": replacement_id,
+        "replacement_sha": replacement_sha,
+        "accepted": accepted,
+        "amendment_id": resolution.get("amendment_id"),
+    }
+
+
+def effective_task_status(state: Mapping[str, Any], task_id: str) -> str:
+    task = state["tasks"][task_id]
+    if task.get("status") != "failed":
+        return str(task.get("status"))
+    resolution = resolution_view(state, task_id)
+    return "resolved_failure" if resolution and resolution.get("accepted") is True else "unresolved_failure"
+
+
+def effective_wave_status(state: Mapping[str, Any], wave: Mapping[str, Any]) -> str:
+    statuses = [effective_task_status(state, task_id) for task_id in wave["tasks"]]
+    if any(status == "unresolved_failure" for status in statuses):
+        return "unresolved_failure"
+    if statuses and all(status in ("completed", "resolved_failure") for status in statuses):
+        return "resolved_failure" if "resolved_failure" in statuses else "completed"
+    return str(wave.get("status"))
+
+
+def status_view(state: Mapping[str, Any]) -> dict[str, Any]:
+    view = copy.deepcopy(dict(state))
+    unresolved_failures: list[str] = []
+    resolved_failures: list[dict[str, Any]] = []
+    for task_id, task in view["tasks"].items():
+        effective = effective_task_status(state, task_id)
+        task["effective_status"] = effective
+        resolution = resolution_view(state, task_id)
+        if resolution is not None:
+            task["resolution"] = resolution
+        if effective == "unresolved_failure":
+            unresolved_failures.append(task_id)
+        elif effective == "resolved_failure":
+            resolved_failures.append({"task": task_id, **(resolution or {})})
+    for wave in view["waves"]:
+        source = next(item for item in state["waves"] if item["id"] == wave["id"])
+        wave["effective_status"] = effective_wave_status(state, source)
+    unresolved_resolutions = [
+        task_id
+        for task_id in state.get("resolutions", {})
+        if not (resolution_view(state, task_id) or {}).get("accepted")
+    ] if isinstance(state.get("resolutions", {}), Mapping) else []
+    view["unresolved_failures"] = unresolved_failures
+    view["resolved_failures"] = resolved_failures
+    view["unresolved_resolutions"] = unresolved_resolutions
+    return view
+
+
 def status_markdown(state: Mapping[str, Any]) -> str:
+    view = status_view(state)
     lines = [
         f"# Fleet Run Status — {state['run_id']}", "",
         f"- Objective: {state['objective']}",
         f"- Coordinator branch: `{state.get('coordinator_branch')}`",
         f"- Initial base: `{state['initial_base_ref']}` / `{state['initial_base_sha']}`",
         f"- Created: {state['created_at']}", f"- Updated: {state['updated_at']}", "",
-        "## Waves", "", "| Wave | Status | Depends on | Base |", "|---|---|---|---|",
+        "## Waves", "", "| Wave | Outcome | Effective | Depends on | Base |", "|---|---|---|---|---|",
     ]
-    for wave in state["waves"]:
+    for wave in view["waves"]:
         base = wave["base"]
         base_text = base.get("value") if base["type"] == "ref" else f"task:{base.get('task')}"
-        lines.append(f"| {wave['id']} | {wave['status']} | {', '.join(wave['depends_on']) or '—'} | `{base_text}` |")
-    lines += ["", "## Tasks", "", "| Task | Track | Status | Orca Task | Dispatch | Branch | SHA |", "|---|---|---|---|---|---|---|"]
-    for tid, task in state["tasks"].items():
-        sha = str(task.get("head_sha") or "—")
-        if sha != "—": sha = sha[:12]
         lines.append(
-            f"| {tid} | {task['track']} | {task['status']} | `{task.get('orca_task_id') or '—'}` | "
+            f"| {wave['id']} | {wave['status']} | {wave['effective_status']} | "
+            f"{', '.join(wave['depends_on']) or '—'} | `{base_text}` |"
+        )
+    lines += [
+        "", "## Tasks", "",
+        "| Task | Track | Outcome | Effective | Resolution | Orca Task | Dispatch | Branch | SHA |",
+        "|---|---|---|---|---|---|---|---|---|",
+    ]
+    for tid, task in view["tasks"].items():
+        sha = str(task.get("head_sha") or "—")
+        if sha != "—":
+            sha = sha[:12]
+        resolution = task.get("resolution")
+        resolution_text = "—"
+        if isinstance(resolution, Mapping) and resolution.get("relation"):
+            replacement_sha = str(resolution.get("replacement_sha") or "pending")[:12]
+            resolution_text = f"{resolution['relation']}:{resolution['replacement_task']}@{replacement_sha}"
+        lines.append(
+            f"| {tid} | {task['track']} | {task['status']} | {task['effective_status']} | `{resolution_text}` | "
+            f"`{task.get('orca_task_id') or '—'}` | "
             f"`{task.get('dispatch_id') or '—'}` | `{task.get('branch') or '—'}` | `{sha}` |"
         )
+    if view["unresolved_failures"]:
+        lines += ["", "Unresolved failures: " + ", ".join(view["unresolved_failures"])]
+    if view["resolved_failures"]:
+        lines += ["", "Resolved failures: " + ", ".join(item["task"] for item in view["resolved_failures"])]
     lines += ["", f"Evidence: `{state['run_dir']}/evidence/`", ""]
     return "\n".join(lines)
 
 
 def do_status(args: argparse.Namespace) -> int:
     _, state = load_state(args.state)
-    print(json.dumps(state, ensure_ascii=False, indent=2) if args.json else status_markdown(state))
+    print(json.dumps(status_view(state), ensure_ascii=False, indent=2) if args.json else status_markdown(state))
     return 0
 
 
 def do_finalize(args: argparse.Namespace) -> int:
     state_path, state = load_state(args.state)
-    incomplete = [tid for tid, task in state["tasks"].items() if task["status"] != "completed"]
+    view = status_view(state)
+    unresolved_failures = list(view["unresolved_failures"])
+    unresolved_resolutions = list(view["unresolved_resolutions"])
+    if unresolved_failures:
+        raise FleetError("unresolved failures: " + ", ".join(unresolved_failures))
+    if unresolved_resolutions:
+        raise FleetError("resolutions without an accepted replacement SHA: " + ", ".join(unresolved_resolutions))
+    incomplete = [
+        tid
+        for tid, task in view["tasks"].items()
+        if task["effective_status"] not in ("completed", "resolved_failure")
+    ]
     if incomplete and not args.allow_incomplete:
         raise FleetError("incomplete tasks: " + ", ".join(incomplete))
     manifest = {
@@ -752,18 +1347,24 @@ def do_finalize(args: argparse.Namespace) -> int:
         "tasks": {
             tid: {
                 "track": task["track"], "status": task["status"],
+                "effective_status": task["effective_status"],
                 "orca_task_id": task.get("orca_task_id"), "dispatch_id": task.get("dispatch_id"),
                 "base_sha": task.get("base_sha"), "branch": task.get("branch"),
                 "head_sha": task.get("head_sha"), "summary": task.get("summary"),
                 "completed_at": task.get("completed_at"),
+                "resolution": task.get("resolution"),
             }
-            for tid, task in state["tasks"].items()
+            for tid, task in view["tasks"].items()
         },
         "integration_candidates": [
             {"task": tid, "branch": task.get("branch"), "sha": task.get("head_sha")}
             for tid, task in state["tasks"].items()
             if task["track"] == "integration" and task["status"] == "completed"
         ],
+        "amendments": copy.deepcopy(state.get("amendments", [])),
+        "resolved_failures": view["resolved_failures"],
+        "unresolved_failures": unresolved_failures,
+        "unresolved_resolutions": unresolved_resolutions,
         "incomplete_tasks": incomplete,
         "evidence_directory": str(Path(state["run_dir"]) / "evidence"),
     }
@@ -778,15 +1379,26 @@ def main() -> int:
     try:
         root = git_root()
         cfg = load_config(root, args.config.resolve() if args.config else None)
-        if args.cmd == "doctor": return do_doctor(root, cfg, args)
-        if args.cmd == "validate": return do_validate(cfg, args)
-        if args.cmd == "start-coordinator": return do_start_coordinator(root, cfg, args)
-        if args.cmd == "launch": return do_launch(root, cfg, args)
-        if args.cmd == "inbox": return do_inbox(root, args)
-        if args.cmd == "accept": return do_accept(root, cfg, args)
-        if args.cmd == "advance": return do_advance(root, cfg, args)
-        if args.cmd == "status": return do_status(args)
-        if args.cmd == "finalize": return do_finalize(args)
+        if args.cmd == "doctor":
+            return do_doctor(root, cfg, args)
+        if args.cmd == "validate":
+            return do_validate(cfg, args)
+        if args.cmd == "start-coordinator":
+            return do_start_coordinator(root, cfg, args)
+        if args.cmd == "launch":
+            return do_launch(root, cfg, args)
+        if args.cmd == "amend":
+            return do_amend(root, cfg, args)
+        if args.cmd == "inbox":
+            return do_inbox(root, args)
+        if args.cmd == "accept":
+            return do_accept(root, cfg, args)
+        if args.cmd == "advance":
+            return do_advance(root, cfg, args)
+        if args.cmd == "status":
+            return do_status(args)
+        if args.cmd == "finalize":
+            return do_finalize(args)
     except FleetError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 2
