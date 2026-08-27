@@ -1,11 +1,33 @@
+# Dependency artifacts
 node_modules/
 .pnpm-store/
 
+# Build artifacts
 .next/
+build/
 coverage/
 dist/
+out/
 *.tsbuildinfo
 
+# Test artifacts
+blob-report/
+playwright-report/
+test-results/
+
+# Local runtime artifacts
+.env
+.env.*
+!.env.example
+!.env.*.example
+.eslintcache
+.swc/
+.tmp/
+.vercel/
+*.log
+*.pid
+
+# Python control-plane artifacts
 __pycache__/
 *.py[cod]
 .pytest_cache/

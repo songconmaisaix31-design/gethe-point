@@ -1,0 +1,55 @@
+{
+  "name": "we-remember",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.2.2",
+  "engines": {
+    "node": ">=24.0.0 <25",
+    "pnpm": "11.2.2"
+  },
+  "scripts": {
+    "build": "next build apps/web",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "lint": "eslint . --max-warnings 0",
+    "test:unit": "vitest run --exclude \"packages/db/tests/disposable/**\"",
+    "test:contracts": "vitest run packages/contracts",
+    "test:e2e:fixture": "playwright test --grep @fixture --grep-invert @visual",
+    "test:accessibility:fixture": "playwright test --grep @a11y",
+    "test:visual:fixture": "playwright test --grep @visual",
+    "db:verify": "vitest run packages/db/tests/disposable --testTimeout 60000 --hookTimeout 60000",
+    "check": "pnpm run typecheck && pnpm run lint && pnpm run test:unit",
+    "check:foundation": "node tools/check-track.mjs foundation",
+    "check:contracts": "node tools/check-track.mjs contracts",
+    "check:data": "node tools/check-track.mjs data",
+    "check:experience": "node tools/check-track.mjs experience",
+    "check:conversation": "node tools/check-track.mjs conversation",
+    "check:responsibility": "node tools/check-track.mjs responsibility",
+    "check:handover": "node tools/check-track.mjs handover",
+    "check:care": "node tools/check-track.mjs care",
+    "check:privacy": "node tools/check-track.mjs privacy",
+    "check:qa-core": "node tools/check-track.mjs qa-core",
+    "check:qa": "node tools/check-track.mjs qa"
+  },
+  "dependencies": {
+    "drizzle-orm": "0.45.2",
+    "next": "16.2.12",
+    "postgres": "3.4.9",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
+    "@playwright/test": "1.62.1",
+    "@types/node": "24.13.1",
+    "@types/react": "19.2.17",
+    "@types/react-dom": "19.2.3",
+    "drizzle-kit": "0.31.10",
+    "eslint": "9.39.2",
+    "eslint-config-next": "16.2.12",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.65.0",
+    "vitest": "4.1.7"
+  }
+}

@@ -1,0 +1,13 @@
+packages:
+  - "apps/*"
+  - "modules/*"
+  - "packages/*"
+
+overrides:
+  "@esbuild-kit/core-utils>esbuild": 0.25.4
+  postcss: 8.5.26
+  sharp: 0.35.3
+
+allowBuilds:
+  esbuild: true
+  sharp: true

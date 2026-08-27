@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "./tsconfig.base.json",
+  "include": [
+    "apps/**/*.ts",
+    "apps/**/*.tsx",
+    "modules/**/*.ts",
+    "modules/**/*.tsx",
+    "packages/**/*.ts",
+    "packages/**/*.tsx",
+    "tools/**/*.ts",
+    "tools/**/*.mts",
+    "*.config.ts",
+    "*.config.mts"
+  ],
+  "exclude": [
+    "node_modules",
+    ".next",
+    "coverage",
+    "playwright-report",
+    "test-results"
+  ]
+}
