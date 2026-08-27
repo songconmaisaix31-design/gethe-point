@@ -66,6 +66,10 @@ importers:
         specifier: 4.1.7
         version: 4.1.7(@types/node@24.13.1)(vite@8.2.2(@types/node@24.13.1)(esbuild@0.28.2)(tsx@4.23.12))
 
+  packages/contracts: {}
+
+  packages/db: {}
+
 packages:
 
   '@axe-core/playwright@4.13.0':
