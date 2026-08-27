@@ -165,6 +165,19 @@ def repo_selector(root: Path, cfg: Mapping[str, Any], dry_run: bool = False) -> 
     raise FleetError("could not resolve Orca repo ID; set repo_selector explicitly in .agents/fleet.json")
 
 
+def canonical_repo_selector(root: Path, selector: str, dry_run: bool = False) -> str:
+    """Resolve portable repo selectors to the runtime's stable repository ID."""
+    if selector.startswith("id:") or dry_run:
+        return selector
+    receipt = orca(root, ["repo", "show", "--repo", selector], "resolve repo selector")
+    result = receipt.get("result")
+    repo = result.get("repo") if isinstance(result, dict) else None
+    rid = repo.get("id") if isinstance(repo, dict) else None
+    if not isinstance(rid, str) or not rid:
+        raise FleetError(f"could not canonicalize Orca repo selector: {selector}")
+    return "id:" + rid.removeprefix("id:")
+
+
 def fetch(root: Path, cfg: Mapping[str, Any], dry_run: bool = False) -> None:
     if cfg.get("fetch_before_launch", True):
         run(["git", "fetch", "--prune", "origin"], cwd=root, dry_run=dry_run, echo=True)
@@ -397,7 +410,7 @@ def render_spec(root: Path, cfg: Mapping[str, Any], state: Mapping[str, Any], ta
 
 def dispatch_wave(root: Path, cfg: Mapping[str, Any], state: dict[str, Any], wave: dict[str, Any], state_path: Path, dry_run: bool) -> None:
     base_ref, base_sha = resolve_wave_base(root, state, wave, dry_run)
-    selector = state["repo_selector"]
+    selector = canonical_repo_selector(root, state["repo_selector"], dry_run)
     orca(root, ["repo", "set-base-ref", "--repo", selector, "--ref", base_ref], f"set base for {wave['id']}", dry_run)
     evidence = Path(state["run_dir"]) / "evidence"
     defaults = cfg.get("worker_defaults", {})
@@ -429,7 +442,7 @@ def dispatch_wave(root: Path, cfg: Mapping[str, Any], state: dict[str, Any], wav
         cmd = [
             "orchestration", "worker-start", "--task", task_id,
             "--worktree", str(mode), "--repo", selector, "--name", task["workspace_name"],
-            "--base-branch", base_ref,
+            "--base-branch", base_sha,
             "--agent", str(agent), "--setup", str(setup),
         ]
         if task.get("model"):

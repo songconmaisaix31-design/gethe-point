@@ -10,7 +10,14 @@ SCRIPTS = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(SCRIPTS))
 
 from common import FleetError  # noqa: E402
-from fleet import build_state, dispatch_id_from_receipt, dispatch_wave, do_launch, settle_worker  # noqa: E402
+from fleet import (  # noqa: E402
+    build_state,
+    canonical_repo_selector,
+    dispatch_id_from_receipt,
+    dispatch_wave,
+    do_launch,
+    settle_worker,
+)
 
 
 class DispatchReceiptTests(unittest.TestCase):
@@ -60,6 +67,23 @@ class WorkspaceNamingTests(unittest.TestCase):
         )
 
         self.assertEqual(state["tasks"]["FOUND-001"]["workspace_name"], "trk-foundation-found-001-v2")
+
+
+class RepoSelectorTests(unittest.TestCase):
+    @patch(
+        "fleet.orca",
+        return_value={"result": {"repo": {"id": "repo_abc123", "path": "C:/repo"}}},
+    )
+    def test_portable_selector_resolves_to_runtime_repo_id(self, orca):
+        selector = canonical_repo_selector(Path("."), "path:C:/repo")
+
+        self.assertEqual(selector, "id:repo_abc123")
+        orca.assert_called_once()
+
+    @patch("fleet.orca")
+    def test_runtime_repo_id_does_not_require_lookup(self, orca):
+        self.assertEqual(canonical_repo_selector(Path("."), "id:repo_abc123"), "id:repo_abc123")
+        orca.assert_not_called()
 
 
 class WorkerSettlementTests(unittest.TestCase):
@@ -116,7 +140,8 @@ class DispatchRecoveryTests(unittest.TestCase):
 
     @patch("fleet.render_spec", return_value="contract spec")
     @patch("fleet.resolve_wave_base", return_value=("origin/foundation", "a" * 40))
-    def test_worker_start_failure_persists_task_id_and_retry_reuses_it(self, _base, _spec):
+    @patch("fleet.canonical_repo_selector", return_value="id:repo_test")
+    def test_worker_start_failure_persists_task_id_and_retry_reuses_it(self, _selector, _base, _spec):
         first_calls = []
 
         def first_orca(_root, args, _label, _dry_run=False):
@@ -155,7 +180,8 @@ class DispatchRecoveryTests(unittest.TestCase):
 
         self.assertFalse(any(call[:2] == ["orchestration", "task-create"] for call in second_calls))
         worker_start = next(call for call in second_calls if call[:2] == ["orchestration", "worker-start"])
-        self.assertEqual(worker_start[worker_start.index("--base-branch") + 1], "origin/foundation")
+        self.assertEqual(worker_start[worker_start.index("--repo") + 1], "id:repo_test")
+        self.assertEqual(worker_start[worker_start.index("--base-branch") + 1], "a" * 40)
         self.assertEqual(persisted["tasks"]["CONTRACT-001"]["dispatch_id"], "ctx_abc123")
         self.assertEqual(persisted["tasks"]["CONTRACT-001"]["status"], "dispatched")
 
