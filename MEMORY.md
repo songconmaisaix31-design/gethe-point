@@ -35,6 +35,7 @@
 - The approved implementation order is `FOUND-001 -> CONTRACT-001 -> DATA-001 -> seven parallel core tasks -> INT-001 -> seven parallel hardening tasks -> INT-002`. Serializing contracts before migrations prevents unresolved responsibility and privacy semantics from being persisted.
 - The implementation uses a single root `pnpm` dependency manifest and lockfile owned only by the `foundation` track. Feature tracks use locked dependencies and non-overlapping paths; new dependencies require a separate foundation task.
 - Fixture mode is the acceptance baseline. Demo role switching is not production authentication, raw `agent_dm` evidence remains self-only, consent is per signal, handover acceptance is terminal and atomic, care execution is deterministic, and space deletion removes all in-space product and audit content.
+- Orca 1.4.188 returns supervised Dispatch IDs as `ctx_*` in `result.dispatchId` and also returns an effect named `dispatch_input`. Fleet must read the exact key and validate the ID shape; generic `dispatch_` prefix scanning can corrupt state by selecting the effect name.
 
 ## Secret handling
 

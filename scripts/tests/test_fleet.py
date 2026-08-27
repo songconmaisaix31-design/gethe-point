@@ -10,7 +10,29 @@ SCRIPTS = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(SCRIPTS))
 
 from common import FleetError  # noqa: E402
-from fleet import do_launch  # noqa: E402
+from fleet import dispatch_id_from_receipt, do_launch  # noqa: E402
+
+
+class DispatchReceiptTests(unittest.TestCase):
+    def test_current_orca_context_dispatch_id_wins_over_effect_name(self):
+        receipt = {
+            "result": {
+                "dispatchId": "ctx_281af24e0d31",
+                "effects": [{"kind": "dispatch_input", "state": "accepted"}],
+            }
+        }
+
+        self.assertEqual(dispatch_id_from_receipt(receipt), "ctx_281af24e0d31")
+
+    def test_legacy_dispatch_id_is_supported(self):
+        receipt = {"result": {"dispatch_id": "dispatch_abc123"}}
+
+        self.assertEqual(dispatch_id_from_receipt(receipt), "dispatch_abc123")
+
+    def test_dispatch_input_effect_is_not_an_id(self):
+        receipt = {"result": {"effects": [{"kind": "dispatch_input"}]}}
+
+        self.assertIsNone(dispatch_id_from_receipt(receipt))
 
 
 class LaunchAuthorizationTests(unittest.TestCase):

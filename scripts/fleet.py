@@ -119,6 +119,16 @@ def orca(root: Path, args: list[str], label: str, dry_run: bool = False) -> dict
     return value
 
 
+def dispatch_id_from_receipt(receipt: Mapping[str, Any]) -> str | None:
+    """Read an actual Dispatch ID without mistaking `dispatch_input` for one."""
+    exact = find_key(receipt, {"dispatchId", "dispatch_id"})
+    candidates = [exact, find_prefixed(receipt, "ctx_"), find_prefixed(receipt, "dispatch_")]
+    for candidate in candidates:
+        if isinstance(candidate, str) and re.fullmatch(r"(?:ctx|dispatch)_[0-9a-fA-F]{6,}", candidate):
+            return candidate
+    return None
+
+
 def repo_selector(root: Path, cfg: Mapping[str, Any], dry_run: bool = False) -> str:
     configured = cfg.get("repo_selector", "auto")
     if isinstance(configured, str) and configured not in ("", "auto"):
@@ -403,7 +413,7 @@ def dispatch_wave(root: Path, cfg: Mapping[str, Any], state: dict[str, Any], wav
         elif task.get("effort"):
             raise FleetError(f"task {tid}: effort requires model")
         started = orca(root, cmd, f"start worker {tid}", dry_run)
-        dispatch = find_prefixed(started, "dispatch_") or (f"dispatch_dry_{tid.lower()}" if dry_run else None)
+        dispatch = dispatch_id_from_receipt(started) or (f"dispatch_dry_{tid.lower()}" if dry_run else None)
         if not dispatch:
             raise FleetError(f"worker-start receipt missing dispatch_ ID for {tid}")
         task["dispatch_id"] = dispatch
