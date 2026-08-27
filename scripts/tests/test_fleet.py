@@ -16,6 +16,7 @@ from fleet import (  # noqa: E402
     dispatch_id_from_receipt,
     dispatch_wave,
     do_launch,
+    run_coordinator_handle,
     settle_worker,
 )
 
@@ -85,6 +86,14 @@ class RepoSelectorTests(unittest.TestCase):
         self.assertEqual(canonical_repo_selector(Path("."), "id:repo_abc123"), "id:repo_abc123")
         orca.assert_not_called()
 
+    @patch(
+        "fleet.orca",
+        return_value={"result": {"run": {"coordinator_handle": "term_abc123"}}},
+    )
+    def test_current_run_coordinator_is_resolved_explicitly(self, orca):
+        self.assertEqual(run_coordinator_handle(Path("."), "run_abc123"), "term_abc123")
+        orca.assert_called_once()
+
 
 class WorkerSettlementTests(unittest.TestCase):
     @patch("fleet.orca", side_effect=FleetError("tab_not_found"))
@@ -141,7 +150,14 @@ class DispatchRecoveryTests(unittest.TestCase):
     @patch("fleet.render_spec", return_value="contract spec")
     @patch("fleet.resolve_wave_base", return_value=("origin/foundation", "a" * 40))
     @patch("fleet.canonical_repo_selector", return_value="id:repo_test")
-    def test_worker_start_failure_persists_task_id_and_retry_reuses_it(self, _selector, _base, _spec):
+    @patch("fleet.run_coordinator_handle", return_value="term_coordinator")
+    def test_worker_start_failure_persists_task_id_and_retry_reuses_it(
+        self,
+        _coordinator,
+        _selector,
+        _base,
+        _spec,
+    ):
         first_calls = []
 
         def first_orca(_root, args, _label, _dry_run=False):
@@ -150,6 +166,8 @@ class DispatchRecoveryTests(unittest.TestCase):
                 return {"ok": True}
             if args[:2] == ["orchestration", "task-create"]:
                 return {"result": {"taskId": "task_abc123"}}
+            if args[:2] == ["orchestration", "dispatch-show"]:
+                return {"result": {"dispatch": None}}
             raise FleetError("selector_not_found")
 
         with patch("fleet.orca", side_effect=first_orca):
@@ -166,11 +184,13 @@ class DispatchRecoveryTests(unittest.TestCase):
             second_calls.append(args)
             if args[:2] == ["repo", "set-base-ref"]:
                 return {"ok": True}
-            if args[:2] == ["orchestration", "worker-start"]:
+            if args[:2] == ["orchestration", "dispatch-show"]:
                 return {
                     "result": {
-                        "dispatchId": "ctx_abc123",
-                        "branch": "trk-architecture-contract-001-v2",
+                        "dispatch": {
+                            "id": "ctx_abc123",
+                            "status": "dispatched",
+                        }
                     }
                 }
             raise AssertionError(f"unexpected Orca call: {args}")
@@ -179,7 +199,10 @@ class DispatchRecoveryTests(unittest.TestCase):
             dispatch_wave(self.root, {}, persisted, self.wave, self.state_path, False)
 
         self.assertFalse(any(call[:2] == ["orchestration", "task-create"] for call in second_calls))
-        worker_start = next(call for call in second_calls if call[:2] == ["orchestration", "worker-start"])
+        self.assertFalse(any(call[:2] == ["orchestration", "worker-start"] for call in second_calls))
+        worker_start = next(call for call in first_calls if call[:2] == ["orchestration", "worker-start"])
+        self.assertEqual(worker_start[worker_start.index("--run") + 1], "run_test")
+        self.assertEqual(worker_start[worker_start.index("--from") + 1], "term_coordinator")
         self.assertEqual(worker_start[worker_start.index("--repo") + 1], "id:repo_test")
         self.assertEqual(worker_start[worker_start.index("--base-branch") + 1], "a" * 40)
         self.assertEqual(persisted["tasks"]["CONTRACT-001"]["dispatch_id"], "ctx_abc123")

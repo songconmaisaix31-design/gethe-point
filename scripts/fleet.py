@@ -178,6 +178,19 @@ def canonical_repo_selector(root: Path, selector: str, dry_run: bool = False) ->
     return "id:" + rid.removeprefix("id:")
 
 
+def run_coordinator_handle(root: Path, run_id: str, dry_run: bool = False) -> str:
+    """Resolve the current coordinator explicitly after a Run binding recovery."""
+    if dry_run:
+        return "term_dry_coordinator"
+    receipt = orca(root, ["orchestration", "run-show", "--id", run_id], "resolve Run coordinator")
+    result = receipt.get("result")
+    run_record = result.get("run") if isinstance(result, dict) else None
+    handle = run_record.get("coordinator_handle") if isinstance(run_record, dict) else None
+    if not isinstance(handle, str) or not handle.startswith("term_"):
+        raise FleetError(f"Run {run_id} has no current coordinator handle")
+    return handle
+
+
 def fetch(root: Path, cfg: Mapping[str, Any], dry_run: bool = False) -> None:
     if cfg.get("fetch_before_launch", True):
         run(["git", "fetch", "--prune", "origin"], cwd=root, dry_run=dry_run, echo=True)
@@ -411,6 +424,7 @@ def render_spec(root: Path, cfg: Mapping[str, Any], state: Mapping[str, Any], ta
 def dispatch_wave(root: Path, cfg: Mapping[str, Any], state: dict[str, Any], wave: dict[str, Any], state_path: Path, dry_run: bool) -> None:
     base_ref, base_sha = resolve_wave_base(root, state, wave, dry_run)
     selector = canonical_repo_selector(root, state["repo_selector"], dry_run)
+    coordinator = run_coordinator_handle(root, state["run_id"], dry_run)
     orca(root, ["repo", "set-base-ref", "--repo", selector, "--ref", base_ref], f"set base for {wave['id']}", dry_run)
     evidence = Path(state["run_dir"]) / "evidence"
     defaults = cfg.get("worker_defaults", {})
@@ -439,20 +453,31 @@ def dispatch_wave(root: Path, cfg: Mapping[str, Any], state: dict[str, Any], wav
         agent = task.get("agent") or defaults.get("agent") or "codex"
         setup = task.get("setup") or defaults.get("setup") or "run"
         mode = task.get("worktree_mode") or defaults.get("worktree_mode") or "new-top-level"
-        cmd = [
-            "orchestration", "worker-start", "--task", task_id,
-            "--worktree", str(mode), "--repo", selector, "--name", task["workspace_name"],
-            "--base-branch", base_sha,
-            "--agent", str(agent), "--setup", str(setup),
-        ]
-        if task.get("model"):
-            cmd += ["--model", str(task["model"])]
-            if task.get("effort"):
-                cmd += ["--effort", str(task["effort"])]
-        elif task.get("effort"):
-            raise FleetError(f"task {tid}: effort requires model")
-        started = orca(root, cmd, f"start worker {tid}", dry_run)
-        dispatch = dispatch_id_from_receipt(started) or (f"dispatch_dry_{tid.lower()}" if dry_run else None)
+        existing = orca(
+            root,
+            ["orchestration", "dispatch-show", "--task", task_id, "--from", coordinator],
+            f"inspect dispatch {tid}",
+            dry_run,
+        )
+        dispatch = dispatch_id_from_receipt(existing)
+        started = existing
+        if not dispatch:
+            cmd = [
+                "orchestration", "worker-start", "--task", task_id,
+                "--run", state["run_id"], "--from", coordinator,
+                "--worktree", str(mode), "--repo", selector, "--name", task["workspace_name"],
+                "--base-branch", base_sha,
+                "--agent", str(agent), "--setup", str(setup),
+            ]
+            if task.get("model"):
+                cmd += ["--model", str(task["model"])]
+                if task.get("effort"):
+                    cmd += ["--effort", str(task["effort"])]
+            elif task.get("effort"):
+                raise FleetError(f"task {tid}: effort requires model")
+            started = orca(root, cmd, f"start worker {tid}", dry_run)
+            dispatch = dispatch_id_from_receipt(started)
+        dispatch = dispatch or (f"dispatch_dry_{tid.lower()}" if dry_run else None)
         if not dispatch:
             raise FleetError(f"worker-start receipt missing dispatch_ ID for {tid}")
         task["dispatch_id"] = dispatch
