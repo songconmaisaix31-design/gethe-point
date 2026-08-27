@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "objective": "演示《都记得》目录所有权计划的最小 Wave DAG",
+  "plan_status": "example",
+  "launch_authorized": false,
+  "base_ref": "origin/main",
+  "execution": {
+    "mode": "child-agents-only",
+    "worktree_per_task": true,
+    "reuse_worker": false,
+    "coordinator_role": "control-only",
+    "completion_task": "INT-900"
+  },
+  "waves": [
+    {
+      "id": "foundation",
+      "description": "先冻结最小公共契约",
+      "depends_on": [],
+      "base": {
+        "type": "ref",
+        "value": "origin/main"
+      },
+      "tasks": [
+        {
+          "id": "FOUND-900",
+          "title": "冻结示例契约",
+          "track": "foundation",
+          "write_paths": [
+            "packages/contracts/**"
+          ],
+          "spec": "定义一个机器可读的示例契约，不实现消费者业务代码。",
+          "acceptance": [
+            "契约可被测试读取",
+            "字段与空值语义明确"
+          ],
+          "checks": [],
+          "agent": "codex"
+        }
+      ]
+    },
+    {
+      "id": "parallel",
+      "description": "两个目录轨从同一契约 SHA 并行开发",
+      "depends_on": [
+        "FOUND-900"
+      ],
+      "base": {
+        "type": "task",
+        "task": "FOUND-900"
+      },
+      "tasks": [
+        {
+          "id": "EXPR-900",
+          "title": "实现示例角色首页",
+          "track": "experience",
+          "write_paths": [
+            "apps/web/src/modules/home/**"
+          ],
+          "spec": "严格消费冻结契约，实现一个隔离的首页模块。",
+          "acceptance": [
+            "模块可独立测试",
+            "不修改其他轨道"
+          ],
+          "checks": [],
+          "agent": "codex"
+        },
+        {
+          "id": "CONV-900",
+          "title": "实现示例对话模块",
+          "track": "conversation",
+          "write_paths": [
+            "apps/web/src/modules/conversation/**"
+          ],
+          "spec": "严格消费冻结契约，实现一个隔离的对话模块。",
+          "acceptance": [
+            "模块可独立测试",
+            "不修改其他轨道"
+          ],
+          "checks": [],
+          "agent": "codex"
+        }
+      ]
+    },
+    {
+      "id": "integration",
+      "description": "唯一集成轨精确合并两个目录轨",
+      "depends_on": [
+        "FOUND-900",
+        "EXPR-900",
+        "CONV-900"
+      ],
+      "base": {
+        "type": "task",
+        "task": "FOUND-900"
+      },
+      "tasks": [
+        {
+          "id": "INT-900",
+          "title": "组装示例发布候选",
+          "track": "integration",
+          "write_paths": [
+            "apps/web/src/app/**",
+            "README.md"
+          ],
+          "spec": "精确 no-ff 合并已验收依赖，只在集成所有路径做组装。",
+          "acceptance": [
+            "保留非 squash 历史",
+            "集成检查通过"
+          ],
+          "checks": [
+            "python -c \"print('example release verification passed')\""
+          ],
+          "agent": "codex"
+        }
+      ]
+    }
+  ]
+}

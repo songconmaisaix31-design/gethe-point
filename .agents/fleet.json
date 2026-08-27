@@ -1,0 +1,182 @@
+{
+  "schema_version": 1,
+  "project": "we-remember-mvp",
+  "repo_selector": "id:14e93d48-5336-4dbf-a84d-88325f8f3d77",
+  "base_ref": "BLOCKED_UNTIL_KIT_IS_IN_SHARED_BASE",
+  "fetch_before_launch": true,
+  "coordinator": {
+    "agent": "codex",
+    "setup": "run",
+    "worktree_prefix": "fleet-control",
+    "context_mode": "structured-only",
+    "business_code_write": "forbidden"
+  },
+  "worker_defaults": {
+    "agent": "codex",
+    "setup": "run",
+    "worktree_mode": "new-top-level",
+    "reuse": "never"
+  },
+  "branch_rules": {
+    "track_pattern": "^(?:[^/]+/)?trk-(?P<track>[a-z0-9_]+)-(?P<task>[a-z0-9-]+?)(?:--(?P<run>[a-z0-9-]+)-a(?P<attempt>[1-9][0-9]*))?$",
+    "control_pattern": "^(?:[^/]+/)?fleet-control(?:-|$)",
+    "base_branches": [
+      "main",
+      "master",
+      "develop"
+    ]
+  },
+  "global_forbidden": [
+    ".git/**",
+    ".env",
+    ".env.local",
+    ".env.production",
+    "**/*.pem",
+    "**/*.key",
+    "**/*credential*",
+    "*.pem",
+    "*.key",
+    "**/.env",
+    "**/.env.local",
+    "**/.env.production"
+  ],
+  "tracks": {
+    "control": {
+      "description": "总控计划、运行状态、决策和跨轨交接；不写业务代码",
+      "allow": [
+        ".agents/plans/**",
+        ".agents/runs/**",
+        ".agents/decisions/**",
+        ".agents/handoffs/**"
+      ],
+      "checks": []
+    },
+    "foundation": {
+      "description": "唯一共享地基：工作区、依赖、公共契约、数据库迁移、设计令牌与测试基础设施",
+      "allow": [
+        "package.json",
+        "pnpm-workspace.yaml",
+        "pnpm-lock.yaml",
+        "turbo.json",
+        "tsconfig.base.json",
+        ".npmrc",
+        ".env.example",
+        "apps/web/package.json",
+        "apps/web/next.config.mjs",
+        "apps/web/tsconfig.json",
+        "apps/web/postcss.config.mjs",
+        "apps/web/vitest.config.ts",
+        "packages/config/**",
+        "packages/ui/**",
+        "packages/contracts/**",
+        "packages/db/**",
+        "supabase/**"
+      ],
+      "checks": []
+    },
+    "experience": {
+      "description": "家庭空间、三角色首页、角色切换、布局壳与被看护人无障碍体验",
+      "allow": [
+        "apps/web/src/modules/space/**",
+        "apps/web/src/modules/home/**",
+        "apps/web/src/components/layout/**"
+      ],
+      "checks": []
+    },
+    "conversation": {
+      "description": "Agent 1:1/家庭群输入面、见证识别、逐条同意门、边界与风险分类",
+      "allow": [
+        "apps/web/src/modules/conversation/**",
+        "packages/ai-witness/**",
+        "packages/boundary/**"
+      ],
+      "checks": []
+    },
+    "responsibility": {
+      "description": "Signal 聚合、责任域、五阶段归属、责任集中度报告与证据解释",
+      "allow": [
+        "apps/web/src/modules/responsibility/**",
+        "packages/responsibility/**",
+        "packages/ai-domain/**"
+      ],
+      "checks": []
+    },
+    "handover": {
+      "description": "交接包、blocked-by-default、双方确认、所有权及未来提醒的原子迁移",
+      "allow": [
+        "apps/web/src/modules/handover/**",
+        "packages/handover/**",
+        "packages/ai-handover/**"
+      ],
+      "checks": []
+    },
+    "care": {
+      "description": "看护规则草稿、人审激活、确定性调度、回应、升级与闭环状态机",
+      "allow": [
+        "apps/web/src/modules/care/**",
+        "packages/care/**"
+      ],
+      "checks": []
+    },
+    "privacy": {
+      "description": "visibility 策略、证据删除失效、撤回授权、个人导出和空间删除",
+      "allow": [
+        "apps/web/src/modules/privacy/**",
+        "packages/privacy/**"
+      ],
+      "checks": []
+    },
+    "qa": {
+      "description": "黄金家庭 Fixture、契约测试、E2E、演示脚本、故障注入与验收证据",
+      "allow": [
+        "fixtures/**",
+        "tests/e2e/**",
+        "packages/testkit/**",
+        "docs/demo/**"
+      ],
+      "checks": []
+    },
+    "integration": {
+      "description": "唯一集成者：App Router、模块适配、部署、发布说明与发布候选",
+      "allow": [
+        "apps/web/src/app/**",
+        "apps/web/src/integration/**",
+        "deploy/**",
+        "docs/release/**",
+        "README.md"
+      ],
+      "checks": []
+    },
+    "automation": {
+      "description": "多 Agent 控制面、脚本、Hook、CI 与仓库级 Agent 规则",
+      "allow": [
+        "scripts/**",
+        ".githooks/**",
+        ".github/**",
+        ".agents/fleet.json",
+        ".agents/prompts/**",
+        "AGENTS.md",
+        "PRINCIPLES.md",
+        "orca.yaml",
+        "Makefile",
+        "TEST_REPORT.md",
+        "docs/operations/**"
+      ],
+      "checks": [
+        "python -B -m unittest discover -s scripts/tests -v"
+      ]
+    }
+  },
+  "execution_policy": {
+    "delegate_all_tasks": true,
+    "required_worktree_mode": "new-top-level",
+    "unique_worktree_per_attempt": true,
+    "reuse_worker": false,
+    "coordinator_role": "control-only",
+    "structured_context_only": true,
+    "strict_worker_identity": true,
+    "max_attempts_per_task": 3,
+    "strict_completion": true,
+    "verify_release_checks_in_detached_worktree": true
+  }
+}

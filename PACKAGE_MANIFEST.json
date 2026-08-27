@@ -1,0 +1,223 @@
+{
+  "schema_version": 1,
+  "package": "we-remember-orca-fleet-kit",
+  "version": "2.0.0-worktree-enforced",
+  "generated_date": "2026-08-27",
+  "product": "都记得（We Remember）",
+  "entrypoint": "python scripts/start_fleet.py --plan .agents/plans/current.json",
+  "execution": {
+    "mode": "child-agents-only",
+    "worktree_per_task": true,
+    "reuse_worker": false,
+    "coordinator_role": "control-only",
+    "completion_task": "INT-002",
+    "unique_worktree_per_attempt": true,
+    "strict_completion": true
+  },
+  "plan": {
+    "waves": 6,
+    "tasks": 18
+  },
+  "validation": {
+    "automated_tests_passed": 20,
+    "plan_validation": "passed",
+    "cross_track_overlaps": 0,
+    "coordinator_dry_run": "passed",
+    "task_dispatch_dry_run": "passed",
+    "live_orca_runtime": "not available in build container; doctor required on target machine"
+  },
+  "files": [
+    {
+      "path": ".agents/.gitignore",
+      "size": 7,
+      "sha256": "a7d8bdcefba82a95ebc021d87c629fdea21f13af953bf01e28b7cf8b0eeceb41",
+      "executable": false
+    },
+    {
+      "path": ".agents/decisions/.gitkeep",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "executable": false
+    },
+    {
+      "path": ".agents/decisions/0001-mvp-engineering-freeze.md",
+      "size": 4637,
+      "sha256": "64ccd427a96cff64d8ddaea90bf6efe8988ad6db096fe1ae6550bccfb73d24ab",
+      "executable": false
+    },
+    {
+      "path": ".agents/decisions/0002-worktree-isolation-completion.md",
+      "size": 4673,
+      "sha256": "1f2105b38fd65c7f6404bd4c0962fe7b68567d7f8bfdb451f195984adcbbb3e6",
+      "executable": false
+    },
+    {
+      "path": ".agents/fleet.json",
+      "size": 5166,
+      "sha256": "21c7b1ecbe794a70c1aa5edba59a42d70042c98cff431fd443d055f27b9eba02",
+      "executable": false
+    },
+    {
+      "path": ".agents/handoffs/.gitkeep",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "executable": false
+    },
+    {
+      "path": ".agents/plans/DEVELOPMENT_PLAN.md",
+      "size": 20010,
+      "sha256": "9c826369eb389c05ca8736ea19f452a16799f3873231a260a656cc9398b290ba",
+      "executable": false
+    },
+    {
+      "path": ".agents/plans/current.json",
+      "size": 27066,
+      "sha256": "b26a84607d9a8dfb81d34908ffcc494879cadbea7ed317ebdc6e70b5888bc39e",
+      "executable": false
+    },
+    {
+      "path": ".agents/plans/example.json",
+      "size": 3083,
+      "sha256": "8afe3137f16ad426105a3079419d2d04e71480e7bd0524f78db59e88e195b284",
+      "executable": false
+    },
+    {
+      "path": ".agents/prompts/coordinator.md",
+      "size": 5836,
+      "sha256": "c6150cd283db32fda71493aa9d96e689abdcc6b92d9c6bf328f2a86369e5a375",
+      "executable": false
+    },
+    {
+      "path": ".agents/prompts/integrator.md",
+      "size": 2398,
+      "sha256": "9a52bf84ee596aaa916a928a5995141fe15908de11e84d4ac67987f80b2dbe2f",
+      "executable": false
+    },
+    {
+      "path": ".agents/prompts/worker.md",
+      "size": 3204,
+      "sha256": "297ce9b2f1d1e0518bc9b3c2c9b3e431ef23b477ffb1b8c6e08cc90833cb5e09",
+      "executable": false
+    },
+    {
+      "path": ".agents/runs/.gitkeep",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "executable": false
+    },
+    {
+      "path": ".githooks/pre-commit",
+      "size": 150,
+      "sha256": "56278fbdcab534ab7b9e1b7a997263148ae2da7bffe2c4b9d1205d5636931a51",
+      "executable": true
+    },
+    {
+      "path": ".github/workflows/agent-gate.yml",
+      "size": 1104,
+      "sha256": "918bad1303c6da7037bc12c2af306d7906522551fd5c5e0b13878d8040e28302",
+      "executable": false
+    },
+    {
+      "path": "AGENTS.md",
+      "size": 4371,
+      "sha256": "0454db69f045d5efcaa8c7a9185946614ac99e421c7a289dd4715ebaedea82d6",
+      "executable": false
+    },
+    {
+      "path": "Makefile",
+      "size": 713,
+      "sha256": "f353dca1c74ddcc453c922c53d0f103504179745340ee4fba959591e346090f6",
+      "executable": false
+    },
+    {
+      "path": "PRINCIPLES.md",
+      "size": 1851,
+      "sha256": "bc07d019c50e078912f1f0d8b48feeb96a6eb6f047748a7a51502143fc19ff0e",
+      "executable": false
+    },
+    {
+      "path": "README.md",
+      "size": 11030,
+      "sha256": "ff2f0d593bc48f27a74ceb39ddf68316035db1fbc7b91fa149f4e75db381a41e",
+      "executable": false
+    },
+    {
+      "path": "TEST_REPORT.md",
+      "size": 4226,
+      "sha256": "836824105e58007c9fcc9720ba3511320ae7ce15c8c3c3da38e860e988814325",
+      "executable": false
+    },
+    {
+      "path": "docs/operations/WORKTREE_EXECUTION.md",
+      "size": 7796,
+      "sha256": "6d3aa2f0b4e63b68bf07529552345973974ccacaddb1f8d2195b775e339c16b0",
+      "executable": false
+    },
+    {
+      "path": "docs/product/PRD.md",
+      "size": 40275,
+      "sha256": "3db63b83a0457c6a70825e0677e1f8ae97ee4df449f985df071e6e904d8f09ac",
+      "executable": false
+    },
+    {
+      "path": "orca.yaml",
+      "size": 56,
+      "sha256": "8dcb8fdfe34fdcbb31184ed33072278e150eab5f8564017577c20352fa2dac94",
+      "executable": false
+    },
+    {
+      "path": "scripts/common.py",
+      "size": 25820,
+      "sha256": "24098cf80ea8305746516ae57d55625eafec7567dde2398a8f60a15c85d325d0",
+      "executable": true
+    },
+    {
+      "path": "scripts/fleet.py",
+      "size": 56926,
+      "sha256": "05424e529d4cba96036e2b4fd278c483ebbeb1f0a8e2a50110f3a824cb7e274e",
+      "executable": true
+    },
+    {
+      "path": "scripts/gate.py",
+      "size": 11085,
+      "sha256": "582864ca25b221236104d81423422b5ca86d9241dd47350b4c3eb72c04ff3302",
+      "executable": true
+    },
+    {
+      "path": "scripts/install_hooks.py",
+      "size": 532,
+      "sha256": "d2755b84db86df60f054db5db7806280f61637be56654e74b22d9cf3f3b03c72",
+      "executable": true
+    },
+    {
+      "path": "scripts/start_fleet.py",
+      "size": 1311,
+      "sha256": "738ff8ec1aa5240ef698bdba65a58fb93577f395d6df1167e414c5bc6d62f650",
+      "executable": true
+    },
+    {
+      "path": "scripts/tests/test_common.py",
+      "size": 2680,
+      "sha256": "0055670b226185b299d56e3a7ee74905d8b006b86b069a31ab723587224d65e0",
+      "executable": false
+    },
+    {
+      "path": "scripts/tests/test_integration.py",
+      "size": 4162,
+      "sha256": "5f2b7fa6133cd943a8aacddd8a151df64da1ed51f723873b5ac04481f8e8fd8f",
+      "executable": false
+    },
+    {
+      "path": "scripts/tests/test_worktree_isolation.py",
+      "size": 13471,
+      "sha256": "487a4fe87caa8ec432a412033c71330d815981ed8c08ad66103069f6c563b1fd",
+      "executable": false
+    },
+    {
+      "path": "scripts/worker_finish.py",
+      "size": 8761,
+      "sha256": "5d1afe453232546fe38d0a63cb894b4418e1c6f0ba0d9fe375a962943269eaa9",
+      "executable": true
+    }
+  ]
+}
