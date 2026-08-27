@@ -1,0 +1,17 @@
+{
+  "run_id": "run_6f548c6156cc",
+  "task_id": "task_181fece3bd35",
+  "logical_task_id": "AUTO-RECOVERY-001",
+  "attempt": 1,
+  "workspace_name": "trk-automation-auto-recovery-001--6f548c6156cc-a1",
+  "worktree_id": "14e93d48-5336-4dbf-a84d-88325f8f3d77::C:/Users/DW/orca/workspaces/gethe-point/trk-automation-auto-recovery-001-6f548c6156cc-a1",
+  "branch": "songconmaisaix31-design/trk-automation-auto-recovery-001-6f548c6156cc-a1",
+  "terminal_handle": "term_b2e3783b-8a86-48d8-b532-45eccb5dc3d2",
+  "dispatch_id": "ctx_c96266d59ef9",
+  "dispatch_status": "dispatched",
+  "worker_mode": "explicit-low-level-unsupervised",
+  "base_ref": "origin/songconmaisaix31-design/fleet-control-selector-recovery-20260827T014449Z",
+  "base_sha": "e742b09a660a5ff8ab8cda5684240a9fbf8fe961",
+  "contract_hash": "2e72b47777bf03c34e8558a9aa5c6bbfcebd3a048ebe492a8431d8dae91e916c",
+  "dispatched_at": "2026-08-27T02:18:36Z"
+}
