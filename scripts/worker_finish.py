@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 
 sys.dont_write_bytecode = True
@@ -45,6 +46,11 @@ def files_argument(files: list[str], limit: int = 6000) -> str:
     return "".join(chunks)
 
 
+def valid_dispatch_id(value: str) -> bool:
+    """Accept current `ctx_*` and legacy `dispatch_*` Orca Dispatch IDs."""
+    return re.fullmatch(r"(?:ctx|dispatch)_[0-9a-fA-F]{6,}", value) is not None
+
+
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--logical-task", required=True)
@@ -67,8 +73,8 @@ def main() -> int:
 def finish(args: argparse.Namespace) -> int:
     if not args.task_id.startswith("task_"):
         raise FleetError("--task-id must be the injected Orca task_... ID")
-    if not args.dispatch_id.startswith("dispatch_"):
-        raise FleetError("--dispatch-id must be the injected Orca dispatch_... ID")
+    if not valid_dispatch_id(args.dispatch_id):
+        raise FleetError("--dispatch-id must be an injected Orca ctx_... or dispatch_... ID")
     root = git_root()
     cfg = load_config(root)
     ctx = load_context(root)

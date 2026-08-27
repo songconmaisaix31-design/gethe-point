@@ -6,8 +6,8 @@ Generated: 2026-08-27
 
 Verified: 2026-08-27
 
-- Parsed the active Fleet config and 19-task overall plan and compiled all 8 Python files.
-- Passed 19 unit/integration tests, including fail-closed launch authorization, exact current/legacy Dispatch receipt parsing, rejection of the `dispatch_input` effect name, non-overlapping track ownership, active-base consistency, Windows-safe subprocess decoding, branch recognition, active/example plan validation, and integration merge gates.
+- Parsed the active Fleet config and 19-task overall plan and compiled all 9 Python files.
+- Passed 22 unit/integration tests, including fail-closed launch authorization, exact current/legacy Dispatch receipt parsing and worker completion validation, rejection of the `dispatch_input` effect name, non-overlapping track ownership, active-base consistency, Windows-safe subprocess decoding, branch recognition, active/example plan validation, and integration merge gates.
 - Proved that both a draft plan and an approved-but-unauthorized plan are rejected before repository selection, fetch, or any Orca call.
 - Validated `.agents/plans/current.json` with `ok: true` and no errors.
 - Passed `fleet.py doctor` against the live local Orca runtime with all 14 tracks recognized and no plan errors.
