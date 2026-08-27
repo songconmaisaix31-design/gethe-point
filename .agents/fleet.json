@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "gethe-point",
   "repo_selector": "path:C:/Users/DW/orca/projects/gethe-point",
-  "base_ref": "origin/main",
+  "base_ref": "origin/songconmaisaix31-design/we-remember-requested-fleet-v2",
   "fetch_before_launch": true,
   "coordinator": {
     "agent": "codex",
@@ -57,18 +57,32 @@
       "checks": []
     },
     "product": {
-      "description": "Product requirements and user-facing scope",
+      "description": "Product requirements, acceptance, and user-facing scope",
       "allow": [
         "产品需求文档_都记得_PRD.md",
         "docs/product/**"
       ],
       "checks": []
     },
-    "architecture": {
-      "description": "Shared contracts, schemas, API boundaries, and architecture decisions",
+    "foundation": {
+      "description": "Root workspace, locked dependencies, shared build configuration, and local developer harness",
       "allow": [
-        "contracts/**",
-        "schemas/**",
+        "package.json",
+        "pnpm-workspace.yaml",
+        "pnpm-lock.yaml",
+        "tsconfig.json",
+        "tsconfig.base.json",
+        "eslint.config.*",
+        "vitest.config.*",
+        "packages/config/**",
+        "tools/**"
+      ],
+      "checks": []
+    },
+    "architecture": {
+      "description": "Shared API contracts, schemas, state machines, security boundaries, and UI tokens",
+      "allow": [
+        "packages/contracts/**",
         "docs/architecture/**",
         "Tech-Spec.md",
         "API_CONTRACT.md",
@@ -76,67 +90,90 @@
       ],
       "checks": []
     },
-    "web": {
-      "description": "Role-specific web application and accessible UI components",
+    "data": {
+      "description": "PostgreSQL schema, migrations, repositories, and disposable database verification",
       "allow": [
-        "apps/web/**",
-        "packages/ui/**"
+        "packages/db/**"
       ],
       "checks": []
     },
-    "api": {
-      "description": "External API and application-service boundary",
+    "experience": {
+      "description": "Role-specific responsive web experience built against fixed contract fixtures first",
       "allow": [
-        "services/api/**"
+        "apps/web/next.config.*",
+        "apps/web/tsconfig.json",
+        "apps/web/public/**",
+        "apps/web/src/app/(ui)/**",
+        "apps/web/src/app/globals.css",
+        "apps/web/src/app/layout.tsx",
+        "apps/web/src/app/page.tsx",
+        "apps/web/src/components/**",
+        "apps/web/src/features/**",
+        "apps/web/tests/**"
       ],
       "checks": []
     },
-    "ai": {
-      "description": "Witness, responsibility-domain, handover, and boundary-agent implementations",
+    "conversation": {
+      "description": "Private conversation, consented signal drafting, AI witness, and high-risk boundary handling",
       "allow": [
-        "services/ai/**"
+        "modules/conversation/**",
+        "modules/ai-witness/**",
+        "modules/boundary/**"
       ],
       "checks": []
     },
-    "domain": {
-      "description": "Consent, responsibility, task, handover, audit, and deterministic domain rules",
+    "responsibility": {
+      "description": "Five-stage ownership, responsibility domains, and deterministic neutral reports",
       "allow": [
-        "services/domain/**"
+        "modules/responsibility/**",
+        "modules/ai-domain/**"
+      ],
+      "checks": []
+    },
+    "handover": {
+      "description": "Blocked-by-default two-party handover and atomic owner/reminder migration",
+      "allow": [
+        "modules/handover/**",
+        "modules/ai-handover/**"
       ],
       "checks": []
     },
     "care": {
-      "description": "Human-confirmed care rules and deterministic escalation state machine",
+      "description": "Human-confirmed deterministic care rules, scheduling, acknowledgement, and escalation",
       "allow": [
-        "services/care/**"
+        "modules/care/**"
+      ],
+      "checks": []
+    },
+    "privacy": {
+      "description": "Evidence access, consent revocation, export, deletion, and authorization policy",
+      "allow": [
+        "modules/privacy/**"
       ],
       "checks": []
     },
     "qa": {
-      "description": "Representative fixtures and end-to-end acceptance",
+      "description": "Fictional golden fixtures, contract acceptance, browser E2E, accessibility, and visual evidence",
       "allow": [
+        "packages/testkit/**",
+        "fixtures/**",
         "tests/e2e/**",
-        "fixtures/**"
+        "playwright.config.*"
       ],
       "checks": []
     },
     "integration": {
-      "description": "Sole integrator for assembly, shared root build files, release, and deployment",
+      "description": "Sole integrator for exact-SHA assembly, application adapters, release evidence, and deployment",
       "allow": [
-        "apps/demo-shell/**",
+        "apps/web/src/app/api/**",
+        "apps/web/src/auth/**",
+        "apps/web/src/integration/**",
+        "apps/web/src/server/**",
+        "apps/web/middleware.ts",
+        "docs/demo/**",
+        "docs/release/**",
         "deploy/**",
         "README.md",
-        "package.json",
-        "pnpm-workspace.yaml",
-        "pnpm-lock.yaml",
-        "package-lock.json",
-        "yarn.lock",
-        "pyproject.toml",
-        "uv.lock",
-        "requirements*.txt",
-        "Dockerfile",
-        ".dockerignore",
-        "docker-compose.yml",
         "vercel.json"
       ],
       "checks": []

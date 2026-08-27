@@ -29,7 +29,12 @@
 - The bootstrap may be committed locally for a clean review boundary, but it is not a runnable shared fleet baseline until the control plane is available from the configured base ref.
 - On 2026-08-27, the requested `orca-directory-fleet-kit.zip` was revalidated at SHA-256 `FAC74080BF7517527743BE7ED3CB0EA9CB8A71039EF83B0E952BF8000B42678E` in `fleet-control-mvp-planning-v2`; 11 tests, seven Python syntax checks, plan validation, and live doctor passed, with shared hooks still unset.
 - A separate remote control plane at `origin/songconmaisaix31-design/we-remember-fleet-kit` comes from a different archive and recorded a Run that failed before Worker dispatch. Do not merge its authorization or evidence into the requested-archive planning lineage without an explicit control-plane selection decision.
-- In the requested kit version, `plan_status` and `launch_authorized` are not read by the Fleet scripts. Until a pre-Run authorization check is added and tested, the unresolved base ref is the only machine-enforced launch block and must not be replaced.
+- Before the 2026-08-27 hardening, the requested kit did not read `plan_status` or `launch_authorized`; the unresolved base ref was then its only machine-enforced launch block.
+- On 2026-08-27, `scripts/fleet.py` was hardened to reject any plan unless `plan_status` is `approved` and `launch_authorized` is exactly `true`, before fetch, Orca mutation, or run-directory creation. Targeted regression tests prove both fail-closed paths.
+- The selected requested-archive control lineage is `origin/songconmaisaix31-design/we-remember-requested-fleet-v2`; the alternate `we-remember-fleet-kit` branch and its failed Runs remain read-only historical input.
+- The approved implementation order is `FOUND-001 -> CONTRACT-001 -> DATA-001 -> seven parallel core tasks -> INT-001 -> seven parallel hardening tasks -> INT-002`. Serializing contracts before migrations prevents unresolved responsibility and privacy semantics from being persisted.
+- The implementation uses a single root `pnpm` dependency manifest and lockfile owned only by the `foundation` track. Feature tracks use locked dependencies and non-overlapping paths; new dependencies require a separate foundation task.
+- Fixture mode is the acceptance baseline. Demo role switching is not production authentication, raw `agent_dm` evidence remains self-only, consent is per signal, handover acceptance is terminal and atomic, care execution is deterministic, and space deletion removes all in-space product and audit content.
 
 ## Secret handling
 

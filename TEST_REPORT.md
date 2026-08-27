@@ -1,17 +1,18 @@
 # Test Report
 
-Generated: 2026-08-22
+Generated: 2026-08-27
 
 ## gethe-point local deployment verification
 
-Verified: 2026-08-26
+Verified: 2026-08-27
 
-- Parsed both fleet JSON files and compiled all 7 Python files in memory.
-- Passed 11 unit/integration tests, including Windows-safe subprocess decoding and Orca username-prefixed branch recognition.
-- Validated the project-specific example plan with `ok: true` and no errors.
-- Passed `fleet.py doctor` against the live local Orca runtime with all 11 tracks recognized.
+- Parsed the active Fleet config and 19-task overall plan and compiled all 8 Python files.
+- Passed 16 unit/integration tests, including fail-closed launch authorization, non-overlapping track ownership, active-base consistency, Windows-safe subprocess decoding, branch recognition, active/example plan validation, and integration merge gates.
+- Proved that both a draft plan and an approved-but-unauthorized plan are rejected before repository selection, fetch, or any Orca call.
+- Validated `.agents/plans/current.json` with `ok: true` and no errors.
+- Passed `fleet.py doctor` against the live local Orca runtime with all 14 tracks recognized and no plan errors.
 - Confirmed local and global `core.hooksPath` remain unset.
-- Did not launch a coordinator, run, task, dispatch, or worker, and did not push remote state.
+- This section is control-plane preflight evidence only; Run, Task, Dispatch, Worker, product, browser, database, deployment, and official-acceptance evidence must be recorded separately when produced.
 
 ## Upstream archive baseline
 

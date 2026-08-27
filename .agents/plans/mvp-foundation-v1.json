@@ -1,8 +1,9 @@
 {
   "schema_version": 1,
   "plan_id": "mvp-foundation-v1",
-  "plan_status": "draft",
+  "plan_status": "superseded",
   "launch_authorized": false,
+  "superseded_by": ".agents/plans/current.json",
   "planning_date": "2026-08-27",
   "objective": "Freeze the reviewed product acceptance and machine-readable architecture contracts for the We Remember MVP before any implementation worker starts",
   "base_ref": "BLOCKED_UNTIL_KIT_IS_IN_SHARED_BASE",

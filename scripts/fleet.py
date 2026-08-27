@@ -198,6 +198,15 @@ def do_validate(cfg: Mapping[str, Any], args: argparse.Namespace) -> int:
     return 2 if errors else 0
 
 
+def require_launch_authorization(plan: Mapping[str, Any]) -> None:
+    """Fail closed before launch can fetch, mutate Orca state, or create files."""
+    status = plan.get("plan_status")
+    if status != "approved":
+        raise FleetError(f"plan_status must be approved for launch, got {status!r}")
+    if plan.get("launch_authorized") is not True:
+        raise FleetError("launch_authorized must be true for launch")
+
+
 def do_start_coordinator(root: Path, cfg: Mapping[str, Any], args: argparse.Namespace) -> int:
     defaults = cfg.get("coordinator", {})
     agent = args.agent or defaults.get("agent") or "codex"
@@ -435,6 +444,7 @@ def dispatch_ready(root: Path, cfg: Mapping[str, Any], state: dict[str, Any], st
 
 def do_launch(root: Path, cfg: Mapping[str, Any], args: argparse.Namespace) -> int:
     plan = load_json(args.plan.resolve())
+    require_launch_authorization(plan)
     errors = validate_plan(plan, cfg)
     if errors:
         raise FleetError("plan errors:\n- " + "\n- ".join(errors))

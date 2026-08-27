@@ -1,0 +1,581 @@
+{
+  "schema_version": 1,
+  "plan_id": "we-remember-mvp-overall-v1",
+  "plan_status": "approved",
+  "launch_authorized": true,
+  "planning_date": "2026-08-27",
+  "objective": "Build and verify the We Remember MVP from one requested-kit control lineage with consent-first privacy, persisted five-stage responsibility, blocked two-party handover, deterministic care, and a reproducible fixture demo",
+  "base_ref": "origin/songconmaisaix31-design/we-remember-requested-fleet-v2",
+  "planning_basis": {
+    "product_prd": "产品需求文档_都记得_PRD.md",
+    "product_prd_git_blob": "761a2431b674824d40fea06b22058c7afd65260a",
+    "requested_archive": "C:\\Users\\DW\\Downloads\\orca-directory-fleet-kit.zip",
+    "requested_archive_sha256": "FAC74080BF7517527743BE7ED3CB0EA9CB8A71039EF83B0E952BF8000B42678E",
+    "selected_remote_ref": "origin/songconmaisaix31-design/we-remember-requested-fleet-v2",
+    "excluded_control_ref": "origin/songconmaisaix31-design/we-remember-fleet-kit",
+    "excluded_reason": "different archive lineage and failed historical Run",
+    "product_engineering_decision": ".agents/decisions/0001-mvp-engineering-freeze.md",
+    "execution_decision": ".agents/decisions/0002-parallel-execution-contract.md",
+    "human_plan": ".agents/plans/OVERALL_DEVELOPMENT_PLAN.md"
+  },
+  "constraints": [
+    "Fixture mode is the default and must pass without network credentials or personal data.",
+    "Private agent_dm raw evidence is self-only and no shared write occurs without per-item speaker consent.",
+    "AI may draft only; deterministic code owns authorization, state, reminders, care, deletion, export, and audit.",
+    "Every task attempt uses a new top-level worktree and exact non-overlapping write paths.",
+    "Feature tracks do not add external dependencies or modify the root manifest or lockfile.",
+    "Fixture, local runtime, public deployment, and official acceptance are distinct evidence levels."
+  ],
+  "waves": [
+    {
+      "id": "workspace-bootstrap",
+      "description": "Create one reproducible locked toolchain before product code",
+      "depends_on": [],
+      "base": {
+        "type": "ref",
+        "value": "origin/songconmaisaix31-design/we-remember-requested-fleet-v2"
+      },
+      "tasks": [
+        {
+          "id": "FOUND-001",
+          "title": "Bootstrap the locked TypeScript workspace and shared developer harness",
+          "track": "foundation",
+          "write_paths": [
+            "package.json",
+            "pnpm-workspace.yaml",
+            "pnpm-lock.yaml",
+            "tsconfig.json",
+            "tsconfig.base.json",
+            "eslint.config.*",
+            "vitest.config.*",
+            "packages/config/**",
+            "tools/**"
+          ],
+          "spec": "Create a single-root pnpm workspace for Node, Next.js, React, strict TypeScript, PostgreSQL/Drizzle, Zod, Vitest, Playwright, and the minimum accessibility test support frozen in ADR 0001. Lock every planned external dependency now; later feature tracks must use only these dependencies. Define root scripts for focused track checks, full checks, build, fixture E2E, visual checks, and disposable database verification. Add only build/test configuration and a smoke test; do not implement product behavior or UI.",
+          "acceptance": [
+            "A clean checkout installs with pnpm install --frozen-lockfile",
+            "Strict TypeScript and lint settings are shared without any or unsafe eval defaults",
+            "Every future task check named in this plan exists as a root script or documented command",
+            "The dependency list is minimal, justified, and contains no direct AI SDK requirement",
+            "No product behavior, secret value, or real personal data is added"
+          ],
+          "checks": [
+            "pnpm install --frozen-lockfile",
+            "pnpm run check:foundation"
+          ],
+          "agent": "codex"
+        }
+      ]
+    },
+    {
+      "id": "contract-freeze",
+      "description": "Turn the approved product rules into one typed and machine-readable contract source",
+      "depends_on": [
+        "FOUND-001"
+      ],
+      "base": {
+        "type": "task",
+        "task": "FOUND-001"
+      },
+      "tasks": [
+        {
+          "id": "CONTRACT-001",
+          "title": "Freeze API, schema, state-machine, security, AI, clock, and UI contracts",
+          "track": "architecture",
+          "write_paths": [
+            "packages/contracts/**",
+            "docs/architecture/**",
+            "Tech-Spec.md",
+            "API_CONTRACT.md"
+          ],
+          "spec": "Implement the contract-only package and technical documentation from ADR 0001. Define explicit actor, visibility, command, query, event, error, audit, idempotency, LLMProvider, and Clock interfaces; Zod/JSON schemas; handover and care transition tables; authorization and deletion matrices; public package exports; Chinese UI vocabulary; design tokens; fixed screen states; and representative success/failure examples. Unknown or invalid inputs must narrow safely and fail closed. Do not implement database repositories, feature handlers, routes, or rendered UI.",
+          "acceptance": [
+            "The five Task responsibility fields are required in the single contract source",
+            "Private evidence, consent, visibility, deletion, export, and space-deletion semantics are mutually consistent",
+            "Handover and care state machines cover every allowed and denied transition",
+            "All commands and queries listed in ADR 0001 have explicit request, actor, result, and error types",
+            "AI output supports one bounded retry then needs_human_review without consequential mutation",
+            "UI tokens, Chinese state vocabulary, viewports, accessibility criteria, and Fixture labels are frozen",
+            "Consumers can import only public exports and all schema examples validate"
+          ],
+          "checks": [
+            "pnpm run check:contracts"
+          ],
+          "agent": "codex"
+        }
+      ]
+    },
+    {
+      "id": "database-foundation",
+      "description": "Persist the frozen privacy and responsibility invariants before feature work",
+      "depends_on": [
+        "CONTRACT-001"
+      ],
+      "base": {
+        "type": "task",
+        "task": "CONTRACT-001"
+      },
+      "tasks": [
+        {
+          "id": "DATA-001",
+          "title": "Create and prove the first complete PostgreSQL migration",
+          "track": "data",
+          "write_paths": [
+            "packages/db/**"
+          ],
+          "spec": "Create Drizzle schema, the first SQL migration, repositories, transaction helpers, and a disposable PostgreSQL verifier for Space, Member, Conversation, Message, Evidence, Signal, Domain, Task, Handover, CareRule, CareEvent, Reminder, ConsentDecision, and AuditLog. Persist all five responsibility fields. Encode referential, uniqueness, state, actor, idempotency, and visibility constraints that belong in the database. The verifier must generate ephemeral local database credentials at runtime, apply the migration to a disposable instance, query the system catalog, exercise representative constraints, and clean up only its exact test resources.",
+          "acceptance": [
+            "A fresh disposable PostgreSQL instance applies the migration without manual steps",
+            "System-catalog evidence proves discoveredBy, deadlineKeptBy, scheduledBy, executedBy, and followedUpBy exist",
+            "Accepted handover owner, reminders, and audit can be changed in one transaction",
+            "Consent, visibility, idempotency, and terminal-state constraints reject representative invalid writes",
+            "Repositories enforce explicit actor and transaction boundaries without logging content",
+            "No credential value is committed or printed"
+          ],
+          "checks": [
+            "pnpm run check:data",
+            "pnpm run db:verify"
+          ],
+          "agent": "codex"
+        }
+      ]
+    },
+    {
+      "id": "parallel-core",
+      "description": "Build seven isolated core capabilities from the accepted database baseline",
+      "depends_on": [
+        "DATA-001"
+      ],
+      "base": {
+        "type": "task",
+        "task": "DATA-001"
+      },
+      "tasks": [
+        {
+          "id": "EXPR-001",
+          "title": "Build the fixed-data role-specific Web/PWA experience",
+          "track": "experience",
+          "write_paths": [
+            "apps/web/next.config.*",
+            "apps/web/tsconfig.json",
+            "apps/web/public/**",
+            "apps/web/src/app/(ui)/**",
+            "apps/web/src/app/globals.css",
+            "apps/web/src/app/layout.tsx",
+            "apps/web/src/app/page.tsx",
+            "apps/web/src/components/**",
+            "apps/web/src/features/**",
+            "apps/web/tests/**"
+          ],
+          "spec": "Build the Chinese primary-carer, partner, and older-subject screens against fixed contract fixtures only. Cover private conversation, explicit signal consent, family activity, neutral responsibility report, blocked and confirmable handover, care inbox/acknowledgement, provenance, deletion controls, and visible workload release. Implement tokens and state vocabulary exactly from CONTRACT-001. Use a typed request/query client seam that visual tests satisfy with fixture responses and INT-001 later satisfies with integration-owned routes; do not connect database or module handlers.",
+          "acceptance": [
+            "All three roles have distinct, complete primary flows and Fixture truth labels",
+            "Loading, empty, blocked, denied, error, retry, and success states are visible",
+            "390x844 and 1440x900 layouts have no clipped text, overlap, or obscured primary action",
+            "The subject experience meets target size, contrast, focus, and reduced-motion requirements",
+            "No blame, score, diagnosis, production-auth claim, or silent success copy appears"
+          ],
+          "checks": [
+            "pnpm run check:experience",
+            "pnpm run test:visual:fixture"
+          ],
+          "agent": "codex"
+        },
+        {
+          "id": "CONV-001",
+          "title": "Build private conversation, consented signal drafting, and safety boundaries",
+          "track": "conversation",
+          "write_paths": [
+            "modules/conversation/**",
+            "modules/ai-witness/**",
+            "modules/boundary/**"
+          ],
+          "spec": "Implement CreatePrivateMessage, CreateSignalDraft, DecideConsent, and ConfirmSignal as small function-based handlers over public contracts. Raw evidence remains self-only. Provide deterministic fixture AI and an optional redacted LLMProvider adapter with schema validation, timeout, one retry, and needs_human_review fallback. Route high-risk content to non-diagnostic speaker guidance and never create an ordinary task or shared write automatically.",
+          "acceptance": [
+            "A private message creates no shared record before explicit per-item consent",
+            "Only the minimum consented redacted excerpt can enter a shared signal",
+            "Invalid JSON, timeout, provider failure, and second invalid output cannot mutate consequential state",
+            "Discussion-only and high-risk fixtures do not become tasks",
+            "Logs and errors contain IDs and outcome metadata but no message or evidence content"
+          ],
+          "checks": [
+            "pnpm run check:conversation"
+          ],
+          "agent": "codex"
+        },
+        {
+          "id": "RESP-001",
+          "title": "Build five-stage responsibility and neutral deterministic reporting",
+          "track": "responsibility",
+          "write_paths": [
+            "modules/responsibility/**",
+            "modules/ai-domain/**"
+          ],
+          "spec": "Implement task attribution, correction, domain grouping, and responsibility reports using persisted five-stage fields. Domain suggestions may come from a validated fixture/LLM draft, but task updates and reports are deterministic. Reports use human-authored templates, exclude discussion-only or invalidated evidence, and describe distribution without scores or blame.",
+          "acceptance": [
+            "Every report value traces to a persisted responsibility field and authorized signal",
+            "Corrections are explicit actor-authorized writes with audit metadata",
+            "Discussion-only, evidence_missing, and needs_review items are excluded",
+            "Fixture and optional AI domain drafts validate before human confirmation",
+            "Report copy remains neutral across representative uneven workloads"
+          ],
+          "checks": [
+            "pnpm run check:responsibility"
+          ],
+          "agent": "codex"
+        },
+        {
+          "id": "HAND-001",
+          "title": "Build blocked two-party handover and atomic ownership migration",
+          "track": "handover",
+          "write_paths": [
+            "modules/handover/**",
+            "modules/ai-handover/**"
+          ],
+          "spec": "Implement handover proposal, required-information supply, independent from/to confirmations, decline, expiry, and acceptance from the frozen state machine. Optional AI may draft missing-information questions only. AcceptHandover must call one transactional port that changes Domain.ownerId, future ownership defaults, active reminders, and audit together; every failure leaves the prior owner unchanged.",
+          "acceptance": [
+            "Missing operational information produces blocked and cannot be confirmed away",
+            "One-sided confirmation cannot accept or move ownership",
+            "Accepted, declined, and expired records are terminal",
+            "Acceptance is idempotent and moves owner, reminders, and audit atomically",
+            "Provider failure cannot bypass required information or confirmations"
+          ],
+          "checks": [
+            "pnpm run check:handover"
+          ],
+          "agent": "codex"
+        },
+        {
+          "id": "CARE-001",
+          "title": "Build the human-confirmed deterministic care scheduler",
+          "track": "care",
+          "write_paths": [
+            "modules/care/**"
+          ],
+          "spec": "Implement ConfirmCareRule, TickCareScheduler, AcknowledgeCareEvent, and HandleCareEvent using public contracts, repositories, an injectable Clock, persisted idempotency keys, and deterministic functions. Cover inactive draft, scheduled reminder, acknowledged, timed out, escalated, closed, and unresolved outcomes. Do not call any LLM in the execution path.",
+          "acceptance": [
+            "A draft rule cannot schedule or escalate before human confirmation",
+            "Repeated ticks and repeated acknowledgements do not duplicate events",
+            "Acknowledgement before timeout suppresses escalation",
+            "Timeout follows the exact confirmed escalation chain and terminates visibly",
+            "No test or production path depends on wall-clock sleeps or an LLM"
+          ],
+          "checks": [
+            "pnpm run check:care"
+          ],
+          "agent": "codex"
+        },
+        {
+          "id": "PRIV-001",
+          "title": "Build evidence access, revocation, export, and deletion policies",
+          "track": "privacy",
+          "write_paths": [
+            "modules/privacy/**"
+          ],
+          "spec": "Implement explicit actor authorization for raw evidence, redacted shared conclusions, audit queries, consent withdrawal for future analysis, personal export, evidence deletion, and family-space deletion. Evidence deletion must invalidate dependent signals, mark tasks/domains needs_review, exclude them from reports, and preserve accepted handover history until the space itself is deleted. Space deletion cascades all in-space product and audit content.",
+          "acceptance": [
+            "Another family role cannot retrieve raw private evidence by guessing an ID",
+            "Consent revocation blocks future analysis without falsifying prior authorized events",
+            "Evidence deletion invalidates every dependent projection deterministically",
+            "Personal export contains only actor-authorized data and records no secret values",
+            "Space deletion removes product and audit content and returns only an ephemeral receipt"
+          ],
+          "checks": [
+            "pnpm run check:privacy"
+          ],
+          "agent": "codex"
+        },
+        {
+          "id": "QA-001",
+          "title": "Build fictional golden fixtures and contract acceptance",
+          "track": "qa",
+          "write_paths": [
+            "packages/testkit/**",
+            "fixtures/**",
+            "tests/e2e/**",
+            "playwright.config.*"
+          ],
+          "spec": "Create deterministic fictional fixture builders and acceptance scenarios for all commands, queries, roles, and evidence levels. Include three responsibility domains, at least eight consented signals, two discussion-only messages, a denied consent, a blocked then accepted handover, care acknowledgement and escalation, and evidence deletion invalidation. At this wave, use contract and fixture adapters; browser wiring completes in INT-001.",
+          "acceptance": [
+            "Fixtures contain no real person, address, account, credential, or copied private content",
+            "Stable IDs and an injectable clock make tests deterministic",
+            "The seven-step demo spine and representative failures are encoded as reusable scenarios",
+            "Every expected success, blocked, denied, needs_human_review, and failed result is asserted",
+            "Fixture labels and evidence-level metadata are part of the test facts"
+          ],
+          "checks": [
+            "pnpm run check:qa-core"
+          ],
+          "agent": "codex"
+        }
+      ]
+    },
+    {
+      "id": "alpha-integration",
+      "description": "Merge every accepted core SHA and connect the complete fixture flow",
+      "depends_on": [
+        "DATA-001",
+        "EXPR-001",
+        "CONV-001",
+        "RESP-001",
+        "HAND-001",
+        "CARE-001",
+        "PRIV-001",
+        "QA-001"
+      ],
+      "base": {
+        "type": "task",
+        "task": "DATA-001"
+      },
+      "tasks": [
+        {
+          "id": "INT-001",
+          "title": "Assemble the alpha and connect the real module adapters",
+          "track": "integration",
+          "write_paths": [
+            "apps/web/src/app/api/**",
+            "apps/web/src/auth/**",
+            "apps/web/src/integration/**",
+            "apps/web/src/server/**",
+            "apps/web/middleware.ts",
+            "docs/demo/**",
+            "README.md"
+          ],
+          "spec": "Start from DATA-001 and merge each accepted core dependency SHA with a clean --no-ff merge. Stop on conflict and return defects to the owning track. Add only integration-owned adapters: fixture actor boundary, command/query composition, Next.js routes, database wiring, and demo documentation. Preserve the static UI contract while replacing its fixture seam with real module handlers. Do not claim production authentication or public deployment.",
+          "acceptance": [
+            "Every non-ancestor dependency SHA is an exact second parent of a clean no-ff merge",
+            "The complete seven-step Fixture flow runs through real command/query handlers and PostgreSQL",
+            "Authorization is enforced server-side even though identities are fictional",
+            "Blocked, denied, provider-failed, and database-failed paths remain explicit",
+            "README and demo docs distinguish Fixture, local runtime, and unavailable public deployment"
+          ],
+          "checks": [
+            "pnpm install --frozen-lockfile",
+            "pnpm run check",
+            "pnpm run test:e2e:fixture"
+          ],
+          "agent": "codex"
+        }
+      ]
+    },
+    {
+      "id": "parallel-hardening",
+      "description": "Harden each accepted capability independently from the integrated alpha",
+      "depends_on": [
+        "INT-001"
+      ],
+      "base": {
+        "type": "task",
+        "task": "INT-001"
+      },
+      "tasks": [
+        {
+          "id": "EXPR-002",
+          "title": "Harden responsive, accessible, and failure-state UX",
+          "track": "experience",
+          "write_paths": [
+            "apps/web/next.config.*",
+            "apps/web/tsconfig.json",
+            "apps/web/public/**",
+            "apps/web/src/app/(ui)/**",
+            "apps/web/src/app/globals.css",
+            "apps/web/src/app/layout.tsx",
+            "apps/web/src/app/page.tsx",
+            "apps/web/src/components/**",
+            "apps/web/src/features/**",
+            "apps/web/tests/**"
+          ],
+          "spec": "Using the integrated alpha as the read-only behavioral reference, fix only experience-owned defects in responsive layout, accessibility, keyboard/focus behavior, reduced motion, Chinese copy clarity, and all loading/blocked/denied/error/retry states. Preserve the fixed contract and integration seam.",
+          "acceptance": [
+            "Desktop and mobile screenshot baselines pass without clipping, overlap, or obscured actions",
+            "Keyboard, focus, contrast, target size, and reduced-motion checks pass",
+            "Every failure state names the blocked action and a truthful next step",
+            "Fixture and non-production identity labels remain visible"
+          ],
+          "checks": [
+            "pnpm run check:experience",
+            "pnpm run test:visual:fixture"
+          ],
+          "agent": "codex"
+        },
+        {
+          "id": "CONV-002",
+          "title": "Harden consent, redaction, and AI failure boundaries",
+          "track": "conversation",
+          "write_paths": [
+            "modules/conversation/**",
+            "modules/ai-witness/**",
+            "modules/boundary/**"
+          ],
+          "spec": "Add adversarial tests and focused fixes for actor confusion, replayed consent, revoked consent, oversized input, prompt injection text, provider timeout, invalid schema, redaction failure, and high-risk content. Fail closed without adding dependencies or logging private content.",
+          "acceptance": [
+            "Replayed, missing, expired, or wrong-actor consent cannot create a shared signal",
+            "Untrusted content remains data and cannot alter tool or policy behavior",
+            "Provider and redaction failures produce blocked or needs_human_review",
+            "Logs remain content-free under every representative failure"
+          ],
+          "checks": [
+            "pnpm run check:conversation"
+          ],
+          "agent": "codex"
+        },
+        {
+          "id": "RESP-002",
+          "title": "Harden attribution correction and neutral report integrity",
+          "track": "responsibility",
+          "write_paths": [
+            "modules/responsibility/**",
+            "modules/ai-domain/**"
+          ],
+          "spec": "Add property and adversarial coverage for partial responsibility fields, duplicate signals, corrections, invalidated evidence, empty domains, and uneven workloads. Keep report output deterministic, traceable, and neutral.",
+          "acceptance": [
+            "Corrections never rewrite another actor's unauthorized data",
+            "Duplicate or invalidated inputs cannot inflate reports",
+            "Empty and partial states remain truthful and deterministic",
+            "Report snapshots contain no rank, score, blame, or diagnosis"
+          ],
+          "checks": [
+            "pnpm run check:responsibility"
+          ],
+          "agent": "codex"
+        },
+        {
+          "id": "HAND-002",
+          "title": "Harden handover concurrency, expiry, and rollback safety",
+          "track": "handover",
+          "write_paths": [
+            "modules/handover/**",
+            "modules/ai-handover/**"
+          ],
+          "spec": "Add concurrent acceptance, duplicate confirmation, stale version, decline/accept race, expiry boundary, transaction failure, and reminder migration failure tests. Preserve the prior owner unless the entire transaction succeeds exactly once.",
+          "acceptance": [
+            "Concurrent accepts yield one accepted result and idempotent repeats",
+            "Declined or expired handovers cannot be revived accidentally",
+            "Any transaction failure leaves owner and reminders unchanged",
+            "Audit evidence distinguishes blocked, denied, failed, and accepted"
+          ],
+          "checks": [
+            "pnpm run check:handover"
+          ],
+          "agent": "codex"
+        },
+        {
+          "id": "CARE-002",
+          "title": "Harden deterministic time, replay, and escalation failures",
+          "track": "care",
+          "write_paths": [
+            "modules/care/**"
+          ],
+          "spec": "Add boundary-time, clock-skew, duplicate tick, duplicate acknowledgement, missing recipient, notification failure, retry, closure, and unresolved tests using only an injectable Clock and deterministic adapters.",
+          "acceptance": [
+            "Boundary timestamps have one documented deterministic outcome",
+            "Replays never duplicate care events or advance twice",
+            "Notification failure retries safely and can terminate unresolved",
+            "No path uses sleep, wall-clock timing, or an LLM"
+          ],
+          "checks": [
+            "pnpm run check:care"
+          ],
+          "agent": "codex"
+        },
+        {
+          "id": "PRIV-002",
+          "title": "Harden authorization, deletion cascades, and export minimization",
+          "track": "privacy",
+          "write_paths": [
+            "modules/privacy/**"
+          ],
+          "spec": "Test the full role/action authorization matrix, guessed identifiers, cross-space access, concurrent delete/read, deletion retries, derived-data cascades, minimal export, and complete space deletion. Keep errors non-enumerating and content-free.",
+          "acceptance": [
+            "Cross-role and cross-space access is denied without revealing record existence",
+            "Concurrent deletion and reads cannot return deleted raw evidence",
+            "Cascades are idempotent and every affected projection is invalidated",
+            "Exports and errors contain only authorized minimum data"
+          ],
+          "checks": [
+            "pnpm run check:privacy"
+          ],
+          "agent": "codex"
+        },
+        {
+          "id": "QA-002",
+          "title": "Run browser, accessibility, privacy, and failure acceptance",
+          "track": "qa",
+          "write_paths": [
+            "packages/testkit/**",
+            "fixtures/**",
+            "tests/e2e/**",
+            "playwright.config.*"
+          ],
+          "spec": "Complete browser E2E and acceptance evidence against the integrated alpha. Cover the seven-step happy path plus denied consent, blocked handover, one-sided confirmation, provider failure, database failure, care timeout, evidence deletion, export, space deletion, authorization denial, accessibility, and both target viewports.",
+          "acceptance": [
+            "Browser tests assert user-visible outcomes rather than only status codes",
+            "Representative success and failure scenarios identify their owning track",
+            "Accessibility and visual evidence covers both target viewports and all three roles",
+            "Artifacts contain only fictional Fixture data and explicit evidence labels"
+          ],
+          "checks": [
+            "pnpm run check:qa",
+            "pnpm run test:e2e:fixture"
+          ],
+          "agent": "codex"
+        }
+      ]
+    },
+    {
+      "id": "release-integration",
+      "description": "Merge exact hardening SHAs and produce the reproducible release candidate",
+      "depends_on": [
+        "INT-001",
+        "EXPR-002",
+        "CONV-002",
+        "RESP-002",
+        "HAND-002",
+        "CARE-002",
+        "PRIV-002",
+        "QA-002"
+      ],
+      "base": {
+        "type": "task",
+        "task": "INT-001"
+      },
+      "tasks": [
+        {
+          "id": "INT-002",
+          "title": "Assemble, verify, and document the release candidate",
+          "track": "integration",
+          "write_paths": [
+            "apps/web/src/app/api/**",
+            "apps/web/src/auth/**",
+            "apps/web/src/integration/**",
+            "apps/web/src/server/**",
+            "apps/web/middleware.ts",
+            "docs/demo/**",
+            "docs/release/**",
+            "deploy/**",
+            "README.md",
+            "vercel.json"
+          ],
+          "spec": "Start from INT-001 and merge every accepted hardening SHA with clean --no-ff merges. Run the complete frozen-install, type, lint, unit, contract, disposable-database, build, browser, accessibility, visual, and fixture-demo suite from a clean state. Produce a release manifest and four-minute demo script with exact truth-boundary labels. Deployment is allowed only if no private credential inspection is required; otherwise record it as unavailable without weakening local acceptance.",
+          "acceptance": [
+            "Every hardening SHA is an exact accepted clean merge dependency",
+            "The complete check suite passes from the committed lockfile and clean worktree",
+            "The release manifest links Run, logical tasks, Dispatches, branches, SHAs, merges, checks, and evidence",
+            "The four-minute fixture demo proves consent through workload release and representative failure",
+            "Local, Fixture, Public Deployment, and Official Acceptance claims are explicit and truthful",
+            "No secret or personal data appears in source, logs, fixtures, screenshots, or release artifacts"
+          ],
+          "checks": [
+            "pnpm install --frozen-lockfile",
+            "pnpm run check",
+            "pnpm run db:verify",
+            "pnpm run build",
+            "pnpm run test:e2e:fixture",
+            "pnpm run test:visual:fixture"
+          ],
+          "agent": "codex"
+        }
+      ]
+    }
+  ]
+}
