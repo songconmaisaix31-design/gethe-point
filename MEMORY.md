@@ -44,6 +44,10 @@
 - Persist an Orca Task ID immediately after `task-create` and before `worker-start`. If launch fails, recover the ID from the task-create evidence receipt and reuse it; otherwise a retry can create duplicate logical work while the external Orca Task remains ready.
 - Canonicalize portable `path:` repo selectors to Orca's runtime repository ID for Worker placement, and pass the resolved immutable base SHA as `worker-start --base-branch`. Repository defaults and symbolic refs alone can still fail with `selector_not_found` even when read-only discovery succeeds.
 - After coordinator recovery increments the Run generation, every `worker-start` must carry the explicit current `--run` and coordinator `--from` handle. Query `dispatch-show` first and adopt an existing active Dispatch so a lost or manually recovered launch receipt cannot start duplicate work.
+- A wave is `dispatched` only when every task is `dispatched` or `completed`. A partially launched wave must remain `planned` so `advance` can resume it after a Worker failure.
+- A failed Worker launch must not block its independent siblings. Persist the failed Dispatch receipt and Task ID, continue the rest of the parallel wave, then recover the failed task only after querying its exact Dispatch, terminal, setup, and worktree state.
+- `agent_prompt_stalled` can be caused by Codex startup prompts, MCP startup latency, or a long-lived TUI transcript rather than repository code. Clear only an idle unsent composer, reuse the exact task and worktree, and use `--retry-of`; never replay a mutation after `runtime_unavailable` before querying state.
+- In `run_a6e82cb7623f`, the seven core tracks were launched from DATA SHA `b5ce8994ddc233ec086c1e9059b8c921e63e1cf7`. CARE required `task-update --status ready` plus `dispatch --inject` after repeated supervised startup stalls; its active Dispatch is live but appears as `unsupervised` in `worker-read`, so preserve that limitation in acceptance evidence and do not describe it as a normal supervised Worker launch.
 
 ## Secret handling
 
