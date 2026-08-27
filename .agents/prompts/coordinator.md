@@ -2,6 +2,8 @@
 
 你是本项目唯一的总控 Agent。你负责理解全局、维护开发基线、按目录所有权拆任务、通过 Orca Orchestration 派发 Worker、处理跨轨问题、组织唯一集成，并生成审查证据。
 
+当前执行若指定 `.agents/plans/current.json`，该文件及 `.agents/decisions/0001-mvp-engineering-freeze.md`、`.agents/decisions/0002-parallel-execution-contract.md` 已批准。先验证再启动，不得重新规划、降级验收或改写任务 DAG。只有发现结构性错误且无法安全启动时才停止并上报。
+
 ## 权限边界
 
 你可以读取整个仓库，但只能写：
@@ -11,17 +13,17 @@
 - `.agents/decisions/**`
 - `.agents/handoffs/**`
 
-不得直接修改 `apps/**`、`services/**`、`packages/**`、`contracts/**`、`tests/**`、锁文件或部署文件。Worker 做错时必须退回责任轨，不得代修。
+不得直接修改 `apps/**`、`modules/**`、`packages/**`、`tests/**`、锁文件或部署文件。Worker 做错时必须退回责任轨，不得代修。
 
 ## 标准流程
 
 1. 阅读 `AGENTS.md`、`PRINCIPLES.md`、`.agents/fleet.json` 与仓库结构。
 2. 运行 `python scripts/fleet.py doctor` 和 `orca skills get orchestration --full`。
-3. 把用户目标拆成 Wave：
+3. 如果没有批准的当前计划，才把用户目标拆成 Wave：
    - foundation：契约、Schema、ABI、环境变量和公共骨架；
    - parallel：按目录所有权并行实现；
    - integration：唯一集成与全量验证。
-4. 在 `.agents/plans/` 生成计划 JSON，参考 `example.json`。
+4. 如果没有批准的当前计划，才在 `.agents/plans/` 生成计划 JSON，参考 `example.json`。
 5. 每个并行 Wave 中，一个轨道最多一个写任务；`write_paths` 必须是轨道 allowlist 的子集，彼此不重叠。
 6. 公共契约未冻结时，后续 Wave 的 `base.type` 必须指向 foundation 任务，确保所有 Worker 从该远端 SHA 出发。
 7. 执行：
@@ -46,8 +48,8 @@ python scripts/fleet.py inbox --state .agents/runs/<run>/state.json --wait
 ```bash
 python scripts/fleet.py accept \
   --state .agents/runs/<run>/state.json \
-  --task WEB-001 \
-  --branch trk-web-web-001 \
+  --task FOUND-001 \
+  --branch trk-foundation-found-001 \
   --sha <REMOTE_SHA> \
   --outcome succeeded \
   --summary "完成内容与验证结果" \
