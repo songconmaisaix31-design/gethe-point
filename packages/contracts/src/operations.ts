@@ -27,7 +27,8 @@ import {
   ExportBundleSchema,
   HandoverMissingInfoSchema,
   HandoverPacketSchema,
-  HandledCareEventSchema,
+  HandleCareEventResolutionSchema,
+  NewHandledCareEventSchema,
   PrivateConversationPageSchema,
   PrivateMessageSchema,
   ProposedHandoverSchema,
@@ -706,7 +707,6 @@ export const TickCareSchedulerContract = defineOperation({
 export const AcknowledgeCareEventRequestSchema =
   IdempotentRequestContextSchema.extend({
     careEventId: EntityIdSchema,
-    acknowledgedAt: TimestampSchema,
     expectedVersion: RecordVersionSchema,
   });
 export type AcknowledgeCareEventRequest = z.infer<
@@ -735,18 +735,10 @@ export const AcknowledgeCareEventContract = defineOperation({
   errorCodes: STATEFUL_MUTATION_ERRORS,
 });
 
-export const CareResolutionSchema = z.enum([
-  "confirmed_safe",
-  "in_person_check_started",
-  "professional_help_contacted",
-]);
-export type CareResolution = z.infer<typeof CareResolutionSchema>;
-
 export const HandleCareEventRequestSchema =
   IdempotentRequestContextSchema.extend({
     careEventId: EntityIdSchema,
-    resolution: CareResolutionSchema,
-    handledAt: TimestampSchema,
+    resolution: HandleCareEventResolutionSchema,
     expectedVersion: RecordVersionSchema,
   });
 export type HandleCareEventRequest = z.infer<
@@ -756,7 +748,7 @@ export type HandleCareEventActor = MemberActor;
 
 export const HandleCareEventResultSchema = z.strictObject({
   status: z.literal("handled"),
-  careEvent: HandledCareEventSchema,
+  careEvent: NewHandledCareEventSchema,
 });
 export type HandleCareEventResult = z.infer<
   typeof HandleCareEventResultSchema

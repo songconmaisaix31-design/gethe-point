@@ -1,6 +1,6 @@
 # Deterministic State-Machine Contract
 
-Status: Frozen by `CONTRACT-001`
+Status: Corrected by `CONTRACT-CORR-002`
 
 The executable tables are `HANDOVER_TRANSITION_TABLE` and `CARE_TRANSITION_TABLE`. Each is a Cartesian table: every possible `from` and `to` state pair has exactly one `allowed` or `denied` rule. An omitted pair cannot be interpreted as allowed.
 
@@ -57,11 +57,11 @@ If any write, notification-intent migration, optimistic version check, or audit 
 | --- | --- |
 | `scheduled` | one occurrence exists and is waiting for its due instant |
 | `notified` | subject notification intent was durably created |
-| `acknowledged` | subject acknowledged before closure |
-| `timed_out` | acknowledgement deadline passed without acknowledgement |
+| `acknowledged` | subject acknowledged on time, or explicitly acknowledged late after escalation |
+| `timed_out` | server time reached the acknowledgement deadline without a timely acknowledgement |
 | `escalated` | one or more confirmed escalation levels were durably notified |
-| `handled` | an authorized escalation recipient recorded a safe resolution |
-| `closed` | terminal completed outcome |
+| `handled` | an authorized escalation recipient recorded one bounded persisted resolution |
+| `closed` | terminal completed outcome; any prior handling time and resolution are preserved |
 | `unresolved` | terminal visible outcome after recipients/retries/escalation are exhausted |
 
 ### Allowed transitions
@@ -70,7 +70,7 @@ If any write, notification-intent migration, optimistic version check, or audit 
 | --- | --- | --- | --- |
 | `scheduled` | `notified` | `TickCareScheduler` | active confirmed rule; due instant reached; subject notification intent persisted |
 | `scheduled` | `unresolved` | `TickCareScheduler` | deterministic terminal recipient/delivery failure after the bounded retry policy |
-| `notified` | `acknowledged` | `AcknowledgeCareEvent` | actor is subject and acknowledgement is allowed |
+| `notified` | `acknowledged` | `AcknowledgeCareEvent` | actor is subject and sampled server `now` is strictly before the deadline |
 | `notified` | `timed_out` | `TickCareScheduler` | `requireAck` and injected time is at or after the deadline |
 | `notified` | `closed` | `TickCareScheduler` | `requireAck` is false and notification audit is persisted |
 | `notified` | `unresolved` | `TickCareScheduler` | bounded delivery retry is exhausted |
@@ -78,16 +78,22 @@ If any write, notification-intent migration, optimistic version check, or audit 
 | `timed_out` | `unresolved` | `TickCareScheduler` | no valid escalation target remains |
 | `escalated` | `escalated` | `TickCareScheduler` | next level exists; level strictly increases; level-scoped key is new |
 | `escalated` | `acknowledged` | `AcknowledgeCareEvent` | subject sends a late acknowledgement before terminal handling |
-| `escalated` | `handled` | `HandleCareEvent` | actor is a current escalation recipient |
+| `escalated` | `handled` | `HandleCareEvent` | actor is a current escalation recipient and supplies one selectable bounded resolution |
 | `escalated` | `unresolved` | `TickCareScheduler` | final escalation and retry policy are exhausted |
 | `acknowledged` | `closed` | deterministic close | acknowledgement audit is persisted |
-| `handled` | `closed` | deterministic close | handling audit is persisted |
+| `handled` | `closed` | deterministic close | handling audit is persisted; `handledAt` and `resolution` are copied unchanged |
 
 Every other pair is denied. `closed` and `unresolved` are terminal.
 
 ### Boundary-time rule
 
-The timeout comparison is inclusive: `now >= acknowledgementDeadline` permits the deterministic timeout transition. An acknowledgement request that wins the optimistic-version write first succeeds; a concurrent tick with the stale version fails. A tick that wins first moves to `timed_out`; a later acknowledgement follows only an explicitly allowed late-ack path. No path relies on process sleep or arrival-order assumptions.
+`AcknowledgeCareEvent` samples the injected server `Clock.now()` once. A notified event is timely only when `now < acknowledgementDeadline`; equality is already timed out, so `now >= acknowledgementDeadline` cannot produce the timely acknowledgement transition and permits the deterministic timeout transition. A timely acknowledgement that wins the optimistic-version write before the deadline succeeds; a concurrent tick with the stale version fails. A tick that wins at or after the deadline moves to `timed_out`; a later acknowledgement follows only the explicitly allowed post-escalation late-ack path. No path relies on a caller timestamp, process sleep, or arrival-order assumptions.
+
+For both `AcknowledgeCareEvent` and `HandleCareEvent`, the single clock sample is reused as the transition instant, persisted `acknowledgedAt` or `handledAt`, idempotency claim time, domain-event time, and audit time. An idempotent replay returns the original persisted result and timestamps without sampling a replacement command time.
+
+### Resolution persistence
+
+New `HandleCareEvent` requests accept only `confirmed_safe`, `in_person_check_started`, or `professional_help_contacted`. Persisted handled events require one of those values, except migrated pre-correction handled history may expose the bounded compatibility value `legacy_unknown`. `legacy_unknown` is never selectable by a new request. A handled-to-closed transition preserves the exact resolution; closed events without handling history have both `handledAt` and `resolution` set to null. Audit changes for the `resolution` field use the dedicated bounded resolution value and cannot carry free-form care content.
 
 ### Idempotency
 

@@ -16,9 +16,36 @@ import {
   type Timestamp,
 } from "./primitives";
 
+/**
+ * Supplies the authoritative server time for deterministic command execution.
+ * Care acknowledgement and handling sample it once and reuse that instant for
+ * transition, persistence, idempotency, domain-event, and audit decisions.
+ */
 export interface Clock {
   now(): Date;
 }
+
+export const CARE_COMMAND_TIME_POLICY = Object.freeze({
+  commandNames: Object.freeze([
+    "AcknowledgeCareEvent",
+    "HandleCareEvent",
+  ] as const),
+  source: "Clock.now",
+  sample: "once_per_execution",
+  callerTimestampFields: Object.freeze([] as const),
+  authoritativeFor: Object.freeze([
+    "transition_decision",
+    "acknowledgement_deadline_comparison",
+    "persisted_transition_timestamp",
+    "idempotency_claim_timestamp",
+    "domain_event_timestamp",
+    "audit_timestamp",
+  ] as const),
+  acknowledgement: Object.freeze({
+    timelyWhen: "now < acknowledgementDeadline",
+    timedOutWhen: "now >= acknowledgementDeadline",
+  }),
+} as const);
 
 export const LLMDraftPurposeSchema = z.enum([
   "signal_draft",

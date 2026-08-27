@@ -217,7 +217,7 @@ const allowedCareTransitions: Readonly<
   notified: {
     acknowledged: {
       trigger: "AcknowledgeCareEvent",
-      guard: "actor_is_subject_and_acknowledgement_is_allowed",
+      guard: "actor_is_subject_and_clock_is_strictly_before_deadline",
     },
     timed_out: {
       trigger: "TickCareScheduler",
@@ -253,7 +253,7 @@ const allowedCareTransitions: Readonly<
     },
     handled: {
       trigger: "HandleCareEvent",
-      guard: "actor_is_current_escalation_recipient",
+      guard: "actor_is_current_escalation_recipient_with_selectable_resolution",
     },
     unresolved: {
       trigger: "TickCareScheduler",
@@ -269,7 +269,7 @@ const allowedCareTransitions: Readonly<
   handled: {
     closed: {
       trigger: "CloseCareEvent",
-      guard: "handling_audit_is_persisted",
+      guard: "handling_audit_is_persisted_and_resolution_is_preserved",
     },
   },
 };

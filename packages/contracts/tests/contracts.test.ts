@@ -3,15 +3,23 @@ import { describe, expect, it } from "vitest";
 import packageManifest from "../package.json";
 import {
   ACCESSIBILITY_CONTRACT,
+  AcknowledgeCareEventRequestSchema,
+  AcknowledgedCareEventSchema,
   ADR_COMMAND_NAMES,
   ADR_QUERY_NAMES,
   AI_ATTEMPT_POLICY,
   ALL_OPERATION_CONTRACTS,
+  AuditChangeSchema,
+  AuditEntrySchema,
   AUTHORIZATION_MATRIX,
   AuthorizationActionSchema,
+  CARE_COMMAND_TIME_POLICY,
   CARE_STATES,
   CARE_TERMINAL_STATES,
   CARE_TRANSITION_TABLE,
+  CareEventSchema,
+  CareResolutionSchema,
+  ClosedCareEventSchema,
   COMMAND_CONTRACTS,
   ContractErrorSchema,
   DELETION_MATRIX,
@@ -20,6 +28,11 @@ import {
   DomainEventSchema,
   FAIL_CLOSED_INPUT_EXAMPLES,
   FIXED_SCREEN_CONTRACTS,
+  FIXTURE_CARE_RESOLUTION_AUDIT_ENTRY,
+  FIXTURE_CLOSED_CARE_EVENT,
+  FIXTURE_HANDLED_CARE_EVENT,
+  FIXTURE_LEGACY_CLOSED_CARE_EVENT,
+  FIXTURE_LEGACY_HANDLED_CARE_EVENT,
   FIXTURE_SCREENSHOT_MANIFEST,
   FIXTURE_TRUTH_LABELS,
   FixedScreenContractSchema,
@@ -29,6 +42,10 @@ import {
   HANDOVER_TRANSITION_TABLE,
   HandoverSchema,
   ConfirmHandoverFromResultSchema,
+  HandleCareEventRequestSchema,
+  HandleCareEventResolutionSchema,
+  HandleCareEventResultSchema,
+  HandledCareEventSchema,
   NEEDS_HUMAN_REVIEW_EXAMPLE,
   NeedsHumanReviewSchema,
   OPERATION_EXAMPLES,
@@ -218,6 +235,124 @@ describe("strict schemas and fail-closed examples", () => {
     ).toBe(false);
   });
 
+  it("uses one server-clock instant and rejects caller care timestamps", () => {
+    expect(
+      AcknowledgeCareEventRequestSchema.safeParse(
+        OPERATION_EXAMPLES.AcknowledgeCareEvent.request,
+      ).success,
+    ).toBe(true);
+    expect(
+      HandleCareEventRequestSchema.safeParse(
+        OPERATION_EXAMPLES.HandleCareEvent.request,
+      ).success,
+    ).toBe(true);
+    expect(
+      AcknowledgeCareEventRequestSchema.safeParse(
+        FAIL_CLOSED_INPUT_EXAMPLES.acknowledgementWithCallerTimestamp,
+      ).success,
+    ).toBe(false);
+    expect(
+      HandleCareEventRequestSchema.safeParse(
+        FAIL_CLOSED_INPUT_EXAMPLES.handlingWithCallerTimestamp,
+      ).success,
+    ).toBe(false);
+    expect(
+      AcknowledgedCareEventSchema.safeParse(
+        FAIL_CLOSED_INPUT_EXAMPLES.timelyAcknowledgementAtDeadline,
+      ).success,
+    ).toBe(false);
+
+    expect(CARE_COMMAND_TIME_POLICY).toMatchObject({
+      commandNames: ["AcknowledgeCareEvent", "HandleCareEvent"],
+      source: "Clock.now",
+      sample: "once_per_execution",
+      callerTimestampFields: [],
+      acknowledgement: {
+        timelyWhen: "now < acknowledgementDeadline",
+        timedOutWhen: "now >= acknowledgementDeadline",
+      },
+    });
+    expect(CARE_COMMAND_TIME_POLICY.authoritativeFor).toEqual(
+      expect.arrayContaining([
+        "transition_decision",
+        "acknowledgement_deadline_comparison",
+        "persisted_transition_timestamp",
+        "idempotency_claim_timestamp",
+        "domain_event_timestamp",
+        "audit_timestamp",
+      ]),
+    );
+  });
+
+  it("bounds persisted care resolution and keeps it content-free in audit", () => {
+    expect(HandledCareEventSchema.safeParse(FIXTURE_HANDLED_CARE_EVENT).success).toBe(
+      true,
+    );
+    expect(ClosedCareEventSchema.safeParse(FIXTURE_CLOSED_CARE_EVENT).success).toBe(
+      true,
+    );
+    expect(CareEventSchema.safeParse(FIXTURE_CLOSED_CARE_EVENT).success).toBe(true);
+    expect(FIXTURE_CLOSED_CARE_EVENT.resolution).toBe(
+      FIXTURE_HANDLED_CARE_EVENT.resolution,
+    );
+
+    expect(
+      HandledCareEventSchema.safeParse(FIXTURE_LEGACY_HANDLED_CARE_EVENT).success,
+    ).toBe(true);
+    expect(
+      ClosedCareEventSchema.safeParse(FIXTURE_LEGACY_CLOSED_CARE_EVENT).success,
+    ).toBe(true);
+    expect(CareResolutionSchema.safeParse("legacy_unknown").success).toBe(true);
+    expect(HandleCareEventResolutionSchema.safeParse("legacy_unknown").success).toBe(
+      false,
+    );
+    expect(
+      HandleCareEventRequestSchema.safeParse(
+        FAIL_CLOSED_INPUT_EXAMPLES.handlingMissingResolution,
+      ).success,
+    ).toBe(false);
+    expect(
+      HandleCareEventRequestSchema.safeParse(
+        FAIL_CLOSED_INPUT_EXAMPLES.handlingWithInvalidResolution,
+      ).success,
+    ).toBe(false);
+    expect(
+      HandleCareEventRequestSchema.safeParse(
+        FAIL_CLOSED_INPUT_EXAMPLES.handlingWithLegacyResolution,
+      ).success,
+    ).toBe(false);
+    expect(
+      HandleCareEventResultSchema.safeParse({
+        status: "handled",
+        careEvent: FIXTURE_LEGACY_HANDLED_CARE_EVENT,
+      }).success,
+    ).toBe(false);
+    expect(
+      ClosedCareEventSchema.safeParse({
+        ...FIXTURE_CLOSED_CARE_EVENT,
+        resolution: null,
+      }).success,
+    ).toBe(false);
+
+    expect(
+      AuditEntrySchema.safeParse(FIXTURE_CARE_RESOLUTION_AUDIT_ENTRY).success,
+    ).toBe(true);
+    expect(
+      AuditChangeSchema.safeParse({
+        field: "resolution",
+        before: { kind: "resolution", value: null },
+        after: { kind: "state", value: "free-form care content" },
+      }).success,
+    ).toBe(false);
+    expect(
+      AuditChangeSchema.safeParse({
+        field: "resolution",
+        before: { kind: "resolution", value: null },
+        after: { kind: "resolution", value: "free_form_resolution" },
+      }).success,
+    ).toBe(false);
+  });
+
   it("validates safe errors and the bounded human-review fallback", () => {
     for (const error of Object.values(REPRESENTATIVE_ERROR_EXAMPLES)) {
       expect(ContractErrorSchema.safeParse(error).success).toBe(true);
@@ -302,6 +437,23 @@ describe("complete deterministic transition tables", () => {
         ({ from, to }) => from === "escalated" && to === "escalated",
       ),
     ).toMatchObject({ decision: "allowed", trigger: "TickCareScheduler" });
+    expect(
+      CARE_TRANSITION_TABLE.find(
+        ({ from, to }) => from === "notified" && to === "acknowledged",
+      ),
+    ).toMatchObject({
+      decision: "allowed",
+      trigger: "AcknowledgeCareEvent",
+      guard: "actor_is_subject_and_clock_is_strictly_before_deadline",
+    });
+    expect(
+      CARE_TRANSITION_TABLE.find(
+        ({ from, to }) => from === "handled" && to === "closed",
+      ),
+    ).toMatchObject({
+      decision: "allowed",
+      guard: "handling_audit_is_persisted_and_resolution_is_preserved",
+    });
   });
 });
 
