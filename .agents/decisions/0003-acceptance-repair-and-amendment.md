@@ -17,7 +17,7 @@ Independent acceptance found defects that mechanical scope and test gates did no
 - `PRIV-001` returns an export authorization error outside the frozen API contract.
 - `DATA-001` cannot persist the contract's `Signal.evidenceState = evidence_missing` value.
 - `QA-001` contains cross-entity fixture contradictions that allow shape-only tests to pass false business facts.
-- `QA-REPAIR-001` must declare its public contracts dependency in `packages/testkit/package.json`, while the resulting root lockfile update remains foundation-owned and therefore needs a sequenced `FOUND-CORR-001` task.
+- `QA-REPAIR-001` must declare its public contracts dependency in `packages/testkit/package.json`, while the resulting root lockfile update remains foundation-owned and therefore needs a sequenced `FOUND-LOCK-001` task.
 - `AUTO-REPAIR-001` passed its mechanical checks but failed independent acceptance because its unlocked check-then-replace CAS can lose concurrent state updates, its state/receipt writes can half-commit, it can patch unrelated undispatched nodes, and it weakens resolution semantics.
 
 The original Tasks and Dispatches are immutable evidence. Reopening them, editing their contracts, or overwriting their acceptance receipts would make the Run impossible to audit. The current Fleet Kit cannot append replacement waves, express supersession, or finalize a resolved failed Attempt.
@@ -39,17 +39,17 @@ AUTO-REPAIR-002
   -> Wave A from DATA-001: CONTRACT-CORR-001 + CONV-REPAIR-001 + RESP-REPAIR-001
   -> Wave B from CONTRACT-CORR-001: DATA-CORR-001 + EXPR-REPAIR-001
   -> Wave C from DATA-CORR-001: CARE-REPAIR-001 + PRIV-REPAIR-001 + QA-REPAIR-001
-  -> Wave D from QA-REPAIR-001: FOUND-CORR-001
-  -> amended INT-001 from FOUND-CORR-001 after all accepted core and replacement SHAs
+  -> Wave D from QA-REPAIR-001: FOUND-LOCK-001
+  -> amended INT-001 from FOUND-LOCK-001 after all accepted core and replacement SHAs
 ```
 
-`CONTRACT-CORR-001` freezes server-observed care timing and a persisted/audited safe resolution. `DATA-CORR-001` adds the signal-specific evidence-state storage, care resolution storage, forward migrations, and catalog proof. `CONV-REPAIR-001` validates every provider-derived shared field against private-input disclosure and routes every frozen high-risk category before provider invocation. `CARE-REPAIR-001` enforces one PostgreSQL lock order and adds a representative concurrency regression. `QA-REPAIR-001` owns its package manifest and public imports; the sequenced foundation-owned `FOUND-CORR-001` updates `pnpm-lock.yaml` and proves a clean frozen install plus QA checks. The experience, conversation, responsibility, care, privacy, QA, and foundation corrections use fresh Task IDs, Dispatches, worktrees, branches, and receipts.
+`CONTRACT-CORR-001` freezes server-observed care timing and a persisted/audited safe resolution. `DATA-CORR-001` adds the signal-specific evidence-state storage, care resolution storage, forward migrations, and catalog proof. `CONV-REPAIR-001` validates every provider-derived shared field against private-input disclosure and routes every frozen high-risk category before provider invocation. `CARE-REPAIR-001` enforces one PostgreSQL lock order and adds a representative concurrency regression. `QA-REPAIR-001` owns its package manifest and public imports; the sequenced foundation-owned `FOUND-LOCK-001` updates `pnpm-lock.yaml` and proves a clean frozen install plus QA checks. The experience, conversation, responsibility, care, privacy, QA, and foundation tasks use fresh Task IDs, Dispatches, worktrees, branches, and receipts.
 
 ## Integration dependency set
 
-The amended but still undispatched `INT-001` must use `FOUND-CORR-001` as its base and depend on these accepted logical tasks:
+The amended but still undispatched `INT-001` must use `FOUND-LOCK-001` as its base and depend on these accepted logical tasks:
 
-- `FOUND-CORR-001`
+- `FOUND-LOCK-001`
 - `DATA-CORR-001`
 - `EXPR-REPAIR-001`
 - `CONV-REPAIR-001`

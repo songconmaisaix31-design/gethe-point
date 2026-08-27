@@ -65,9 +65,9 @@
 ## QA dependency closure
 
 - `QA-REPAIR-001` must own `packages/testkit/package.json` and declare `@we-remember/contracts` through the public workspace package boundary.
-- `FOUND-CORR-001` must run after QA, own only the root lockfile update, and prove `pnpm install --frozen-lockfile` plus `pnpm run check:qa-core` from the committed dependency graph.
-- `INT-001` must use `FOUND-CORR-001` as its base so the accepted QA ancestry and reproducible lockfile are present before integration.
+- `FOUND-LOCK-001` must run after QA with setup skipped, own only the root lockfile update, and then prove `pnpm install --frozen-lockfile` plus `pnpm run check:qa-core` from the committed dependency graph.
+- `INT-001` must use `FOUND-LOCK-001` as its base so the accepted QA ancestry and reproducible lockfile are present before integration.
 
 ## Gate
 
-`INT-001` remains blocked until `AUTO-REPAIR-002` and every replacement and correction named in ADR 0003, including `CONV-REPAIR-001`, `QA-REPAIR-001`, and `FOUND-CORR-001`, is independently accepted by exact remote SHA.
+`INT-001` remains blocked until `AUTO-REPAIR-002` and every replacement and correction named in ADR 0003, including `CONV-REPAIR-001`, `QA-REPAIR-001`, and `FOUND-LOCK-001`, is independently accepted by exact remote SHA.
