@@ -27,6 +27,9 @@
 - Local verification on 2026-08-26 passed Python compilation, 11 unit/integration tests, plan validation, and live `fleet.py doctor`; both local and global `core.hooksPath` remained unset.
 - Orca creates GitHub-owned branches with a username prefix on this machine. Branch rules therefore accept both `trk-*` / `fleet-control-*` and a single optional `<owner>/` prefix.
 - The bootstrap may be committed locally for a clean review boundary, but it is not a runnable shared fleet baseline until the control plane is available from the configured base ref.
+- On 2026-08-27, the requested `orca-directory-fleet-kit.zip` was revalidated at SHA-256 `FAC74080BF7517527743BE7ED3CB0EA9CB8A71039EF83B0E952BF8000B42678E` in `fleet-control-mvp-planning-v2`; 11 tests, seven Python syntax checks, plan validation, and live doctor passed, with shared hooks still unset.
+- A separate remote control plane at `origin/songconmaisaix31-design/we-remember-fleet-kit` comes from a different archive and recorded a Run that failed before Worker dispatch. Do not merge its authorization or evidence into the requested-archive planning lineage without an explicit control-plane selection decision.
+- In the requested kit version, `plan_status` and `launch_authorized` are not read by the Fleet scripts. Until a pre-Run authorization check is added and tested, the unresolved base ref is the only machine-enforced launch block and must not be replaced.
 
 ## Secret handling
 

@@ -3,15 +3,27 @@
   "plan_id": "mvp-foundation-v1",
   "plan_status": "draft",
   "launch_authorized": false,
-  "planning_date": "2026-08-26",
+  "planning_date": "2026-08-27",
   "objective": "Freeze the reviewed product acceptance and machine-readable architecture contracts for the We Remember MVP before any implementation worker starts",
   "base_ref": "BLOCKED_UNTIL_KIT_IS_IN_SHARED_BASE",
   "planning_basis": {
     "product_prd": "产品需求文档_都记得_PRD.md",
+    "product_prd_sha256": "04B827FED3FA84652DCCA9E41B0F55F8E7D3F28A660F9A4547E1609316A18676",
+    "product_prd_git_blob": "761a2431b674824d40fea06b22058c7afd65260a",
+    "requested_archive": "C:\\Users\\DW\\Downloads\\orca-directory-fleet-kit.zip",
+    "requested_archive_sha256": "FAC74080BF7517527743BE7ED3CB0EA9CB8A71039EF83B0E952BF8000B42678E",
     "fleet_bootstrap_sha": "4e65eba793ff1c63c695ff842e30fd0a9b3fcf07",
+    "planning_lineage_sha": "aff1a48d55118f9b8462f697f4133289cd3fc4bf",
+    "current_control_worktree": "C:\\Users\\DW\\orca\\workspaces\\gethe-point\\fleet-control-mvp-planning-v2",
     "current_shared_base_ref": "origin/main",
     "current_shared_base_sha": "70ca3dce63e137902274c14c101e69e47a84f1cb",
-    "current_shared_base_contains_fleet_kit": false
+    "current_shared_base_contains_requested_fleet_kit": false,
+    "alternate_remote_control_plane": {
+      "ref": "origin/songconmaisaix31-design/we-remember-fleet-kit",
+      "sha": "ecc7d5cbc32bc606cf568cd508038476689c4154",
+      "source_archive_matches_requested_archive": false,
+      "observed_run_status": "failed_before_worker_dispatch"
+    }
   },
   "launch_guards": [
     {
@@ -31,6 +43,18 @@
       "status": "blocked",
       "condition": "base_ref and the first wave base are replaced with the exact reviewed remote ref",
       "unblock_evidence": "fleet.py validate succeeds after the replacement and git rev-parse resolves the ref"
+    },
+    {
+      "id": "LG-004",
+      "status": "blocked",
+      "condition": "One reviewed Fleet control-plane lineage is selected and the alternate failed Run is explicitly excluded or reconciled",
+      "unblock_evidence": "A control decision names the requested archive checksum, selected base ref and SHA, and treatment of the failed alternate Run"
+    },
+    {
+      "id": "LG-005",
+      "status": "blocked",
+      "condition": "Fleet launch code enforces plan_status and launch_authorized before creating any Orca Run state",
+      "unblock_evidence": "A targeted automation test proves draft or launch_authorized=false is rejected before Run creation"
     }
   ],
   "constraints": [
@@ -41,7 +65,9 @@
     "Missing information, invalid structured output, missing confirmation, or unknown safety policy produces blocked or human-confirmation state, never implicit success.",
     "No real household, health, account, or credential data may appear in fixtures, logs, prompts, documentation, or evidence.",
     "Visual implementation cannot start until platform, viewport matrix, states, assets, tokens, and screenshot acceptance are frozen.",
-    "Implementation checks and package-manager commands must come from the accepted architecture output; this plan does not invent them."
+    "Implementation checks and package-manager commands must come from the accepted architecture output; this plan does not invent them.",
+    "The alternate remote Fleet branch was built from a different archive and its exhausted pre-dispatch Run is not a valid base or success receipt for this plan.",
+    "In the requested kit, plan_status and launch_authorized are review metadata only; the unresolved base ref is the current machine-enforced launch block and must remain unresolved until LG-005 is closed."
   ],
   "global_acceptance": [
     "The PRD is reviewed and every P0 item maps to an observable user outcome, a deterministic or AI owner, a data boundary, and a verification method.",
@@ -115,6 +141,22 @@
       "risk": "Local tests, screenshots, HTTP responses, deployment configuration, and public runtime evidence can be confused with release or submission acceptance.",
       "mitigation": "Require evidence labels for Local, Fixture, Public Runtime, Deployment, and Official Acceptance; never promote one level into another.",
       "gate": "Foundation documentation and final release manifest"
+    },
+    {
+      "id": "R-009",
+      "severity": "blocker",
+      "owner_track": "control",
+      "risk": "Two Fleet control-plane lineages with different archive provenance can create split-brain plans, duplicate Runs, and conflicting completion evidence.",
+      "mitigation": "Select one reviewed lineage by archive checksum and exact remote SHA, preserve the failed alternate Run as historical evidence, and never retry or dispatch across lineages.",
+      "gate": "LG-004"
+    },
+    {
+      "id": "R-010",
+      "severity": "blocker",
+      "owner_track": "automation",
+      "risk": "The current Fleet scripts do not read plan_status or launch_authorized, so those fields alone do not stop launch.",
+      "mitigation": "Keep the intentionally unresolved base ref and add a pre-Run authorization check with a no-state-created regression test before publishing an executable shared base.",
+      "gate": "LG-005"
     }
   ],
   "waves": [
@@ -135,13 +177,16 @@
             "产品需求文档_都记得_PRD.md",
             "docs/product/**"
           ],
-          "spec": "Review the pending PRD and produce docs/product/mvp-acceptance.json, docs/product/demo-fixture-contract.json, and concise supporting Markdown. Map every P0 capability to the user problem it solves, observable states, privacy boundary, deterministic versus AI responsibility, failure behavior, demo evidence, and explicit non-goals. Freeze the target platform decision, viewport and accessibility matrix, required data states, visual source/assets/tokens requirements, seven-step demo spine, Fixture labeling, and 96-hour scope-cut rules. Do not choose implementation details or write product code.",
+          "spec": "Review the pending PRD and produce docs/product/mvp-acceptance.json, docs/product/demo-fixture-contract.json, and concise supporting Markdown. Map every P0 capability to the user problem it solves, observable states, privacy boundary, deterministic versus AI responsibility, failure behavior, demo evidence, and explicit non-goals. Resolve the PRD conflicts around family-group scope cuts, privacy-rights scope, the rephrase helper, per-item consent versus category grants, handover terminology, evidence visibility, and deletion versus audit retention. Freeze the target platform decision, viewport and accessibility matrix, required data states, visual source/assets/tokens requirements, seven-step demo spine, Fixture labeling, and 96-hour scope-cut rules. Do not choose implementation details or write product code.",
           "acceptance": [
             "PRD status and decision log truthfully record reviewed, blocked, and deferred decisions",
             "Every P0 item maps to an observable outcome, acceptance evidence, failure state, and owning future track",
             "The seven-step demo includes explicit consent, neutral reporting, blocked handover, two-party acceptance, reminder transfer, deterministic care escalation, and the final workload reduction",
             "Fixture data is fictional, contains no personal data, and defines at least three domains, eight valid signals, and two discussion-only non-tasks",
             "Target platform, viewports, accessibility requirements, UI states, asset/token source, and screenshot QA criteria are explicit before visual work",
+            "One authoritative P0 matrix resolves family-group, privacy-rights, rephrase-helper, and consent-grant contradictions without a silent scope cut",
+            "Handover terminology, evidence access, audit retention, and deletion expectations each have one approved product rule before architecture begins",
+            "Fixture, Local, Public Runtime, Deployment, and Official Acceptance evidence remain visibly distinct in the product and demo contract",
             "P1 and non-goals are separated from P0; any P0 cut requires a recorded product decision",
             "mvp-acceptance.json and demo-fixture-contract.json parse successfully as UTF-8 JSON"
           ],
@@ -183,6 +228,8 @@
             "Care rules require human activation and every consequential care transition is deterministic and testable with a controllable clock",
             "Invalid or timed-out AI output gets one bounded retry and then a human-confirmation state; it cannot activate consequential behavior",
             "Evidence deletion, consent withdrawal, AI disablement, export, and space deletion have explicit authorization, cascade, audit, and failure semantics",
+            "Conversation, Message, ConsentDecision or ShareGrant, Reminder, Handover, CareEvent, and Visibility contracts reconcile every accepted P0 interaction and state",
+            "Evidence.rawRef access and deletion, Handover retention, AuditLog retention, and space deletion are mutually consistent and testable",
             "High-risk content routes to non-diagnostic safety guidance and never becomes an ordinary task",
             "The selected stack and every dependency are justified against delivery speed, privacy, maintainability, and offline demo reliability",
             "implementation-contract.json defines non-overlapping physical paths and exact build, type, lint, unit, contract, E2E, accessibility, and security checks for the next Epoch",
