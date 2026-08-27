@@ -34,10 +34,12 @@
             "API_CONTRACT.md",
             "Tech-Spec.md"
           ],
-          "spec": "Apply a forward-only public-contract correction. Remove caller-supplied acknowledgedAt and handledAt from AcknowledgeCareEvent and HandleCareEvent requests. Define Clock.now as the sole authoritative transition, deadline, persistence, idempotency, and audit time for those commands. Add a bounded CareResolution to handled events, preserve it when a handled event closes, and add resolution to the content-free audit change-field contract. Update examples and technical documentation without changing unrelated APIs, error codes, or product semantics.",
+          "spec": "Apply a forward-only public-contract correction. Remove caller-supplied acknowledgedAt and handledAt from AcknowledgeCareEvent and HandleCareEvent requests. Define Clock.now as the sole authoritative transition, deadline, persistence, idempotency, and audit time for those commands. Freeze acknowledgement as timely only when server now is strictly before the deadline; equality is already timed out. Add a bounded CareResolution to handled events, preserve it when a handled event closes, and add resolution to the content-free audit change-field contract. Include a non-user-selectable legacy_unknown persisted value for pre-correction handled or closed rows while rejecting it from new HandleCareEvent requests. Update examples and technical documentation without changing unrelated APIs, error codes, or product semantics.",
           "acceptance": [
             "Strict request schemas reject acknowledgedAt and handledAt supplied by callers",
+            "The public contract defines now before deadline as the only timely acknowledgement and treats equality as timed out",
             "Handled events require one bounded resolution and closed events preserve any prior handling resolution",
+            "legacy_unknown is visible only for migrated history and cannot be selected by a new handling request",
             "Audit changes can record only the bounded resolution enum and never free-form care content",
             "Examples cover valid acknowledgement, handling, closure, invalid timestamps, missing resolution, and invalid resolution",
             "The operation registry and every public schema example validate",
@@ -63,10 +65,15 @@
             "Self-harm, domestic-violence, and acute-medical fixtures bypass the provider and cannot create an ordinary task or automatic shared signal",
             "Provider-derived conclusions cannot publish private raw content",
             "Exact copies and near-verbatim variants with case, whitespace, punctuation, Unicode, or one-character changes fail closed",
+            "Creating a private message produces no shared signal, task, report fact, or cross-role query result",
+            "Consent is per signal, belongs to the same speaker, and must remain present, unexpired, and unrevoked through confirmation",
+            "Raw evidence and private-message queries remain self-only even when another role guesses an identifier",
+            "Consent revocation, evidence invalidation, actor deactivation, or version drift while the provider is running yields zero shared writes",
             "Invalid output, timeout, provider failure, and second invalid output produce needs_human_review without consequential mutation",
             "Logs and errors contain only identifiers and bounded outcome metadata"
           ],
           "checks": [
+            "python -B -c \"import sys; from subprocess import call,DEVNULL; bad=['8c8a07fa77e26a975944e4df75ea6d6930a5d91f','26ae5d926adbc0cddaa4fe21015eef5481056917','7ebd3ebafb7274eed1f6f1551e1c64550a772167','b5371bb0d23cd0f2b51dcd4df020043fd54942ed','a90c520cbd0a65c86d3f76e2f3e08f3b4d671ad8','cf864638a7d196f1370dcb6d732eed41a9aaafac']; quiet={'stdout':DEVNULL,'stderr':DEVNULL}; missing=[sha for sha in bad if call(['git','cat-file','-e',sha+'^{commit}'],**quiet)!=0]; found=[sha for sha in bad if sha not in missing and call(['git','merge-base','--is-ancestor',sha,'HEAD'],**quiet)==0]; print('forbidden ancestor gate passed' if not missing and not found else 'missing commits: '+','.join(missing)+'; forbidden ancestors: '+','.join(found)); sys.exit(1 if missing or found else 0)\"",
             "pnpm run check:conversation"
           ],
           "agent": "codex"
@@ -86,9 +93,13 @@
             "Every report value traces to persisted responsibility fields and authorized current signals",
             "Discussion-only, evidence_missing, and needs_review facts are excluded deterministically",
             "Corrections require an authorized actor, expected version, and content-free audit metadata",
+            "Provider timeout or invalid output creates no attribution, report, or domain mutation and returns a bounded review state",
+            "A provider domain suggestion cannot persist until an authorized human explicitly confirms it",
+            "Authorization, evidence, or version changes while the provider is running yield zero persisted changes",
             "Representative uneven workloads use neutral Chinese copy without score, rank, blame, or diagnosis"
           ],
           "checks": [
+            "python -B -c \"import sys; from subprocess import call,DEVNULL; bad=['8c8a07fa77e26a975944e4df75ea6d6930a5d91f','26ae5d926adbc0cddaa4fe21015eef5481056917','7ebd3ebafb7274eed1f6f1551e1c64550a772167','b5371bb0d23cd0f2b51dcd4df020043fd54942ed','a90c520cbd0a65c86d3f76e2f3e08f3b4d671ad8','cf864638a7d196f1370dcb6d732eed41a9aaafac']; quiet={'stdout':DEVNULL,'stderr':DEVNULL}; missing=[sha for sha in bad if call(['git','cat-file','-e',sha+'^{commit}'],**quiet)!=0]; found=[sha for sha in bad if sha not in missing and call(['git','merge-base','--is-ancestor',sha,'HEAD'],**quiet)==0]; print('forbidden ancestor gate passed' if not missing and not found else 'missing commits: '+','.join(missing)+'; forbidden ancestors: '+','.join(found)); sys.exit(1 if missing or found else 0)\"",
             "pnpm run check:responsibility"
           ],
           "agent": "codex"
@@ -113,10 +124,12 @@
           "write_paths": [
             "packages/db/**"
           ],
-          "spec": "Apply forward-only PostgreSQL and Drizzle corrections without rewriting the accepted initial migration or its snapshot. Add a signal-specific evidence-state enum with available and evidence_missing. Add bounded care-resolution storage, handled/closed consistency constraints, resolution audit-field support, repository mappings, a new migration, a new Drizzle snapshot, and journal updates. Verify both upgrade-from-0000 and fresh-all-migrations paths in a disposable PostgreSQL instance.",
+          "spec": "Apply forward-only PostgreSQL and Drizzle corrections without rewriting the accepted initial migration or its snapshot. Add a signal-specific evidence-state enum with available and evidence_missing. Add bounded care-resolution storage, handled/closed consistency constraints, resolution audit-field support, repository mappings, a new migration, a new Drizzle snapshot, and journal updates. Before the upgrade test, seed representative old-schema available and deleted signal rows plus handled and closed care rows; prove deleted maps to evidence_missing, legacy care history maps to legacy_unknown, and identifiers, actors, timestamps, and audit history are preserved. Verify both upgrade-from-0000 and fresh-all-migrations paths in a disposable PostgreSQL instance.",
           "acceptance": [
             "The accepted 0000 migration and 0000 snapshot remain byte-identical",
             "A new forward migration converts signals to a signal-specific available or evidence_missing enum",
+            "Old-schema available and deleted signal rows are seeded before migration and retain their facts with deleted mapped to evidence_missing",
+            "Old-schema handled and closed rows are seeded before migration and retain their facts with the contract-defined legacy_unknown resolution",
             "Care handling persists one bounded resolution and closure preserves it",
             "Database constraints reject handled events without resolution and reject resolution without a corresponding handled timestamp",
             "System-catalog evidence proves enum values, columns, constraints, indexes, and audit-field support",
@@ -155,6 +168,7 @@
             "Fixture and non-production identity labels remain visible and no blame, score, diagnosis, or silent-success copy appears"
           ],
           "checks": [
+            "python -B -c \"import sys; from subprocess import call,DEVNULL; bad=['8c8a07fa77e26a975944e4df75ea6d6930a5d91f','26ae5d926adbc0cddaa4fe21015eef5481056917','7ebd3ebafb7274eed1f6f1551e1c64550a772167','b5371bb0d23cd0f2b51dcd4df020043fd54942ed','a90c520cbd0a65c86d3f76e2f3e08f3b4d671ad8','cf864638a7d196f1370dcb6d732eed41a9aaafac']; quiet={'stdout':DEVNULL,'stderr':DEVNULL}; missing=[sha for sha in bad if call(['git','cat-file','-e',sha+'^{commit}'],**quiet)!=0]; found=[sha for sha in bad if sha not in missing and call(['git','merge-base','--is-ancestor',sha,'HEAD'],**quiet)==0]; print('forbidden ancestor gate passed' if not missing and not found else 'missing commits: '+','.join(missing)+'; forbidden ancestors: '+','.join(found)); sys.exit(1 if missing or found else 0)\"",
             "pnpm run check:experience",
             "pnpm run build",
             "pnpm exec playwright test --config apps/web/tests/playwright.config.ts"
@@ -184,6 +198,9 @@
           "spec": "Implement a fresh care capability against CONTRACT-CORR-001 and DATA-CORR-001 without merging the rejected attempt. Read Clock.now once per command and use that reading for all deadline decisions, transition timestamps, idempotency persistence, and audits. Acknowledgement is timely only when server now is strictly before the acknowledgement deadline; equality or lateness cannot suppress escalation. Persist and audit the bounded handling resolution and retain it through closure. Enforce one PostgreSQL lock order: care events in deterministic ID order before care rules in deterministic ID order. Add a credential-free disposable PostgreSQL race test using existing locked dependencies and a care-local harness.",
           "acceptance": [
             "Caller-controlled timestamps cannot backdate acknowledgement or handling",
+            "An unconfirmed draft rule cannot schedule, notify, acknowledge, or escalate",
+            "Only the subject actor can acknowledge and only the current escalation recipient can handle",
+            "Wrong-space, inactive, or unrelated actors fail closed without any event, rule, notification, idempotency, or audit mutation",
             "Acknowledgement succeeds only when Clock.now is strictly before the deadline",
             "At the exact deadline or later, acknowledgement cannot suppress the due timeout or escalation",
             "Handling requires the current escalation recipient and persists and audits the bounded resolution",
@@ -193,6 +210,7 @@
             "No path uses an LLM, wall-clock sleep, Date.now, or free-form care resolution"
           ],
           "checks": [
+            "python -B -c \"import sys; from subprocess import call,DEVNULL; bad=['8c8a07fa77e26a975944e4df75ea6d6930a5d91f','26ae5d926adbc0cddaa4fe21015eef5481056917','7ebd3ebafb7274eed1f6f1551e1c64550a772167','b5371bb0d23cd0f2b51dcd4df020043fd54942ed','a90c520cbd0a65c86d3f76e2f3e08f3b4d671ad8','cf864638a7d196f1370dcb6d732eed41a9aaafac']; quiet={'stdout':DEVNULL,'stderr':DEVNULL}; missing=[sha for sha in bad if call(['git','cat-file','-e',sha+'^{commit}'],**quiet)!=0]; found=[sha for sha in bad if sha not in missing and call(['git','merge-base','--is-ancestor',sha,'HEAD'],**quiet)==0]; print('forbidden ancestor gate passed' if not missing and not found else 'missing commits: '+','.join(missing)+'; forbidden ancestors: '+','.join(found)); sys.exit(1 if missing or found else 0)\"",
             "pnpm run check:care"
           ],
           "agent": "codex"
@@ -207,6 +225,8 @@
           "spec": "Implement a fresh privacy capability from DATA-CORR-001 without merging the rejected attempt. Map inactive, missing, or otherwise unauthorized export actors to the dedicated export_not_authorized contract error without returning partial content or revealing record existence. Preserve explicit actor authorization for raw evidence, consent revocation, personal export, evidence deletion, and full space deletion. Use the corrected signal evidence-state mapping and keep accepted handover ownership intact during evidence deletion.",
           "acceptance": [
             "Inactive, missing, wrong-space, and unauthorized export actors receive export_not_authorized",
+            "Another role cannot retrieve raw evidence by guessing its identifier or combining a valid actor with a wrong space",
+            "Revoking analysis consent blocks every later analysis attempt without rewriting prior authorized events or accepted history",
             "Every ExportMyData result or error parses through the frozen public contract",
             "Denied export returns no partial bundle and creates no content-bearing log",
             "Authorized export contains only the actor-authorized minimum",
@@ -215,6 +235,7 @@
             "Space deletion removes in-space product and audit content and returns only an ephemeral non-content receipt"
           ],
           "checks": [
+            "python -B -c \"import sys; from subprocess import call,DEVNULL; bad=['8c8a07fa77e26a975944e4df75ea6d6930a5d91f','26ae5d926adbc0cddaa4fe21015eef5481056917','7ebd3ebafb7274eed1f6f1551e1c64550a772167','b5371bb0d23cd0f2b51dcd4df020043fd54942ed','a90c520cbd0a65c86d3f76e2f3e08f3b4d671ad8','cf864638a7d196f1370dcb6d732eed41a9aaafac']; quiet={'stdout':DEVNULL,'stderr':DEVNULL}; missing=[sha for sha in bad if call(['git','cat-file','-e',sha+'^{commit}'],**quiet)!=0]; found=[sha for sha in bad if sha not in missing and call(['git','merge-base','--is-ancestor',sha,'HEAD'],**quiet)==0]; print('forbidden ancestor gate passed' if not missing and not found else 'missing commits: '+','.join(missing)+'; forbidden ancestors: '+','.join(found)); sys.exit(1 if missing or found else 0)\"",
             "pnpm run check:privacy"
           ],
           "agent": "codex"
@@ -229,7 +250,7 @@
             "tests/e2e/**",
             "playwright.config.*"
           ],
-          "spec": "Build one canonical fictional household graph and derive every fixture, scenario, expected report, deletion receipt, handover receipt, reminder set, and evidence label from that graph. Import contracts only through @we-remember/contracts and declare the workspace dependency in packages/testkit/package.json. Do not deep-import packages/contracts/src. Evidence deletion must preserve accepted ownership, invalidate only dependent projections, and recompute reports. Handover may migrate only active future reminders belonging to the transferred domain. Add identity and ownership invariant tests that fail on cross-graph IDs or stale derived facts. Add root Playwright discovery and webServer configuration for later integration; browser execution remains owned by INT-001.",
+          "spec": "Build one canonical fictional household graph and derive every fixture, scenario, expected report, deletion receipt, handover receipt, reminder set, and evidence label from that graph. Import contracts only through @we-remember/contracts and declare the workspace dependency in packages/testkit/package.json. Do not deep-import packages/contracts/src. Evidence deletion must preserve accepted ownership, invalidate only dependent projections, and recompute reports. Handover may migrate only active future reminders belonging to the transferred domain. Add identity and ownership invariant tests that fail on cross-graph IDs or stale derived facts. Add root Playwright discovery and webServer configuration for later integration; browser execution remains owned by INT-001. The offline no-lock install is only an interim local link for this logic check; clean frozen-install proof belongs to the dependent FOUND-LOCK-001 gate.",
           "acceptance": [
             "All scenarios use IDs from one canonical fixture graph",
             "Reports and receipts are derived from current tasks, signals, domains, handovers, and deletion state rather than duplicated constants",
@@ -240,7 +261,8 @@
             "Fixtures contain only fictional data and preserve explicit Fixture and evidence-level labels"
           ],
           "checks": [
-            "pnpm install --lockfile=false --offline --ignore-scripts",
+            "python -B -c \"import sys; from subprocess import call,DEVNULL; bad=['8c8a07fa77e26a975944e4df75ea6d6930a5d91f','26ae5d926adbc0cddaa4fe21015eef5481056917','7ebd3ebafb7274eed1f6f1551e1c64550a772167','b5371bb0d23cd0f2b51dcd4df020043fd54942ed','a90c520cbd0a65c86d3f76e2f3e08f3b4d671ad8','cf864638a7d196f1370dcb6d732eed41a9aaafac']; quiet={'stdout':DEVNULL,'stderr':DEVNULL}; missing=[sha for sha in bad if call(['git','cat-file','-e',sha+'^{commit}'],**quiet)!=0]; found=[sha for sha in bad if sha not in missing and call(['git','merge-base','--is-ancestor',sha,'HEAD'],**quiet)==0]; print('forbidden ancestor gate passed' if not missing and not found else 'missing commits: '+','.join(missing)+'; forbidden ancestors: '+','.join(found)); sys.exit(1 if missing or found else 0)\"",
+            "pnpm install --no-lockfile --offline --ignore-scripts",
             "pnpm run check:qa-core"
           ],
           "agent": "codex"
@@ -274,7 +296,7 @@
             "The public-package QA checks pass after the frozen install"
           ],
           "checks": [
-            "pnpm install --lockfile-only --ignore-scripts",
+            "pnpm install --lockfile-only --ignore-scripts --no-frozen-lockfile",
             "pnpm install --frozen-lockfile",
             "pnpm run check:foundation",
             "pnpm run check:qa-core"
@@ -323,6 +345,7 @@
         "README and demo documentation distinguish Fixture, local runtime, public deployment, and official acceptance"
       ],
       "checks": [
+            "python -B -c \"import sys; from subprocess import call,DEVNULL; bad=['8c8a07fa77e26a975944e4df75ea6d6930a5d91f','26ae5d926adbc0cddaa4fe21015eef5481056917','7ebd3ebafb7274eed1f6f1551e1c64550a772167','b5371bb0d23cd0f2b51dcd4df020043fd54942ed','a90c520cbd0a65c86d3f76e2f3e08f3b4d671ad8','cf864638a7d196f1370dcb6d732eed41a9aaafac']; quiet={'stdout':DEVNULL,'stderr':DEVNULL}; missing=[sha for sha in bad if call(['git','cat-file','-e',sha+'^{commit}'],**quiet)!=0]; found=[sha for sha in bad if sha not in missing and call(['git','merge-base','--is-ancestor',sha,'HEAD'],**quiet)==0]; print('forbidden ancestor gate passed' if not missing and not found else 'missing commits: '+','.join(missing)+'; forbidden ancestors: '+','.join(found)); sys.exit(1 if missing or found else 0)\"",
         "pnpm install --frozen-lockfile",
         "pnpm run check",
         "pnpm run db:verify",
