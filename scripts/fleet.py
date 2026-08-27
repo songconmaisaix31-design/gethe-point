@@ -499,10 +499,14 @@ def update_waves(state: dict[str, Any]) -> None:
             wave["completed_at"] = wave.get("completed_at") or now()
         elif any(x == "failed" for x in statuses):
             wave["status"] = "failed"
-        elif any(x == "dispatched" for x in statuses):
+        elif all(x in ("dispatched", "completed") for x in statuses):
             wave["status"] = "dispatched"
-        if wave["status"] == "planned" and any(state["tasks"][x]["status"] == "failed" for x in wave["depends_on"]):
+        elif any(state["tasks"][x]["status"] == "failed" for x in wave["depends_on"]):
             wave["status"] = "blocked"
+        else:
+            # Keep a partially dispatched wave resumable after worker-start
+            # fails for one of its remaining tasks.
+            wave["status"] = "planned"
 
 
 def dispatch_ready(root: Path, cfg: Mapping[str, Any], state: dict[str, Any], state_path: Path, dry_run: bool) -> list[str]:

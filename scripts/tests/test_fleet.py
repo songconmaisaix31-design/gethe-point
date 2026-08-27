@@ -18,6 +18,7 @@ from fleet import (  # noqa: E402
     do_launch,
     run_coordinator_handle,
     settle_worker,
+    update_waves,
 )
 
 
@@ -103,6 +104,48 @@ class WorkerSettlementTests(unittest.TestCase):
         self.assertFalse(receipt["ok"])
         self.assertEqual(receipt["dispatch_id"], "ctx_281af24e0d31")
         self.assertIn("tab_not_found", receipt["error"])
+
+
+class WaveStateTests(unittest.TestCase):
+    def test_partially_dispatched_wave_remains_resumable(self):
+        state = {
+            "waves": [
+                {
+                    "id": "parallel-core",
+                    "tasks": ["EXPR-001", "RESP-001"],
+                    "depends_on": [],
+                    "status": "dispatched",
+                }
+            ],
+            "tasks": {
+                "EXPR-001": {"status": "dispatched"},
+                "RESP-001": {"status": "planned"},
+            },
+        }
+
+        update_waves(state)
+
+        self.assertEqual(state["waves"][0]["status"], "planned")
+
+    def test_fully_dispatched_wave_is_dispatched(self):
+        state = {
+            "waves": [
+                {
+                    "id": "parallel-core",
+                    "tasks": ["EXPR-001", "RESP-001"],
+                    "depends_on": [],
+                    "status": "planned",
+                }
+            ],
+            "tasks": {
+                "EXPR-001": {"status": "dispatched"},
+                "RESP-001": {"status": "dispatched"},
+            },
+        }
+
+        update_waves(state)
+
+        self.assertEqual(state["waves"][0]["status"], "dispatched")
 
 
 class DispatchRecoveryTests(unittest.TestCase):
