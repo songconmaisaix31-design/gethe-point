@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "amendment_id": "hackathon-core-mvp-qa-correction-v1",
+  "description": "Replace the rejected QA attempt with one focused correction for server-owned Fixture identity, exact Style A assertions, and frozen action copy.",
+  "plan_status": "approved",
+  "launch_authorized": true,
+  "run_id": "run_9905fa756757",
+  "parent_plan_sha256": "3c09e2a6cd22fa6aa0debcce6572b6fef731e2b24126de09e684e05993d3c623",
+  "state_sha256": "ab695180aaff51899970021313a2d334b47263e92d61ea5dd71d01c6dce25024",
+  "automation": {
+    "branch": "fleet-control-mvp-repair-v3",
+    "sha": "e450b8e15d761c19b8d41ce3f6eb0993c1518593"
+  },
+  "workspace_suffix": "mvp-corr1",
+  "append_waves": [
+    {
+      "id": "hackathon-qa-correction",
+      "description": "Rebuild the focused core acceptance from the clean MVP base with the three rejected product-contract issues corrected.",
+      "depends_on": [
+        "MVP-BASE-001"
+      ],
+      "base": {
+        "type": "task",
+        "task": "MVP-BASE-001"
+      },
+      "tasks": [
+        {
+          "id": "MVP-QA-002",
+          "title": "Correct core Fixture security and Style A acceptance",
+          "track": "qa",
+          "write_paths": [
+            "packages/testkit/**",
+            "fixtures/**",
+            "tests/e2e/**",
+            "playwright.config.*"
+          ],
+          "spec": "Start from exact accepted MVP-BASE-001 SHA 25f00004f83185be3d987424b28f627f3854b35d. Do not merge or cherry-pick rejected candidate e5e2cebd039ee9a9627fa7b819d3b6a3153aa8c7; it may be read only as a failed design reference. Rebuild the minimal canonical graph, testkit, and six @mvp-core Playwright specifications. Fix exactly three blockers. First, command bodies must not contain role, actor, space, scenario, content, or private text. A separately injected server-owned Fixture session context supplies the allowlisted scenario and role; command request schemas are strict and command-specific, and only private-message probe commands may carry a target ID. A partner session that submits subject, role, actor, space, content, scenario, or guessed private identifiers must fail closed with zero writes and no raw content. Second, define and assert the frozen Style A variables directly: #F4F1EA background, #FFFFFF surface, #1F1C17 text, #33513F primary, #8A5A3B accent, and #9C4E22 warning. Do not reuse the older contracts UI_CSS_VARIABLES as the visual expectation. Use a compact rail maximum of 330px and assert 16-20px core card vertical padding plus meaningful consent, report, responsibility, and handover depth. Third, the visible SupplyHandoverInfo action copy is exactly 补齐上次检查结果. Keep the accepted candidate's otherwise useful canonical graph, five persisted owners, blocked and two-confirmation states, atomic owner and reminder transfer, six focused test inventory, reload proof, and no-mock browser design, but recreate them without failed commit ancestry. Browser execution remains deferred until integration supplies routes.",
+          "acceptance": [
+            "The task starts from exact accepted MVP-BASE-001 SHA 25f00004f83185be3d987424b28f627f3854b35d, contains HAND-001 as an ancestor, and contains neither rejected QA commit e5e2cebd039ee9a9627fa7b819d3b6a3153aa8c7 nor another failed Attempt as an ancestor",
+            "One canonical fictional graph remains the sole source for three roles, private message, consented signal, five responsibility owners, blocked handover, two confirmations, and one future reminder",
+            "The command request body cannot choose role, actor, space, scenario, content, or private text; a separately injected server-owned Fixture session context supplies allowlisted identity",
+            "A partner session cannot read or share a guessed subject private-message ID even when the request tries subject, role, actor, space, scenario, or content tampering; response contains no raw text and all write counts stay zero",
+            "Command request parsing is strict and command-specific; targetId is accepted only by the explicit private-message probe commands and is rejected elsewhere",
+            "The exact Style A semantic colors #F4F1EA, #FFFFFF, #1F1C17, #33513F, #8A5A3B, and #9C4E22 are canonical QA expectations and are asserted from computed runtime styles",
+            "The compact rail maximum is 330px; core cards assert 16-20px vertical padding and meaningful vertical title, content or evidence, state, and action zones rather than shallow horizontal strips",
+            "The visible missing-information action is exactly 补齐上次检查结果 and maps to SupplyHandoverInfo",
+            "The six @mvp-core specifications remain discoverable without skip, mock routes, or setContent; full browser execution is deferred only until MVP-INT-001",
+            "Frozen install and check:qa-core pass, Playwright test discovery passes, scope is clean, and the branch is pushed with remote SHA parity"
+          ],
+          "checks": [
+            "pnpm install --frozen-lockfile --ignore-scripts",
+            "pnpm run check:qa-core"
+          ],
+          "agent": "codex",
+          "setup": "skip"
+        }
+      ]
+    }
+  ],
+  "update_waves": [
+    {
+      "id": "hackathon-integration",
+      "depends_on": [
+        "MVP-BASE-001",
+        "MVP-CONV-001",
+        "MVP-RESP-001",
+        "MVP-EXPR-001",
+        "MVP-QA-002"
+      ]
+    }
+  ],
+  "update_tasks": [
+    {
+      "id": "MVP-INT-001",
+      "spec": "Start from the exact accepted MVP-BASE-001 SHA and verify accepted HAND-001 SHA 59e4bcb98be9d21432a92d02e7d01962bc4451cb is already an ancestor. Fetch and cleanly merge --no-ff only the exact accepted remote SHAs for MVP-CONV-001, MVP-RESP-001, MVP-EXPR-001, and replacement MVP-QA-002. Abort on conflict or unexpected ancestry, and verify rejected QA commit e5e2cebd039ee9a9627fa7b819d3b6a3153aa8c7 is not an ancestor. Add only integration-owned Fixture session, public command/query composition, database adapters, routes, and demo documentation. The page may establish one allowlisted local Fixture role session, but all subsequent command bodies must omit role, actor, space, scenario, content, and private text; derive them from the server-owned session and canonical graph. Unknown sessions and any tampered identity or content fields fail closed with zero writes. Wire the canonical journey through the real Next.js UI, public handlers, and PostgreSQL, including SupplyHandoverInfo from the exact 补齐上次检查结果 action before either confirmation. Keep provider behavior deterministic and credential-free. Do not patch product modules sideways or claim production readiness.",
+      "acceptance": [
+        "HAND-001 is an ancestor of the exact MVP-BASE-001 integration base; each of the four accepted product SHAs including MVP-QA-002 is an exact second parent of a clean no-ff merge and rejected QA commit e5e2cebd039ee9a9627fa7b819d3b6a3153aa8c7 is not an ancestor",
+        "The canonical private message has zero shared rows before consent and creates one derived shared signal after same-speaker consent",
+        "Through the real handlers, a partner Fixture session cannot read or share a guessed private-message identifier; the command body cannot select a subject role, actor, space, scenario, or content, the response contains no raw text, and shared rows remain zero",
+        "Unknown sessions and tampered identity, scenario, or content fields are rejected and persist zero writes",
+        "The report reads the persisted five-stage fields through real query handlers",
+        "Missing information and one-sided confirmation keep the handover blocked with owner and reminder unchanged",
+        "The exact visible 补齐上次检查结果 action invokes SupplyHandoverInfo, moves blocked to awaiting_confirmations, and leaves owner and reminder unchanged",
+        "After both confirmations, owner and future reminder move atomically and both role views retain the new state after reload",
+        "The flow runs through the real Next.js runtime and disposable PostgreSQL rather than disconnected static mocks",
+        "The @mvp-core browser run exercises the subject step at 390x844 and the compact rail plus three phone-proportioned role surfaces at 1440x900 with exact Style A variables, visible primary actions, vertically structured core cards, and no blocking overlap or clipping",
+        "Fixture, Local Demo, and Not Production Acceptance labels remain visible and documentation makes no live-model, production-auth, deployment, release, or official-acceptance claim",
+        "No-consent, blocked, one-sided, wrong-role, and tampered-session negative browser cases pass with zero forbidden mutation"
+      ]
+    }
+  ],
+  "resolutions": [
+    {
+      "task": "MVP-QA-001",
+      "superseded_by": "MVP-QA-002"
+    }
+  ]
+}
