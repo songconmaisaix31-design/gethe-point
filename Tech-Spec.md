@@ -1,10 +1,10 @@
 # We Remember MVP Contract Technical Specification
 
-Status: Frozen by `CONTRACT-001`
+Status: Corrected by `CONTRACT-CORR-003`
 
 Source decision: `.agents/decisions/0001-mvp-engineering-freeze.md`
 
-Foundation base: `bede795a127ef5baa48fc4bd01752c2f3c408c65`
+Foundation base: `217d9a3b421e8eef628483f349346eea981a435c`
 
 ## 1. Outcome
 
@@ -37,6 +37,8 @@ The contract is complete when:
 6. optional AI can attempt a structured draft at most twice and then returns `needs_human_review` with `consequentialMutationAllowed: false`;
 7. the UI contract freezes tokens, Chinese vocabulary, viewports, accessibility constraints, truth labels, screen states, and screenshot scenario names;
 8. contract tests validate every exported example, JSON Schema generation, public package exports, state-table completeness, and representative denial paths.
+9. care acknowledgement and handling use one server-clock sample, never caller timestamps; handled history has a bounded persisted resolution and content-free audit representation;
+10. timestamp ordering is exact for every value accepted by `TimestampSchema`, including arbitrary fractional precision, equivalent offsets, omitted seconds, calendar boundaries, and year `0000`.
 
 ## 4. Single source of truth
 
@@ -90,7 +92,9 @@ ADR 0001 lists acceptance commands but omits triggers for its approved `declined
 
 ### 6.4 Care
 
-A care rule remains `draft` until a human confirms its schedule, acknowledgement window, ordered escalation chain, primary caregiver, and terminal behavior. The event machine uses an injectable `Clock`, persisted idempotency keys, and deterministic transitions. Duplicate ticks, acknowledgements, or handling requests replay the first result rather than producing another event or notification. Exhausted or impossible escalation ends visibly as `unresolved`; it never disappears silently.
+A care rule remains `draft` until a human confirms its schedule, acknowledgement window, ordered escalation chain, primary caregiver, and terminal behavior. The event machine uses an injectable `Clock`, persisted idempotency keys, and deterministic transitions. `AcknowledgeCareEvent` is timely only when the one sampled server instant is strictly before the persisted acknowledgement deadline; equality is already on the `timed_out` side. Duplicate ticks, acknowledgements, or handling requests replay the first result rather than producing another event or notification. Exhausted or impossible escalation ends visibly as `unresolved`; it never disappears silently.
+
+New handling requires one of the bounded selectable resolutions `confirmed_safe`, `in_person_check_started`, or `professional_help_contacted`. A handled event persists that resolution, and a handled-to-closed transition preserves it unchanged. `legacy_unknown` is accepted only in persisted handled or handled-then-closed history migrated from rows that predate the correction; it is not a selectable request value. A closed event with no handling history keeps both `handledAt` and `resolution` null. Resolution audit values use the same bounded enum and cannot contain free-form care content.
 
 ### 6.5 Deletion and export
 
@@ -114,9 +118,11 @@ A validated draft is still non-consequential and requires the relevant human/det
 
 ## 8. Deterministic time and idempotency
 
-Feature code receives a `Clock`; contract tests and fixture flows never sleep or read wall-clock time directly. JSON boundaries use offset-aware ISO-8601 instants.
+Feature code receives a `Clock`; contract tests and fixture flows never sleep or read wall-clock time directly. For each non-replayed `AcknowledgeCareEvent` or `HandleCareEvent`, the command samples `Clock.now()` exactly once. That same instant is authoritative for the state-transition decision, deadline comparison, persisted transition timestamp, idempotency claim timestamp, domain-event timestamp, and audit timestamp. The request schemas reject `acknowledgedAt` and `handledAt`, so client clocks cannot move the care state machine. JSON persistence boundaries serialize the server instant as an offset-aware ISO-8601 value.
 
-Consequential and retryable commands carry an idempotency key. The persistence port scopes a key by space, command, and actor, stores a canonical request hash, and returns one of `claimed`, `replay`, or `conflict`. Reusing a key with a different request hash is `idempotency_conflict`; it never executes the new request.
+`compareTimestamps` is the sole public instant-ordering primitive used by `TimeRangeSchema` and care deadline validation. Its inputs must already be accepted by `TimestampSchema`. It uses exact proleptic-Gregorian day/second and offset arithmetic followed by digit-wise fractional comparison, so arbitrary precision is preserved and equivalent offset spellings compare equal without JavaScript `Date`, epoch milliseconds, rounding, truncation, fixed precision, large exponentiation, or another dependency.
+
+Consequential and retryable commands carry an idempotency key. The persistence port scopes a key by space, command, and actor, stores a canonical request hash, and returns one of `claimed`, `replay`, or `conflict`. Reusing a key with a different request hash is `idempotency_conflict`; it never executes the new request. A replay reuses the original persisted transition and timestamps rather than sampling a replacement time.
 
 ## 9. UI fact source
 
@@ -165,6 +171,7 @@ It runs repository-wide strict TypeScript, focused ESLint for `packages/contract
 ## 12. Known limits
 
 - Contract validation proves shapes and deterministic policy facts, not database atomicity or route authorization. Later data and feature tracks must prove those behaviors.
+- This architecture track exposes `legacy_unknown` for migrated history but does not alter the data-track migration; storage backfill and database constraints remain owned by the data track.
 - Fixture actors are fictional and do not prove production identity.
 - Screenshot names and assertions are frozen here; actual screenshots require the UI track's rendered implementation.
 - Human usability of the one-step older-subject acknowledgement remains a later acceptance receipt, even when automated accessibility checks pass.

@@ -12,6 +12,7 @@ import {
   TimeOfDaySchema,
   TimeRangeSchema,
   TimestampSchema,
+  compareTimestamps,
 } from "./primitives";
 
 export const SpaceSchema = RecordMetadataSchema.extend({
@@ -463,6 +464,25 @@ export const CareRuleSchema = z.discriminatedUnion("status", [
 ]);
 export type CareRule = z.infer<typeof CareRuleSchema>;
 
+export const SELECTABLE_CARE_RESOLUTIONS = Object.freeze([
+  "confirmed_safe",
+  "in_person_check_started",
+  "professional_help_contacted",
+] as const);
+
+export const HandleCareEventResolutionSchema = z.enum(
+  SELECTABLE_CARE_RESOLUTIONS,
+);
+export type HandleCareEventResolution = z.infer<
+  typeof HandleCareEventResolutionSchema
+>;
+
+export const CareResolutionSchema = z.enum([
+  ...SELECTABLE_CARE_RESOLUTIONS,
+  "legacy_unknown",
+]);
+export type CareResolution = z.infer<typeof CareResolutionSchema>;
+
 export const CareEventStateSchema = z.enum([
   "scheduled",
   "notified",
@@ -518,6 +538,22 @@ export const AcknowledgedCareEventSchema = CareEventBaseSchema.extend({
   handledAt: z.null(),
   closedAt: z.null(),
   unresolvedAt: z.null(),
+}).superRefine((event, context) => {
+  if (
+    event.timedOutAt === null &&
+    (event.acknowledgementDeadline === null ||
+      compareTimestamps(
+        event.acknowledgedAt,
+        event.acknowledgementDeadline,
+      ) !== -1)
+  ) {
+    context.addIssue({
+      code: "custom",
+      message:
+        "A timely acknowledgement must be strictly before acknowledgementDeadline",
+      path: ["acknowledgedAt"],
+    });
+  }
 });
 export type AcknowledgedCareEvent = z.infer<
   typeof AcknowledgedCareEventSchema
@@ -555,10 +591,15 @@ export const HandledCareEventSchema = CareEventBaseSchema.extend({
   escalationLevel: z.number().int().min(1).max(10),
   escalatedAt: TimestampSchema,
   handledAt: TimestampSchema,
+  resolution: CareResolutionSchema,
   closedAt: z.null(),
   unresolvedAt: z.null(),
 });
 export type HandledCareEvent = z.infer<typeof HandledCareEventSchema>;
+
+export const NewHandledCareEventSchema = HandledCareEventSchema.extend({
+  resolution: HandleCareEventResolutionSchema,
+});
 
 export const ClosedCareEventSchema = CareEventBaseSchema.extend({
   state: z.literal("closed"),
@@ -568,9 +609,19 @@ export const ClosedCareEventSchema = CareEventBaseSchema.extend({
   escalationLevel: z.number().int().nonnegative().max(10),
   escalatedAt: TimestampSchema.nullable(),
   handledAt: TimestampSchema.nullable(),
+  resolution: CareResolutionSchema.nullable(),
   closedAt: TimestampSchema,
   unresolvedAt: z.null(),
+}).superRefine((event, context) => {
+  if ((event.handledAt === null) !== (event.resolution === null)) {
+    context.addIssue({
+      code: "custom",
+      message: "handledAt and resolution must both be null or both be present",
+      path: ["resolution"],
+    });
+  }
 });
+export type ClosedCareEvent = z.infer<typeof ClosedCareEventSchema>;
 
 export const UnresolvedCareEventSchema = CareEventBaseSchema.extend({
   state: z.literal("unresolved"),
