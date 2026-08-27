@@ -1,0 +1,124 @@
+import {
+  FIXTURE_ACCEPTED_HANDOVER,
+  FIXTURE_ACTORS,
+  FIXTURE_AWAITING_HANDOVER,
+  FIXTURE_BLOCKED_HANDOVER,
+  FIXTURE_BOTH_CONFIRMED_HANDOVER,
+  FIXTURE_CONSENT,
+  FIXTURE_CONVERSATION,
+  FIXTURE_DOMAIN,
+  FIXTURE_FROM_CONFIRMED_HANDOVER,
+  FIXTURE_IDS,
+  FIXTURE_MEMBERS,
+  FIXTURE_PRIVATE_MESSAGE,
+  FIXTURE_REPORT,
+  FIXTURE_SHARED_SIGNAL,
+  FIXTURE_SIGNAL_DRAFT,
+  FIXTURE_SPACE,
+  FIXTURE_TASK,
+  FIXTURE_TIMES,
+  FIXTURE_TRUTH_LABELS,
+  REQUIRED_VIEWPORTS,
+  UI_CSS_VARIABLES,
+} from "../packages/contracts/src/index";
+
+export const MVP_CORE_SCENARIO_ID = "mvp-core" as const;
+
+const reminderId = "00000000-0000-4000-8000-000000000027";
+
+/**
+ * Canonical fictional graph consumed by fixture UI, modules, database seeders,
+ * and browser acceptance. Consumers must import values from this object rather
+ * than recreating IDs, copy, timestamps, or expected layout thresholds.
+ */
+export const MVP_CORE_FIXTURE = Object.freeze({
+  scenarioId: MVP_CORE_SCENARIO_ID,
+  fixtureVersion: 1,
+  display: Object.freeze({
+    title: "晨光家庭（虚构演示）",
+    fictionalNotice: "以下人物、消息、检查资料与事件均为虚构。",
+    truthBadges: Object.freeze(["Fixture", "Local Demo", "Not Production Acceptance"]),
+    contractTruthLabels: FIXTURE_TRUTH_LABELS,
+    memberNames: Object.freeze({
+      primary: `${FIXTURE_MEMBERS.primary.displayName}（虚构）`,
+      partner: `${FIXTURE_MEMBERS.partner.displayName}（虚构）`,
+      subject: `${FIXTURE_MEMBERS.subject.displayName}（虚构）`,
+    }),
+  }),
+  ids: Object.freeze({
+    ...FIXTURE_IDS,
+    reminder: reminderId,
+  }),
+  actors: FIXTURE_ACTORS,
+  space: FIXTURE_SPACE,
+  members: Object.freeze([
+    FIXTURE_MEMBERS.primary,
+    FIXTURE_MEMBERS.partner,
+    FIXTURE_MEMBERS.subject,
+  ]),
+  privateConversation: Object.freeze({
+    conversation: FIXTURE_CONVERSATION,
+    message: FIXTURE_PRIVATE_MESSAGE,
+    derivedDraft: FIXTURE_SIGNAL_DRAFT,
+    consentedSignal: FIXTURE_SHARED_SIGNAL,
+    consentDecision: FIXTURE_CONSENT,
+  }),
+  responsibility: Object.freeze({
+    domain: FIXTURE_DOMAIN,
+    task: FIXTURE_TASK,
+    report: FIXTURE_REPORT,
+    stageOwners: Object.freeze({
+      discoveredBy: FIXTURE_TASK.discoveredBy,
+      deadlineKeptBy: FIXTURE_TASK.deadlineKeptBy,
+      scheduledBy: FIXTURE_TASK.scheduledBy,
+      executedBy: FIXTURE_TASK.executedBy,
+      followedUpBy: FIXTURE_TASK.followedUpBy,
+    }),
+  }),
+  handover: Object.freeze({
+    blocked: FIXTURE_BLOCKED_HANDOVER,
+    awaitingConfirmations: FIXTURE_AWAITING_HANDOVER,
+    fromConfirmed: FIXTURE_FROM_CONFIRMED_HANDOVER,
+    bothConfirmed: FIXTURE_BOTH_CONFIRMED_HANDOVER,
+    accepted: FIXTURE_ACCEPTED_HANDOVER,
+    supplyAction: Object.freeze({
+      operation: "SupplyHandoverInfo",
+      label: "补充上次检查结果（虚构资料）",
+      resolvedItem: Object.freeze({
+        missingInfoId: FIXTURE_IDS.missingInfo,
+        value: "虚构资料：上次常规检查结果已归档，仅用于演示交接。",
+        evidenceIds: Object.freeze([FIXTURE_IDS.evidence]),
+      }),
+    }),
+  }),
+  reminder: Object.freeze({
+    id: reminderId,
+    domainId: FIXTURE_IDS.domain,
+    label: "虚构提醒：确认下次复查安排",
+    scheduledFor: "2026-09-03T09:00:00+08:00",
+    initialOwnerId: FIXTURE_IDS.primary,
+    acceptedOwnerId: FIXTURE_IDS.partner,
+    status: "active",
+  }),
+  eventTimeline: Object.freeze({
+    createdAt: FIXTURE_TIMES.created,
+    consentedAt: FIXTURE_TIMES.updated,
+    fromConfirmedAt: FIXTURE_TIMES.confirmedFrom,
+    toConfirmedAt: FIXTURE_TIMES.confirmedTo,
+    acceptedAt: FIXTURE_TIMES.accepted,
+  }),
+  layoutAcceptance: Object.freeze({
+    subjectViewport: REQUIRED_VIEWPORTS[0],
+    desktopViewport: REQUIRED_VIEWPORTS[1],
+    styleA: Object.freeze({
+      cssVariables: UI_CSS_VARIABLES,
+      cardVerticalPaddingPx: Object.freeze({ minimum: 16, maximum: 20 }),
+      responsibilityMinimumHeightPx: 220,
+      handoverMinimumHeightPx: 280,
+      compactRailMaximumWidthPx: 220,
+      phoneSurfaceWidthPx: Object.freeze({ minimum: 300, maximum: 390 }),
+    }),
+  }),
+} as const);
+
+export type MvpCoreFixture = typeof MVP_CORE_FIXTURE;
