@@ -1,0 +1,135 @@
+{
+  "schema_version": 1,
+  "amendment_id": "repair-conversation-004",
+  "description": "Replace the rejected conversation Attempt with the smallest functional privacy-safe implementation and defer conservative sub-millisecond consent precision to hardening.",
+  "plan_status": "draft",
+  "launch_authorized": false,
+  "run_id": "run_a6e82cb7623f",
+  "parent_plan_sha256": "a6e2df82bd3c282a5053820d4388e9f5af231062b119d96d340e3e820c4bd7ce",
+  "state_sha256": "c7aa0ef7e4b6b2498a01d6820f90b0bc0cc9df75d09086a9b7dd16e9a3757188",
+  "automation": {
+    "branch": "trk-automation-auto-repair-005-v2",
+    "sha": "100083fe6ea93c0552793264a8de883b15369623"
+  },
+  "workspace_suffix": "repair-v5",
+  "append_waves": [
+    {
+      "id": "repair-conversation-v4",
+      "description": "Restore the user-facing private conversation flow with a fail-closed disclosure boundary in parallel with contract repair.",
+      "depends_on": [
+        "FOUND-BASELOCK-001"
+      ],
+      "base": {
+        "type": "task",
+        "task": "FOUND-BASELOCK-001"
+      },
+      "tasks": [
+        {
+          "id": "CONV-REPAIR-004",
+          "title": "Deliver private conversation with fail-closed disclosure normalization",
+          "track": "conversation",
+          "write_paths": [
+            "modules/conversation/**",
+            "modules/ai-witness/**",
+            "modules/boundary/**"
+          ],
+          "spec": "Implement a fresh functional conversation capability from the exact accepted FOUND-BASELOCK-001 SHA without merging or cherry-picking CONV-001, CONV-REPAIR-001, CONV-REPAIR-002, CONV-REPAIR-003, or any rejected Attempt. Preserve the working behavior independently proven in CONV-REPAIR-003: pre-provider authorization of the active actor, space, private message, evidence ownership and state, and same-speaker analysis consent; deterministic provider bypass for every frozen high-risk category; bounded allowlisted provider inputs; recursive inspection of every provider-derived string and nested value; transaction-before-Clock.now confirmation with locked rereads and conditional persistence; self-only raw evidence and private message reads; and content-free logs and errors. Use a version-fixed complete Unicode Default Full Case Folding table. After NFKC and full folding, derive a symmetric disclosure skeleton that removes Unicode marks, punctuation, symbols, separators, controls, and format characters before equality, containment, and one-code-point-edit checks. This must fail closed for repeated internal whitespace, punctuation, and symbol insertion, including STRASSE      family detail, S.T.R.A.S.S.E family detail, and STRASSE ★ ★ ★ family detail against Straße family detail in both directions. Keep the existing general Clock Date boundary for MVP compatibility. Its conservative sub-millisecond consent refusal is a documented non-leaking limitation assigned to CONV-002 hardening; it must never turn an expired or unauthorized consent into an accepted write.",
+          "acceptance": [
+            "The task starts from the exact accepted FOUND-BASELOCK-001 SHA and no rejected Attempt SHA is an ancestor",
+            "The private-message to provider-draft to explicit-confirmation user flow works through public module ports",
+            "Unauthorized, inactive, cross-space, missing, or mismatched source input fails before provider invocation and provider call count remains zero",
+            "Self-harm, domestic-violence, and acute-medical fixtures bypass the provider and create no ordinary task or automatic shared signal",
+            "Every provider-derived string and nested value plus the final rendered draft and shared signal is disclosure-checked",
+            "The implementation uses version-fixed complete Unicode Default Full Case Folding rather than uppercase or lowercase heuristics",
+            "Straße, STRAẞE, and STRASSE plus repeated whitespace, punctuation, symbol, separator, containment, and one-edit variants fail closed in both directions",
+            "The real provider pipeline returns needs_human_review and writes nothing for STRASSE      family detail, S.T.R.A.S.S.E family detail, and STRASSE ★ ★ ★ family detail when the protected source contains Straße family detail",
+            "Creating a private message produces no shared signal, task, report fact, confirmation record, or cross-role query result",
+            "Consent remains same-speaker, present, unexpired, and unrevoked through transaction-safe confirmation",
+            "Raw-evidence and private-message queries remain self-only even when another role guesses an identifier",
+            "Consent revocation, evidence invalidation, actor deactivation, visibility drift, or version drift during provider execution or before persistence yields zero shared writes",
+            "Invalid output, synchronous or asynchronous provider failure, timeout, and a second invalid output return needs_human_review without consequential mutation",
+            "The documented sub-millisecond Date limitation can only reject conservatively and is assigned to CONV-002; it cannot authorize an expired consent or leak content",
+            "Logs and errors contain only identifiers and bounded outcome metadata"
+          ],
+          "checks": [
+            "python -B -c \"import sys; from subprocess import call,DEVNULL; bad=['8c8a07fa77e26a975944e4df75ea6d6930a5d91f','26ae5d926adbc0cddaa4fe21015eef5481056917','7ebd3ebafb7274eed1f6f1551e1c64550a772167','b5371bb0d23cd0f2b51dcd4df020043fd54942ed','a90c520cbd0a65c86d3f76e2f3e08f3b4d671ad8','cf864638a7d196f1370dcb6d732eed41a9aaafac','e90b8aec43e79a15a921721af1efbd9eff8595f6','8f44897b4a5f8d1d6119e279675c7d02aa060963','88d7a821148a65069cc601cf63b23199388952aa','df5efe21ebea388cb7182ae51c9efc29ec336db1','649989d9db7b6feb935b38d6a914a3f41313a10b','e83bffd66f0dcc275b07bc61eaae3e445a8c0119','4cbbdb432297422fc9c982801cd812b5e5ee6a2a']; quiet={'stdout':DEVNULL,'stderr':DEVNULL}; missing=[sha for sha in bad if call(['git','cat-file','-e',sha+'^{commit}'],**quiet)!=0]; found=[sha for sha in bad if sha not in missing and call(['git','merge-base','--is-ancestor',sha,'HEAD'],**quiet)==0]; print('forbidden ancestor gate passed' if not missing and not found else 'missing commits: '+','.join(missing)+'; forbidden ancestors: '+','.join(found)); sys.exit(1 if missing or found else 0)\"",
+            "pnpm install --frozen-lockfile --ignore-scripts",
+            "pnpm run check:conversation"
+          ],
+          "agent": "codex",
+          "setup": "skip"
+        }
+      ]
+    }
+  ],
+  "update_waves": [
+    {
+      "id": "alpha-integration",
+      "description": "Merge only accepted functional replacements, handover, and workspace-lock SHAs into the alpha.",
+      "depends_on": [
+        "FOUND-LOCK-001",
+        "DATA-CORR-001",
+        "EXPR-REPAIR-001",
+        "CONV-REPAIR-004",
+        "RESP-REPAIR-003",
+        "HAND-001",
+        "CARE-REPAIR-001",
+        "PRIV-REPAIR-001",
+        "QA-REPAIR-001"
+      ],
+      "base": {
+        "type": "task",
+        "task": "FOUND-LOCK-001"
+      }
+    }
+  ],
+  "update_tasks": [
+    {
+      "id": "INT-001",
+      "spec": "Start from the exact accepted FOUND-LOCK-001 SHA, which must contain accepted QA-REPAIR-001, DATA-CORR-001, and CONTRACT-CORR-004 ancestry. Merge the exact accepted remote SHAs for EXPR-REPAIR-001, CONV-REPAIR-004, RESP-REPAIR-003, HAND-001, CARE-REPAIR-001, and PRIV-REPAIR-001 with clean --no-ff merges. Never merge or cherry-pick rejected EXPR-001, CONV-001, RESP-001, CARE-001, PRIV-001, QA-001, CONV-REPAIR-001, RESP-REPAIR-001, CONTRACT-CORR-002, CONTRACT-CORR-003, CONV-REPAIR-002, CONV-REPAIR-003, or RESP-REPAIR-002 commit objects. Add only integration-owned actor boundaries, command and query composition, routes, database wiring, and demo documentation. Preserve Fixture and non-production truth labels.",
+      "acceptance": [
+        "FOUND-LOCK-001 is the exact integration base and QA-REPAIR-001, DATA-CORR-001, and CONTRACT-CORR-004 are verified ancestors",
+        "Every non-ancestor dependency SHA is an exact second parent of a clean no-ff merge",
+        "CONV-REPAIR-004 is the sole integrated conversation implementation and rejected CONV-REPAIR-003 is not an ancestor",
+        "HAND-001 remains the accepted handover implementation and is not repeated or replaced",
+        "No rejected or failed Attempt SHA is an ancestor of the integrated alpha",
+        "The seven-step Fixture flow runs through real command and query handlers and disposable PostgreSQL",
+        "Server-side authorization and pre-provider authorization remain effective",
+        "Blocked, denied, provider-failed, database-failed, care-boundary, deletion, and export paths remain explicit",
+        "Both browser viewports render the real Next.js application without regression",
+        "README and demo documentation distinguish Fixture, local runtime, public deployment, and official acceptance"
+      ],
+      "checks": [
+        "python -B -c \"import sys; from subprocess import call,DEVNULL; bad=['8c8a07fa77e26a975944e4df75ea6d6930a5d91f','26ae5d926adbc0cddaa4fe21015eef5481056917','7ebd3ebafb7274eed1f6f1551e1c64550a772167','b5371bb0d23cd0f2b51dcd4df020043fd54942ed','a90c520cbd0a65c86d3f76e2f3e08f3b4d671ad8','cf864638a7d196f1370dcb6d732eed41a9aaafac','e90b8aec43e79a15a921721af1efbd9eff8595f6','8f44897b4a5f8d1d6119e279675c7d02aa060963','88d7a821148a65069cc601cf63b23199388952aa','df5efe21ebea388cb7182ae51c9efc29ec336db1','649989d9db7b6feb935b38d6a914a3f41313a10b','e83bffd66f0dcc275b07bc61eaae3e445a8c0119','4cbbdb432297422fc9c982801cd812b5e5ee6a2a']; quiet={'stdout':DEVNULL,'stderr':DEVNULL}; missing=[sha for sha in bad if call(['git','cat-file','-e',sha+'^{commit}'],**quiet)!=0]; found=[sha for sha in bad if sha not in missing and call(['git','merge-base','--is-ancestor',sha,'HEAD'],**quiet)==0]; print('forbidden ancestor gate passed' if not missing and not found else 'missing commits: '+','.join(missing)+'; forbidden ancestors: '+','.join(found)); sys.exit(1 if missing or found else 0)\"",
+        "pnpm install --frozen-lockfile",
+        "pnpm run check",
+        "pnpm run db:verify",
+        "pnpm run build",
+        "pnpm run test:e2e:fixture",
+        "pnpm run test:visual:fixture"
+      ]
+    },
+    {
+      "id": "CONV-002",
+      "spec": "Harden the accepted CONV-REPAIR-004 capability after INT-001. Replace every Date.parse or epoch-millisecond consent comparison with the CONTRACT-CORR-004 package-root compareTimestamps function while retaining the general Clock Date adapter for non-care compatibility. Add sub-millisecond expiry, concurrent confirmation, double-submit, consent revocation during provider execution, source deletion, unauthorized ID guessing, provider failure, malformed output, and transactional rollback tests. Preserve the fail-closed disclosure skeleton and all user-facing conversation behavior.",
+      "acceptance": [
+        "A consent decided at 2026-08-27T20:01:00.000998Z with expiry 2026-08-27T20:01:00.000999Z remains valid at the earlier instant and is invalid at equality or later",
+        "All consent ordering imports compareTimestamps from the contracts package root and contains no Date.parse or epoch-millisecond comparison",
+        "Concurrent confirmations and double submits create at most one shared signal",
+        "Consent revocation, source deletion, authorization drift, provider failure, malformed output, and transaction failure write nothing",
+        "The privacy skeleton continues to block repeated whitespace, punctuation, symbol, containment, and one-edit variants",
+        "No private content appears in logs, errors, reports, or unauthorized queries"
+      ],
+      "checks": [
+        "python -B -c \"import sys; from subprocess import call,DEVNULL; bad=['8c8a07fa77e26a975944e4df75ea6d6930a5d91f','26ae5d926adbc0cddaa4fe21015eef5481056917','7ebd3ebafb7274eed1f6f1551e1c64550a772167','b5371bb0d23cd0f2b51dcd4df020043fd54942ed','a90c520cbd0a65c86d3f76e2f3e08f3b4d671ad8','cf864638a7d196f1370dcb6d732eed41a9aaafac','e90b8aec43e79a15a921721af1efbd9eff8595f6','8f44897b4a5f8d1d6119e279675c7d02aa060963','88d7a821148a65069cc601cf63b23199388952aa','df5efe21ebea388cb7182ae51c9efc29ec336db1','649989d9db7b6feb935b38d6a914a3f41313a10b','e83bffd66f0dcc275b07bc61eaae3e445a8c0119','4cbbdb432297422fc9c982801cd812b5e5ee6a2a']; quiet={'stdout':DEVNULL,'stderr':DEVNULL}; missing=[sha for sha in bad if call(['git','cat-file','-e',sha+'^{commit}'],**quiet)!=0]; found=[sha for sha in bad if sha not in missing and call(['git','merge-base','--is-ancestor',sha,'HEAD'],**quiet)==0]; print('forbidden ancestor gate passed' if not missing and not found else 'missing commits: '+','.join(missing)+'; forbidden ancestors: '+','.join(found)); sys.exit(1 if missing or found else 0)\"",
+        "pnpm run check:conversation"
+      ]
+    }
+  ],
+  "resolutions": [
+    {
+      "task": "CONV-REPAIR-003",
+      "superseded_by": "CONV-REPAIR-004"
+    }
+  ]
+}
