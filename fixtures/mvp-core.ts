@@ -41,6 +41,7 @@ export const MVP_CORE_STYLE_A_CSS_VARIABLES = Object.freeze({
 
 const reminderId = "00000000-0000-4000-8000-000000000027";
 const verticalZones = Object.freeze(["title", "content", "state", "actions"] as const);
+const tabletViewport = Object.freeze({ id: "tablet", width: 1024, height: 768 } as const);
 
 /**
  * Canonical fictional graph consumed by Fixture UI, modules, database seeders,
@@ -49,7 +50,7 @@ const verticalZones = Object.freeze(["title", "content", "state", "actions"] as 
  */
 export const MVP_CORE_FIXTURE = Object.freeze({
   scenarioId: MVP_CORE_SCENARIO_ID,
-  fixtureVersion: 2,
+  fixtureVersion: 3,
   roles: MVP_CORE_ROLES,
   display: Object.freeze({
     title: "晨光家庭（虚构演示）",
@@ -125,13 +126,36 @@ export const MVP_CORE_FIXTURE = Object.freeze({
     acceptedAt: FIXTURE_TIMES.accepted,
   }),
   layoutAcceptance: Object.freeze({
-    subjectViewport: REQUIRED_VIEWPORTS[0],
-    desktopViewport: REQUIRED_VIEWPORTS[1],
+    viewports: Object.freeze({
+      desktop: REQUIRED_VIEWPORTS[1],
+      tablet: tabletViewport,
+      mobile: REQUIRED_VIEWPORTS[0],
+    }),
+    selectedRoleWebApp: Object.freeze({
+      desktop: Object.freeze({
+        sidebarVisible: true,
+        selectedRoleWorkspaceCount: 1,
+        workspaceWiderThanSidebar: true,
+      }),
+      tablet: Object.freeze({
+        selectedRoleWorkspaceCount: 1,
+        reflowsWithoutClipping: true,
+      }),
+      mobile: Object.freeze({
+        sidebarVisible: false,
+        selectedRoleWorkspaceCount: 1,
+        fullWidthCurrentRolePage: true,
+      }),
+      roleNavigationTargets: MVP_CORE_ROLES,
+      deviceFramingAllowed: false,
+      documentHorizontalOverflowAllowed: false,
+      panelHorizontalOverflowAllowed: false,
+      truthLabelEllipsisAllowed: false,
+    }),
     styleA: Object.freeze({
       cssVariables: MVP_CORE_STYLE_A_CSS_VARIABLES,
       cardVerticalPaddingPx: Object.freeze({ minimum: 16, maximum: 20 }),
       compactRailMaximumWidthPx: 330,
-      phoneSurfaceWidthPx: Object.freeze({ minimum: 300, maximum: 390 }),
       zoneGapPxMinimum: 8,
       zoneSpanPxMinimum: 128,
       coreCards: Object.freeze({
