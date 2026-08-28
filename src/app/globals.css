@@ -1088,7 +1088,7 @@ th {
 
 .timetable-filters button,
 .quick-queries button {
-  min-height: 40px;
+  min-height: 44px;
   padding: 6px 10px;
   border: 1px solid transparent;
   border-radius: 6px;
@@ -1532,6 +1532,7 @@ th {
   }
 
   .home-role-switch > div {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     width: 100%;
   }
 

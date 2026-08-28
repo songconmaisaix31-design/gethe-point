@@ -4,8 +4,8 @@ import type { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "都记得 · Fixture Demo",
-  description: "A consent-first family responsibility demo.",
+  title: "都记得 · 家庭日程",
+  description: "家庭日程与角色安全的成员 Agent。",
 };
 
 export default function RootLayout({ children }: { readonly children: ReactNode }) {

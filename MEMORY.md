@@ -13,6 +13,9 @@
 - Deliver a simple MVP, not the previous over-engineered project.
 - Implement the timetable with one SQLite table and keep the member Agent's intent, references, suggestions, and authorization deterministic. Optional StepFun enhancement uses native server-side fetch to rewrite only bounded role-safe answer text and falls back without making the MVP credential-dependent.
 - Agent targeting is presentation context, not authorization. All replies come from the caller's role-safe projection; timetable mutations remain explicit, and completion is owner-only.
+- Store timetable timestamps in UTC and render them in `Asia/Shanghai` for the local household experience.
+- A target Agent never elevates the caller's role-safe projection. Hidden self-only item IDs are indistinguishable from missing IDs, and timetable completion remains owner-only.
+- The provider outbound allowlist contains only the deterministic answer, target display name, deterministic intent, and a bounded visible timetable summary/counts. It excludes raw questions, private Evidence, messages, notifications, IDs, and transcripts.
 - StepFun configuration uses environment variable names only (`STEPFUN_API_KEY`, optional `STEPFUN_MODEL`). Never store or log values, raw provider bodies, private Evidence text, or conversation transcripts.
 - Use one Next.js application, strict TypeScript, Node's SQLite API, one domain folder, and one Web folder.
 - Selective migration means reviewing and copying only useful fixture data, UI behavior, or small pure functions. Do not merge or cherry-pick old implementation branches wholesale.
@@ -32,4 +35,4 @@
 
 ## Secret Handling
 
-- Record environment variable names only. Never record secret values.
+- Record environment variable names only. No secrets are stored; never record secret values.

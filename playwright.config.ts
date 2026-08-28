@@ -14,9 +14,13 @@ export default defineConfig({
     trace: "retain-on-failure",
   },
   webServer: {
-    command: "pnpm dev",
+    command: "pnpm start",
     url: baseURL,
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: false,
+    env: {
+      STEPFUN_API_KEY: "",
+      STEPFUN_MODEL: "",
+    },
   },
   projects: [
     {
