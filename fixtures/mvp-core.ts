@@ -146,6 +146,7 @@ export const MVP_CORE_FIXTURE = Object.freeze({
         compactNavigationVisible: true,
         selectedRoleWorkspaceCount: 1,
         fullWidthCurrentRolePage: true,
+        horizontalGutterPxMaximum: 16,
       }),
       roleNavigationTargets: MVP_CORE_ROLES,
       deviceFramingAllowed: false,
