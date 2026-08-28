@@ -406,7 +406,7 @@ test.describe("@mvp-core @fixture canonical journey", () => {
     await expect(page.getByTestId(ids.privateMessage)).toHaveText(
       MVP_CORE_FIXTURE.privateConversation.message.content,
     );
-    await expectInsideViewport(page, page.getByTestId(ids.shareConsent));
+    await expectPrimaryActionReachable(page, page.getByTestId(ids.subjectSurface), "subject");
     await expectNoHorizontalOverflow(page);
 
     await page.getByTestId(ids.shareConsent).click();
