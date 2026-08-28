@@ -346,28 +346,36 @@ const expectVerticalCard = async (
     page.getByTestId(zoneIds.actions),
   ] as const;
   const acceptance = MVP_CORE_FIXTURE.layoutAcceptance.styleA;
-  const geometry = await card.evaluate((element) => {
-    const style = getComputedStyle(element);
-    return {
-      paddingTop: Number.parseFloat(style.paddingTop),
-      paddingBottom: Number.parseFloat(style.paddingBottom),
-      height: element.getBoundingClientRect().height,
-    };
-  });
+  const cardHeight = await card.evaluate(
+    (element) => element.getBoundingClientRect().height,
+  );
+  expect(cardHeight).toBeGreaterThanOrEqual(minimumHeightPx);
 
-  expect(geometry.paddingTop).toBeGreaterThanOrEqual(
-    acceptance.cardVerticalPaddingPx.minimum,
+  const zoneGeometries = await Promise.all(
+    zones.map((zone) =>
+      zone.evaluate((element) => {
+        const style = getComputedStyle(element);
+        return {
+          paddingTop: Number.parseFloat(style.paddingTop),
+          paddingBottom: Number.parseFloat(style.paddingBottom),
+        };
+      }),
+    ),
   );
-  expect(geometry.paddingTop).toBeLessThanOrEqual(
-    acceptance.cardVerticalPaddingPx.maximum,
-  );
-  expect(geometry.paddingBottom).toBeGreaterThanOrEqual(
-    acceptance.cardVerticalPaddingPx.minimum,
-  );
-  expect(geometry.paddingBottom).toBeLessThanOrEqual(
-    acceptance.cardVerticalPaddingPx.maximum,
-  );
-  expect(geometry.height).toBeGreaterThanOrEqual(minimumHeightPx);
+  for (const geometry of zoneGeometries) {
+    expect(geometry.paddingTop).toBeGreaterThanOrEqual(
+      acceptance.cardVerticalPaddingPx.minimum,
+    );
+    expect(geometry.paddingTop).toBeLessThanOrEqual(
+      acceptance.cardVerticalPaddingPx.maximum,
+    );
+    expect(geometry.paddingBottom).toBeGreaterThanOrEqual(
+      acceptance.cardVerticalPaddingPx.minimum,
+    );
+    expect(geometry.paddingBottom).toBeLessThanOrEqual(
+      acceptance.cardVerticalPaddingPx.maximum,
+    );
+  }
 
   const boxes = await Promise.all(zones.map(async (zone) => zone.boundingBox()));
   for (const box of boxes) {
