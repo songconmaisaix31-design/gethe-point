@@ -1,5 +1,5 @@
-import { DemoApp } from "../components/DemoApp";
+import { FamilyHome } from "../components/FamilyHome";
 
 export default function HomePage() {
-  return <DemoApp />;
+  return <FamilyHome />;
 }
