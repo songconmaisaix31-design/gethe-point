@@ -1,4 +1,9 @@
+import { randomUUID } from "node:crypto";
+
 import type {
+  AgentIntent,
+  AgentQueryRequest,
+  AgentQueryResponse,
   CareEventProjection,
   CareRuleProjection,
   DemoAction,
@@ -13,6 +18,10 @@ import type {
   Role,
   RoleSafeProjection,
   SignalProjection,
+  TimetableCategory,
+  TimetableItemProjection,
+  TimetableStatus,
+  TimetableVisibility,
   Visibility,
 } from "@/contracts";
 // @ts-expect-error Node's native TypeScript runner requires an explicit extension.
@@ -31,6 +40,8 @@ import { appNotificationAdapter, createA3NotificationAdapter } from "./notificat
 import type { FixtureSession } from "./types.ts";
 
 const DEDUPE_WINDOW_MS = 5 * 60 * 1_000;
+const FIXTURE_WEEK_START_MS = Date.parse("2026-08-24T00:00:00+08:00");
+const FIXTURE_WEEK_END_MS = Date.parse("2026-08-31T00:00:00+08:00");
 
 interface MemberRow {
   readonly id: string;
@@ -120,6 +131,18 @@ interface NotificationRow {
   readonly occurred_at: string;
 }
 
+interface TimetableRow {
+  readonly id: string;
+  readonly title: string;
+  readonly starts_at: string;
+  readonly ends_at: string;
+  readonly category: TimetableCategory;
+  readonly owner_id: string;
+  readonly domain_id: string | null;
+  readonly status: TimetableStatus;
+  readonly visibility: TimetableVisibility;
+}
+
 interface PendingNotification extends NotificationAdapterRequest {
   readonly text: string;
 }
@@ -146,10 +169,34 @@ function parseStringArray(value: string): readonly string[] {
   return parsed;
 }
 
+function routeAgentIntent(
+  message: string,
+  intentHint?: AgentIntent,
+): AgentIntent {
+  if (intentHint !== undefined) {
+    return intentHint;
+  }
+
+  const keywordGroups: Readonly<Record<Exclude<AgentIntent, "help">, readonly string[]>> = {
+    schedule: ["日程", "安排", "时间", "什么时候", "待办"],
+    responsibilities: ["责任", "负责", "分工", "任务"],
+    care: ["照护", "用药", "健康", "提醒"],
+  };
+  const matches = (Object.entries(keywordGroups) as readonly [
+    Exclude<AgentIntent, "help">,
+    readonly string[],
+  ][]).filter(([, keywords]) => keywords.some((keyword) => message.includes(keyword)));
+  return matches.length === 1 ? matches[0][0] : "help";
+}
+
 export interface DemoService {
   reset(session: FixtureSession): RoleSafeProjection;
   execute(session: FixtureSession, action: DemoAction): Promise<RoleSafeProjection>;
   getState(session: FixtureSession): RoleSafeProjection;
+  queryAgent(
+    session: FixtureSession,
+    request: AgentQueryRequest,
+  ): AgentQueryResponse;
 }
 
 export function createDemoService(
@@ -217,6 +264,12 @@ export function createDemoService(
         break;
       case "delete_evidence":
         deleteEvidence(actorId, action.actorId, action.evidenceId);
+        break;
+      case "create_timetable_item":
+        createTimetableItem(actorId, session.role, action);
+        break;
+      case "complete_timetable_item":
+        completeTimetableItem(actorId, action.itemId);
         break;
     }
 
@@ -341,6 +394,24 @@ export function createDemoService(
       safeCode: item.safe_code,
       occurredAt: item.occurred_at,
     }));
+    const timetableItems = rows<TimetableRow>(
+      database.prepare("SELECT * FROM timetable_items ORDER BY starts_at, id").all(),
+    )
+      .filter(
+        (item) => item.visibility === "household" || item.owner_id === viewerId,
+      )
+      .map<TimetableItemProjection>((item) => ({
+        id: item.id,
+        title: item.title,
+        startsAt: item.starts_at,
+        endsAt: item.ends_at,
+        category: item.category,
+        ownerId: item.owner_id,
+        domainId: item.domain_id,
+        status: item.status,
+        visibility: item.visibility,
+        canComplete: item.status === "planned" && item.owner_id === viewerId,
+      }));
 
     return {
       role: session.role,
@@ -354,6 +425,67 @@ export function createDemoService(
       careRules,
       careEvents,
       notificationLogs,
+      timetableItems,
+    };
+  }
+
+  function queryAgent(
+    session: FixtureSession,
+    request: AgentQueryRequest,
+  ): AgentQueryResponse {
+    const state = getState(session);
+    const target = state.members.find(
+      (member) => member.id === request.targetMemberId,
+    );
+    assertDomain(target, "not_found", "The target member is unavailable.");
+
+    const intent = routeAgentIntent(request.message, request.intentHint);
+    const targetItems = state.timetableItems.filter(
+      (item) => item.ownerId === target.id,
+    );
+    const matchingItems = targetItems.filter((item) => {
+      if (intent === "care") {
+        return item.category === "care";
+      }
+      if (intent === "responsibilities") {
+        return item.category === "responsibility";
+      }
+      return intent === "schedule";
+    });
+
+    let text: string;
+    let suggestedActions: AgentQueryResponse["suggestedActions"];
+    if (intent === "schedule") {
+      text = matchingItems.length === 0
+        ? `当前可见日程中没有${target.displayName}的安排。`
+        : `${target.displayName}当前有 ${matchingItems.length} 项可见日程：${matchingItems.map((item) => item.title).join("、")}。`;
+      suggestedActions = ["view_timetable", "add_item"];
+    } else if (intent === "responsibilities") {
+      const ownedDomains = state.domains.filter(
+        (domain) => domain.ownerId === target.id,
+      );
+      text = ownedDomains.length === 0 && matchingItems.length === 0
+        ? `当前可见投影中没有${target.displayName}负责的事项。`
+        : `${target.displayName}当前负责 ${ownedDomains.length} 个可见领域，并有 ${matchingItems.length} 项可见责任日程。`;
+      suggestedActions = ["view_timetable", "open_demo"];
+    } else if (intent === "care") {
+      const careRuleCount = state.careRules.filter(
+        (rule) => rule.subjectId === target.id,
+      ).length;
+      text = `${target.displayName}当前有 ${matchingItems.length} 项可见照护日程和 ${careRuleCount} 条照护规则。如需操作，请使用明确的结构化动作。`;
+      suggestedActions = ["view_timetable", "open_demo"];
+    } else {
+      text = `我可以查询${target.displayName}的可见日程、责任和照护信息。自由文本不会修改任何数据。`;
+      suggestedActions = ["view_timetable", "add_item", "open_demo"];
+    }
+
+    return {
+      intent,
+      targetMemberId: target.id,
+      text,
+      referencedItemIds: matchingItems.map((item) => item.id),
+      suggestedActions,
+      engine: "fixture_intent_router",
     };
   }
 
@@ -383,6 +515,102 @@ export function createDemoService(
       database.exec("ROLLBACK");
       throw error;
     }
+  }
+
+  function createTimetableItem(
+    actorId: string,
+    role: Role,
+    action: Extract<DemoAction, { readonly type: "create_timetable_item" }>,
+  ): void {
+    transaction(() => {
+      const owner = row<{ readonly id: string }>(
+        database.prepare("SELECT id FROM members WHERE id = ?").get(action.ownerId),
+      );
+      assertDomain(owner, "invalid_request", "The timetable owner is invalid.");
+      if (action.domainId !== undefined) {
+        const domain = row<{ readonly id: string }>(
+          database.prepare("SELECT id FROM domains WHERE id = ?").get(action.domainId),
+        );
+        assertDomain(domain, "invalid_request", "The timetable domain is invalid.");
+      }
+
+      const ownsItem = action.ownerId === actorId;
+      const canCreateForHousehold =
+        (role === "primary" || role === "partner") &&
+        (action.category === "family" || action.category === "care");
+      assertDomain(
+        ownsItem || canCreateForHousehold,
+        "forbidden",
+        "This Fixture role cannot create the timetable item.",
+      );
+
+      const title = action.title.trim();
+      assertDomain(
+        title.length >= 1 && title.length <= 80,
+        "invalid_request",
+        "The timetable title is invalid.",
+      );
+      const startsAtMs = Date.parse(action.startsAt);
+      const endsAtMs = startsAtMs + action.durationMinutes * 60_000;
+      assertDomain(
+        startsAtMs >= FIXTURE_WEEK_START_MS && endsAtMs <= FIXTURE_WEEK_END_MS,
+        "invalid_request",
+        "The timetable item must stay within the Fixture week.",
+      );
+      const visibility: TimetableVisibility =
+        action.category === "responsibility" ? "self" : "household";
+      const itemId = `timetable_${randomUUID().replaceAll("-", "")}`;
+      const now = currentTime();
+      database
+        .prepare(
+          `INSERT INTO timetable_items(
+            id, title, starts_at, ends_at, category, owner_id, domain_id,
+            status, visibility, created_by, created_at, completed_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, 'planned', ?, ?, ?, NULL)`,
+        )
+        .run(
+          itemId,
+          title,
+          action.startsAt,
+          new Date(endsAtMs).toISOString(),
+          action.category,
+          action.ownerId,
+          action.domainId ?? null,
+          visibility,
+          actorId,
+          now,
+        );
+      auditAt(actorId, "create_timetable_item", itemId, now, {
+        ownerId: action.ownerId,
+        category: action.category,
+      });
+    });
+  }
+
+  function completeTimetableItem(actorId: string, itemId: string): void {
+    transaction(() => {
+      const item = row<TimetableRow>(
+        database.prepare("SELECT * FROM timetable_items WHERE id = ?").get(itemId),
+      );
+      assertDomain(item, "not_found", "The timetable item is unavailable.");
+      assertDomain(
+        item.owner_id === actorId,
+        "forbidden",
+        "Only the timetable owner can complete this item.",
+      );
+      assertDomain(
+        item.status === "planned",
+        "conflict",
+        "The timetable item is already completed.",
+      );
+      const now = currentTime();
+      database
+        .prepare(
+          "UPDATE timetable_items SET status = 'completed', completed_at = ? WHERE id = ? AND status = 'planned'",
+        )
+        .run(now, itemId);
+      auditAt(actorId, "complete_timetable_item", itemId, now, {});
+    });
   }
 
   function shareEvidence(
@@ -904,5 +1132,5 @@ export function createDemoService(
       .run(actorId, action, targetId, occurredAt, JSON.stringify(metadata));
   }
 
-  return { reset, execute, getState };
+  return { reset, execute, getState, queryAgent };
 }

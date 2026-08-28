@@ -11,6 +11,14 @@
     { "id": "member_partner", "displayName": "陈建国", "role": "partner", "capacity": "available" },
     { "id": "member_subject", "displayName": "周素兰", "role": "subject", "capacity": "available" }
   ],
+  "timetableItems": [
+    { "id": "timetable_school_form", "title": "交回新生体检表", "startsAt": "2026-08-28T09:00:00+08:00", "endsAt": "2026-08-28T09:30:00+08:00", "category": "responsibility", "ownerId": "member_primary", "domainId": "domain_school", "status": "planned", "visibility": "self" },
+    { "id": "timetable_family_dinner", "title": "家庭晚餐", "startsAt": "2026-08-28T18:30:00+08:00", "endsAt": "2026-08-28T19:30:00+08:00", "category": "family", "ownerId": "member_partner", "domainId": "domain_home", "status": "planned", "visibility": "household" },
+    { "id": "timetable_medicine", "title": "晚间用药", "startsAt": "2026-08-28T20:00:00+08:00", "endsAt": "2026-08-28T20:30:00+08:00", "category": "care", "ownerId": "member_subject", "domainId": "domain_health", "status": "planned", "visibility": "household" },
+    { "id": "timetable_health_booking", "title": "预约骨科复查", "startsAt": "2026-08-29T10:00:00+08:00", "endsAt": "2026-08-29T10:30:00+08:00", "category": "responsibility", "ownerId": "member_primary", "domainId": "domain_health", "status": "planned", "visibility": "self" },
+    { "id": "timetable_grocery", "title": "采购家庭日用品", "startsAt": "2026-08-29T16:00:00+08:00", "endsAt": "2026-08-29T17:00:00+08:00", "category": "family", "ownerId": "member_partner", "domainId": "domain_home", "status": "planned", "visibility": "household" },
+    { "id": "timetable_walk", "title": "陪奶奶散步", "startsAt": "2026-08-30T08:00:00+08:00", "endsAt": "2026-08-30T08:30:00+08:00", "category": "care", "ownerId": "member_subject", "domainId": "domain_health", "status": "planned", "visibility": "household" }
+  ],
   "familyMessages": [
     { "id": "message_family_1", "speakerId": "member_primary", "text": "今晚我加班，饭在锅里，你俩先吃" },
     { "id": "message_family_2", "speakerId": "member_partner", "text": "行，我把碗洗了" },

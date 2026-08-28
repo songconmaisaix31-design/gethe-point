@@ -109,7 +109,30 @@ const SCHEMA = `
     occurred_at TEXT NOT NULL,
     safe_metadata_json TEXT NOT NULL
   ) STRICT;
+
+  CREATE TABLE IF NOT EXISTS timetable_items (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    starts_at TEXT NOT NULL,
+    ends_at TEXT NOT NULL,
+    category TEXT NOT NULL CHECK (category IN ('responsibility', 'care', 'family')),
+    owner_id TEXT NOT NULL REFERENCES members(id),
+    domain_id TEXT REFERENCES domains(id),
+    status TEXT NOT NULL CHECK (status IN ('planned', 'completed')),
+    visibility TEXT NOT NULL CHECK (visibility IN ('household', 'self')),
+    created_by TEXT NOT NULL REFERENCES members(id),
+    created_at TEXT NOT NULL,
+    completed_at TEXT
+  ) STRICT;
 `;
+
+const TIMETABLE_SEED_STATEMENT = `INSERT INTO timetable_items VALUES
+  ('timetable_school_form', '交回新生体检表', '2026-08-28T09:00:00+08:00', '2026-08-28T09:30:00+08:00', 'responsibility', 'member_primary', 'domain_school', 'planned', 'self', 'member_primary', '2026-08-28T12:00:00.000Z', NULL),
+  ('timetable_family_dinner', '家庭晚餐', '2026-08-28T18:30:00+08:00', '2026-08-28T19:30:00+08:00', 'family', 'member_partner', 'domain_home', 'planned', 'household', 'member_partner', '2026-08-28T12:00:00.000Z', NULL),
+  ('timetable_medicine', '晚间用药', '2026-08-28T20:00:00+08:00', '2026-08-28T20:30:00+08:00', 'care', 'member_subject', 'domain_health', 'planned', 'household', 'member_subject', '2026-08-28T12:00:00.000Z', NULL),
+  ('timetable_health_booking', '预约骨科复查', '2026-08-29T10:00:00+08:00', '2026-08-29T10:30:00+08:00', 'responsibility', 'member_primary', 'domain_health', 'planned', 'self', 'member_primary', '2026-08-28T12:00:00.000Z', NULL),
+  ('timetable_grocery', '采购家庭日用品', '2026-08-29T16:00:00+08:00', '2026-08-29T17:00:00+08:00', 'family', 'member_partner', 'domain_home', 'planned', 'household', 'member_partner', '2026-08-28T12:00:00.000Z', NULL),
+  ('timetable_walk', '陪奶奶散步', '2026-08-30T08:00:00+08:00', '2026-08-30T08:30:00+08:00', 'care', 'member_subject', 'domain_health', 'planned', 'household', 'member_subject', '2026-08-28T12:00:00.000Z', NULL)`;
 
 const SEED_STATEMENTS = [
   `INSERT INTO demo_state VALUES (1, '2026-08-28T12:00:00.000Z')`,
@@ -155,6 +178,7 @@ const SEED_STATEMENTS = [
     ('handover_health', 'domain_health', 'member_primary', 'member_partner', 0, 0, 0, 'blocked', 0)`,
   `INSERT INTO care_rules VALUES
     ('care_rule_medicine', 'member_subject', 'draft', '每天 20:00 饭后', 60, '["member_partner","member_primary"]', 0)`,
+  TIMETABLE_SEED_STATEMENT,
 ] as const;
 
 export type DemoDatabase = DatabaseSync;
@@ -167,6 +191,13 @@ export function createDemoDatabase(path = ":memory:"): DemoDatabase {
     .get() as { readonly count: number };
   if (state.count === 0) {
     resetDemoDatabase(database);
+  } else {
+    const timetable = database
+      .prepare("SELECT COUNT(*) AS count FROM timetable_items")
+      .get() as { readonly count: number };
+    if (timetable.count === 0) {
+      database.exec(TIMETABLE_SEED_STATEMENT);
+    }
   }
   return database;
 }
@@ -178,6 +209,7 @@ export function resetDemoDatabase(database: DemoDatabase): void {
       DELETE FROM audit_logs;
       DELETE FROM notification_logs;
       DELETE FROM care_events;
+      DELETE FROM timetable_items;
       DELETE FROM care_rules;
       DELETE FROM handovers;
       DELETE FROM tasks;

@@ -19,10 +19,24 @@ export const ChannelSchema = z.enum(Channels);
 export const PrioritySchema = z.enum(Priorities);
 export const SafeErrorCodeSchema = z.enum(SafeErrorCodes);
 
+export const TimetableCategories = ["responsibility", "care", "family"] as const;
+export const TimetableStatuses = ["planned", "completed"] as const;
+export const TimetableVisibilities = ["household", "self"] as const;
+export const AgentIntents = ["schedule", "responsibilities", "care", "help"] as const;
+
+export const TimetableCategorySchema = z.enum(TimetableCategories);
+export const TimetableStatusSchema = z.enum(TimetableStatuses);
+export const TimetableVisibilitySchema = z.enum(TimetableVisibilities);
+export const AgentIntentSchema = z.enum(AgentIntents);
+
 export type Role = z.infer<typeof RoleSchema>;
 export type Channel = z.infer<typeof ChannelSchema>;
 export type Priority = z.infer<typeof PrioritySchema>;
 export type SafeErrorCode = z.infer<typeof SafeErrorCodeSchema>;
+export type TimetableCategory = z.infer<typeof TimetableCategorySchema>;
+export type TimetableStatus = z.infer<typeof TimetableStatusSchema>;
+export type TimetableVisibility = z.infer<typeof TimetableVisibilitySchema>;
+export type AgentIntent = z.infer<typeof AgentIntentSchema>;
 
 export const EntityIdSchema = z
   .string()
@@ -118,6 +132,23 @@ export const DemoActionSchema = z.discriminatedUnion("type", [
       type: z.literal("delete_evidence"),
       evidenceId: EntityIdSchema,
       actorId: EntityIdSchema,
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("create_timetable_item"),
+      ownerId: EntityIdSchema,
+      title: z.string().trim().min(1).max(80),
+      startsAt: z.iso.datetime({ offset: true }),
+      durationMinutes: z.number().int().min(15).max(480),
+      category: TimetableCategorySchema,
+      domainId: EntityIdSchema.optional(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("complete_timetable_item"),
+      itemId: EntityIdSchema,
     })
     .strict(),
 ]);
@@ -233,6 +264,19 @@ export interface NotificationLogProjection {
   readonly occurredAt: string;
 }
 
+export interface TimetableItemProjection {
+  readonly id: string;
+  readonly title: string;
+  readonly startsAt: string;
+  readonly endsAt: string;
+  readonly category: TimetableCategory;
+  readonly ownerId: string;
+  readonly domainId: string | null;
+  readonly status: TimetableStatus;
+  readonly visibility: TimetableVisibility;
+  readonly canComplete: boolean;
+}
+
 export interface RoleSafeProjection {
   readonly role: Role;
   readonly now: string;
@@ -245,6 +289,30 @@ export interface RoleSafeProjection {
   readonly careRules: readonly CareRuleProjection[];
   readonly careEvents: readonly CareEventProjection[];
   readonly notificationLogs: readonly NotificationLogProjection[];
+  readonly timetableItems: readonly TimetableItemProjection[];
+}
+
+export const AgentQueryRequestSchema = z
+  .object({
+    targetMemberId: EntityIdSchema,
+    message: z.string().trim().min(1).max(240),
+    intentHint: AgentIntentSchema.optional(),
+  })
+  .strict();
+
+export type AgentQueryRequest = z.infer<typeof AgentQueryRequestSchema>;
+
+export interface AgentQueryResponse {
+  readonly intent: AgentIntent;
+  readonly targetMemberId: string;
+  readonly text: string;
+  readonly referencedItemIds: readonly string[];
+  readonly suggestedActions: readonly (
+    | "view_timetable"
+    | "add_item"
+    | "open_demo"
+  )[];
+  readonly engine: "fixture_intent_router";
 }
 
 export const SafeErrorSchema = z
