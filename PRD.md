@@ -44,4 +44,3 @@ Deliver one truthful four-minute Web demo showing that an invisible family respo
 - Fake/local A3 verification is not real-device smoke.
 - Provider acceptance is not user receipt, acknowledgement, consent, or task completion.
 - Disabled enterprise channels are not implemented integrations.
-

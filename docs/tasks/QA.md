@@ -21,4 +21,3 @@ Create one realistic fictional household Fixture and executable acceptance for t
 ## Explicitly Do Not
 
 - Fix product code, create provider mocks that bypass public boundaries, deploy, or claim real A3/enterprise delivery.
-

@@ -48,4 +48,3 @@ Build only the four-minute MVP demo path. Every change must directly support con
 - Build: `pnpm run build`
 - Fixture E2E: `pnpm run test:e2e`
 - Accessibility: `pnpm run test:a11y`
-

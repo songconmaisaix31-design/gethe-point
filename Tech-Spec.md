@@ -62,4 +62,3 @@ No generic event store, outbox framework, workflow engine, multi-tenant abstract
 - Domain tests cover consent denial/scoping, persisted attribution/report neutrality, blocked and accepted handover, exact owner/reminder transfer, care activation and timeout equality, deduplication, A3 disabled/success/failure, and deletion.
 - Browser tests run the full demo path and check desktop/mobile overflow, subject target sizes/type, reduced motion, and key truth labels.
 - Final verification runs from a clean integration HEAD.
-

@@ -21,4 +21,3 @@ Turn the approved static Style A prototype into a responsive role-based Web expe
 ## Explicitly Do Not
 
 - Change contracts/domain/database, add a design system dependency, or claim live hardware/provider success.
-

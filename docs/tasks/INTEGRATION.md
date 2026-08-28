@@ -11,4 +11,3 @@ Merge exact accepted Foundation, Domain, Web, and QA SHAs, add only small assemb
 3. The complete consent/report/blocked-handover/transfer/care/A3-Fixture path runs in a browser.
 4. README startup instructions reproduce the result without credentials; external limitations are explicit.
 5. Worktree is clean; integration branch and exact SHA are pushed; protected `main` remains unchanged.
-

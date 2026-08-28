@@ -55,4 +55,3 @@ internal_failure
 ```
 
 Errors never include private message text, external response bodies, endpoints, tokens, stack traces, or record-existence detail beyond the caller's authorized projection.
-

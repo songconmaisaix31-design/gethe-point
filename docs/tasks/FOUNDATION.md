@@ -22,4 +22,3 @@ Create the smallest runnable toolchain and frozen shared action/projection contr
 3. Shared contracts contain no `any` and reject unsupported enterprise channels.
 4. Root configuration is sufficient for Domain/Web/QA tracks.
 5. Only assigned paths change; worktree is clean and pushed.
-

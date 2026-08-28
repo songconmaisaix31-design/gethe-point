@@ -18,4 +18,3 @@
 ## Secret Handling
 
 - Record environment variable names only. Never record secret values.
-

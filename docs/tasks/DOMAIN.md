@@ -21,4 +21,3 @@ Implement the minimal persisted MVP behavior for consent, report, handover, dete
 ## Explicitly Do Not
 
 - Add ORM/workflow/event-store abstractions, platform SDKs, UI, real provider calls, credentials, or production auth.
-

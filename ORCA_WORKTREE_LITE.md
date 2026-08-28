@@ -31,4 +31,3 @@ Each development track
 - Applicable typecheck, lint, unit, build, E2E, and accessibility checks pass.
 - No undisclosed critical placeholder remains.
 - The integration branch is pushed and the README is reproducible.
-
