@@ -142,7 +142,8 @@ export const MVP_CORE_FIXTURE = Object.freeze({
         reflowsWithoutClipping: true,
       }),
       mobile: Object.freeze({
-        sidebarVisible: false,
+        persistentSidebarVisible: false,
+        compactNavigationVisible: true,
         selectedRoleWorkspaceCount: 1,
         fullWidthCurrentRolePage: true,
       }),

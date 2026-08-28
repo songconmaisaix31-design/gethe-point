@@ -673,14 +673,42 @@ test.describe("@mvp-core @fixture canonical journey", () => {
         await expect(rail).toBeVisible();
       }
       if (viewportName === "mobile") {
-        await expect(rail).toBeHidden();
+        const mobileAcceptance = acceptance.selectedRoleWebApp.mobile;
+        expect(mobileAcceptance.persistentSidebarVisible).toBe(false);
+        expect(mobileAcceptance.compactNavigationVisible).toBe(true);
+        await expect(rail).toBeVisible();
+        await expectHorizontallyInsideViewport(page, rail);
+        await expectNoPanelHorizontalOverflow(rail);
+
+        const roleNavigation = rail.getByRole("navigation", { name: "Fixture 角色导航" });
+        const allowedRoles = acceptance.selectedRoleWebApp.roleNavigationTargets;
+        expect(allowedRoles).toHaveLength(3);
+        await expect(roleNavigation).toBeVisible();
+        await expect(roleNavigation.getByRole("link")).toHaveCount(allowedRoles.length);
+        for (const role of allowedRoles) {
+          const roleLink = roleNavigation.locator(`a[href$="?role=${role}"]`);
+          await expect(roleLink).toHaveCount(1);
+          await expect(roleLink).toBeVisible();
+        }
+
+        const currentStatus = rail.locator('section[aria-live="polite"]');
+        await expect(currentStatus).toBeVisible();
+        await expect(
+          currentStatus.getByText("当前服务端真相", { exact: true }),
+        ).toBeVisible();
+        const resetAction = rail.getByRole("button", { name: "重置 Fixture" });
+        await expect(resetAction).toBeVisible();
+        await expect(resetAction).toBeEnabled();
       }
 
       for (const role of roleNavigationOrder) {
-        const navigationLink = page.locator(`a[href$="?role=${role}"]:visible`);
+        const navigationLink = rail.locator(`a[href$="?role=${role}"]`);
         await expect(navigationLink).toHaveCount(1);
+        await expect(navigationLink).toBeVisible();
         await navigationLink.click();
         await expect(page).toHaveURL(new RegExp(`[?&]role=${role}(?:&|$)`, "u"));
+        await expect(rail.locator('a[aria-current="page"]')).toHaveCount(1);
+        await expect(navigationLink).toHaveAttribute("aria-current", "page");
 
         const surface = await expectOnlySelectedRole(page, role);
         await expectHorizontallyInsideViewport(page, surface);
@@ -706,11 +734,13 @@ test.describe("@mvp-core @fixture canonical journey", () => {
         }
 
         if (viewportName === "mobile") {
+          const railBox = await rail.boundingBox();
           const surfaceBox = await surface.boundingBox();
           const configuredViewport = page.viewportSize();
-          if (surfaceBox === null || configuredViewport === null) {
-            throw new Error("Expected one full-width current-role mobile page");
+          if (railBox === null || surfaceBox === null || configuredViewport === null) {
+            throw new Error("Expected compact navigation above one full-width mobile workspace");
           }
+          expect(railBox.y + railBox.height).toBeLessThanOrEqual(surfaceBox.y + 1);
           expect(Math.abs(surfaceBox.x)).toBeLessThanOrEqual(1);
           expect(Math.abs(surfaceBox.width - configuredViewport.width)).toBeLessThanOrEqual(1);
         }
