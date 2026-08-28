@@ -83,7 +83,7 @@ interface AgentQueryResponse {
   text: string;
   referencedItemIds: string[];
   suggestedActions: Array<"view_timetable" | "add_item" | "open_demo">;
-  engine: "fixture_intent_router";
+  engine: "stepfun" | "fixture_intent_router";
 }
 ```
 
@@ -95,3 +95,5 @@ Rules:
 - Selecting a target member never increases visibility.
 - Raw evidence content is never returned.
 - Unsupported or ambiguous text returns the `help` intent with supported examples.
+- Intent, referenced IDs, and suggested actions are deterministic server decisions. StepFun may rewrite only `text` from an already role-safe bounded summary.
+- Missing or failed StepFun configuration falls back to `fixture_intent_router`; provider errors and bodies are not exposed in the response.

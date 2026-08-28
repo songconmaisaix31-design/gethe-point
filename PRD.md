@@ -30,13 +30,13 @@ The accepted V1.1 demonstration remains available at `/demo`. The new home at `/
 - Owner-only completion of timetable items.
 - Responsive desktop and mobile layouts with keyboard and screen-reader support.
 - Regression protection for the accepted `/demo` flow.
-- Honest labeling of the credential-free deterministic Fixture intent router.
+- Optional StepFun-enhanced Agent answers, with honest fallback labeling when the credential-free Fixture router is used.
 
 ## Deliberate Constraints
 
 - No calendar library, Agent framework, vector database, ORM, background scheduler, or global state library.
 - No transcript persistence, natural-language date parsing, recurrence, drag-and-drop, or speculative automation.
-- No LLM keys or external credentials are required for the MVP.
+- The timetable and deterministic Agent fallback require no external credential. StepFun enhancement is enabled only through server-side environment configuration.
 - No production authentication, multi-household tenancy, or enterprise administration claims.
 - Free text is read-only. Every mutation uses explicit validated fields and authorization checks.
 
@@ -45,6 +45,7 @@ The accepted V1.1 demonstration remains available at `/demo`. The new home at `/
 - `/` is visibly and functionally timetable-first.
 - The Fixture exposes at least six timetable items across all three members and at least three categories.
 - Each Agent can answer supported queries from current persisted, role-safe data.
+- When StepFun is configured, it may rewrite only the bounded answer text from a minimal role-safe summary; it cannot select references, suggest mutations, or change state.
 - A valid created item survives reload and a Fixture reset restores the canonical seed.
 - Only an item's owner can complete it.
 - Selecting another member's Agent never expands the current viewer's visibility or exposes raw private evidence.

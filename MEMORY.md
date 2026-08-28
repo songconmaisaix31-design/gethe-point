@@ -11,8 +11,9 @@
 ## Durable Decisions
 
 - Deliver a simple MVP, not the previous over-engineered project.
-- Implement the timetable with one SQLite table and the member Agent with a deterministic, read-only intent router. Do not add a calendar library, Agent framework, transcript store, or LLM credential requirement.
+- Implement the timetable with one SQLite table and keep the member Agent's intent, references, suggestions, and authorization deterministic. Optional StepFun enhancement uses native server-side fetch to rewrite only bounded role-safe answer text and falls back without making the MVP credential-dependent.
 - Agent targeting is presentation context, not authorization. All replies come from the caller's role-safe projection; timetable mutations remain explicit, and completion is owner-only.
+- StepFun configuration uses environment variable names only (`STEPFUN_API_KEY`, optional `STEPFUN_MODEL`). Never store or log values, raw provider bodies, private Evidence text, or conversation transcripts.
 - Use one Next.js application, strict TypeScript, Node's SQLite API, one domain folder, and one Web folder.
 - Selective migration means reviewing and copying only useful fixture data, UI behavior, or small pure functions. Do not merge or cherry-pick old implementation branches wholesale.
 - Do not migrate Fleet Kit, package-level contract/data architecture, large table sets, custom gates, historical proof artifacts, or release machinery.

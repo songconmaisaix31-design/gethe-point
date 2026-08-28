@@ -14,7 +14,7 @@ Make the family timetable the primary home and expose each family member as a ro
 
 - Read `PRD.md`, `Tech-Spec.md`, `API_CONTRACT.md`, and `ORCA_WORKTREE_LITE.md` before implementation.
 - Keep one Web application and one lightweight persistence boundary. Do not create a monorepo, package graph, framework, custom scheduler, Fleet Kit, proof system, or generic platform.
-- Do not add a calendar library or Agent framework. The timetable is a small domain projection and the credential-free Agent is a bounded read-only intent router.
+- Do not add a calendar library, Agent framework, or provider SDK. The timetable is a small domain projection; the Agent keeps a deterministic read-only core and may use native `fetch` for optional StepFun text enhancement.
 - Prefer platform APIs and installed dependencies. Add a dependency only when it removes more risk or code than it adds.
 - Reuse `prototype.html`, `style-options.html`, and `dujide-logo-roof-ink.svg`. Selectively migrate old implementation code only at function/component level after review; never cherry-pick or merge an old implementation branch wholesale.
 - Do not migrate `.agents/`, Fleet scripts, Git hooks, old contract packages, old database packages, historical run state, release manifests, or verification bureaucracy.
@@ -30,7 +30,7 @@ Make the family timetable the primary home and expose each family member as a ro
 - External input starts as `unknown` and is validated at the boundary.
 - `/` is timetable-first; selecting a member Agent never expands the current viewer's role-safe projection.
 - Free-text Agent queries are read-only. Mutations use explicit structured actions and only an item's owner may complete it.
-- Label the deterministic local Agent engine truthfully as a Fixture intent router.
+- Label each Agent answer truthfully as StepFun or Fixture intent router. StepFun may rewrite only answer text from a bounded role-safe summary; it never receives raw Evidence text or mutation authority.
 - Never read, print, copy, or store `.env`, tokens, webhook URLs, cookies, private keys, or credentials.
 - `ENABLE_ROBOT` defaults to `false`. Live provider acceptance is never presented as user receipt or acknowledgement.
 
