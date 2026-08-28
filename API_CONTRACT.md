@@ -1,57 +1,97 @@
-# We Remember MVP API Contract
+# We Remember Timetable Agents MVP API Contract
 
-Status: Frozen for implementation
+All request bodies reject unknown keys. External input is parsed as `unknown` and narrowed with Zod before use.
 
-## Roles and Visibility
-
-```ts
-type Role = "primary" | "partner" | "subject";
-type Visibility = "self" | "space" | "care_related" | { members: readonly string[] };
-type Channel = "app" | "robot_a3";
-type Priority = "normal" | "high" | "urgent";
-```
-
-Only `app` and `robot_a3` are implemented. Enterprise channels remain product roadmap text, not runtime enum members.
-
-## Demo Actions
+## Timetable Projection
 
 ```ts
-type DemoAction =
-  | { type: "share_evidence"; evidenceId: string; visibility: Visibility }
-  | { type: "add_handover_info"; handoverId: string; item: "last_report" }
-  | { type: "confirm_handover"; handoverId: string; actorId: string; expectedVersion: number }
-  | { type: "activate_care_rule"; careRuleId: string; actorId: string; expectedVersion: number }
-  | { type: "trigger_care_reminder"; careRuleId: string }
-  | { type: "advance_demo_clock"; seconds: number }
-  | { type: "acknowledge_care"; careEventId: string; actorId: string }
-  | { type: "handle_escalation"; careEventId: string; actorId: string }
-  | { type: "delete_evidence"; evidenceId: string; actorId: string };
+type TimetableCategory = "responsibility" | "care" | "family";
+type TimetableStatus = "planned" | "completed";
+
+interface TimetableItemProjection {
+  id: string;
+  title: string;
+  startsAt: string;
+  endsAt: string;
+  category: TimetableCategory;
+  ownerId: string;
+  domainId: string | null;
+  status: TimetableStatus;
+  visibility: "household" | "self";
+  canComplete: boolean;
+}
 ```
 
-Every request rejects unknown keys and invalid identifiers. The server derives space/member authority from the Fixture session rather than accepting arbitrary scope IDs.
+`GET /api/demo/state?role=<role>` adds `timetableItems: TimetableItemProjection[]` to the existing `RoleSafeProjection`.
 
-## Fixed State Rules
+## Timetable Actions
 
-- Sharing `self` creates no shared signal/domain/task/report effect.
-- Shared effects require the evidence speaker's explicit action.
-- A handover is externally `blocked` until required information and both confirmations exist.
-- Handover acceptance updates domain owner, open-task future reminder owner, handover state, and audit record in one SQLite transaction.
-- A care rule remains inert until human activation.
-- Care timeout equality counts as timed out. Escalation order is preserved exactly.
-- Notification state `sent_to_provider` is never rendered as read, acknowledged, or completed.
-- Deleting evidence marks dependent conclusions `needs_review` and excludes them from the report; accepted ownership does not silently roll back.
+Create:
 
-## Safe Errors
-
-```text
-invalid_request
-forbidden
-not_found
-conflict
-disabled
-timeout
-provider_unavailable
-internal_failure
+```json
+{
+  "type": "create_timetable_item",
+  "ownerId": "member_subject",
+  "title": "晚间用药",
+  "startsAt": "2026-08-29T19:00:00+08:00",
+  "durationMinutes": 30,
+  "category": "care",
+  "domainId": "domain_health"
+}
 ```
 
-Errors never include private message text, external response bodies, endpoints, tokens, stack traces, or record-existence detail beyond the caller's authorized projection.
+Complete:
+
+```json
+{
+  "type": "complete_timetable_item",
+  "itemId": "timetable_medicine"
+}
+```
+
+Rules:
+
+- `title`: 1-80 trimmed characters.
+- `startsAt`: valid ISO date-time within the bounded Fixture week.
+- `durationMinutes`: integer from 15 through 480.
+- `domainId`: optional valid Fixture domain.
+- Subject can create only for self; primary and partner can create household family/care items.
+- Only the item owner may complete a planned item.
+
+Successful actions use the existing action response shape and return the refreshed role-safe projection. Validation and authorization failures use the existing safe error envelope.
+
+## Member Agent Query
+
+`POST /api/demo/agent?role=<role>`
+
+Request:
+
+```ts
+interface AgentQueryRequest {
+  targetMemberId: string;
+  message: string; // 1-240 trimmed characters
+  intentHint?: "schedule" | "responsibilities" | "care" | "help";
+}
+```
+
+Response:
+
+```ts
+interface AgentQueryResponse {
+  intent: "schedule" | "responsibilities" | "care" | "help";
+  targetMemberId: string;
+  text: string;
+  referencedItemIds: string[];
+  suggestedActions: Array<"view_timetable" | "add_item" | "open_demo">;
+  engine: "fixture_intent_router";
+}
+```
+
+Rules:
+
+- The query is read-only and cannot trigger a state change.
+- The caller is derived from the validated `role` query parameter, not the body.
+- Responses are composed only from the caller's current `RoleSafeProjection`.
+- Selecting a target member never increases visibility.
+- Raw evidence content is never returned.
+- Unsupported or ambiguous text returns the `help` intent with supported examples.

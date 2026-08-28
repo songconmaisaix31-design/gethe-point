@@ -2,6 +2,7 @@
 
 ## Current State
 
+- The active product direction makes `/` a seven-day family timetable and exposes 林秀、陈建国、周素兰 as role-safe member Agent entry points; the accepted V1.1 flow remains at `/demo`.
 - `DELIVERY-006` starts from clean commit `4d379df3c1d6c6f185474753e9d2fe12e6a63e29` and applies the reviewed tree delta from `42008dfd6ed9c167553d742d8c14f4ac48a2fe27` as one squash, excluding generated screenshots and `tests/e2e/visual.spec.ts`.
 - The source PRD is `C:\Users\DW\Downloads\产品需求文档_都记得_PRD_V1.1.md` (V1.1, 2026-08-28).
 - `prototype.html` Style A is the approved visual source; the repository Logo is reusable.
@@ -10,6 +11,8 @@
 ## Durable Decisions
 
 - Deliver a simple MVP, not the previous over-engineered project.
+- Implement the timetable with one SQLite table and the member Agent with a deterministic, read-only intent router. Do not add a calendar library, Agent framework, transcript store, or LLM credential requirement.
+- Agent targeting is presentation context, not authorization. All replies come from the caller's role-safe projection; timetable mutations remain explicit, and completion is owner-only.
 - Use one Next.js application, strict TypeScript, Node's SQLite API, one domain folder, and one Web folder.
 - Selective migration means reviewing and copying only useful fixture data, UI behavior, or small pure functions. Do not merge or cherry-pick old implementation branches wholesale.
 - Do not migrate Fleet Kit, package-level contract/data architecture, large table sets, custom gates, historical proof artifacts, or release machinery.

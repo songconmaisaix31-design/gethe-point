@@ -1,46 +1,52 @@
-# We Remember V1.1 MVP Brief
+# We Remember Timetable Agents MVP
 
-Status: Approved for implementation
+- Status: Approved for implementation
+- Source: `C:\Users\DW\Downloads\产品需求文档_都记得_PRD_V1.1.md`
+- Product direction: family timetable first, with one role-safe Agent per family member
 
-Source: `C:\Users\DW\Downloads\产品需求文档_都记得_PRD_V1.1.md`
+## Product Outcome
 
-## Outcome
+Make the family timetable the home of the application. A household member should be able to see what the family needs to do this week, open a specific family member's Agent, ask about that person's role-safe information, and take a small number of explicit actions without navigating a complex system.
 
-Deliver one truthful four-minute Web demo showing that an invisible family responsibility can move from private conversation to a clear owner without surveillance, blame, or probabilistic care execution.
+The accepted V1.1 demonstration remains available at `/demo`. The new home at `/` does not remove consent, responsibility, handover, care, or notification behavior already delivered.
 
-## Demo Path
+## Core Experience
 
-1. Show three realistic family-group messages and three role-specific surfaces.
-2. The subject says “腿又疼了” in a private Agent conversation and explicitly chooses whether and with whom to share it.
-3. Show a neutral weekly responsibility table backed by persisted `discoveredBy`, `deadlineKeptBy`, `scheduledBy`, `executedBy`, and `followedUpBy` fields.
-4. Propose the “奶奶这次复查” domain handover. Missing information keeps it visibly blocked.
-5. Supply the missing information and collect both confirmations. Ownership and future reminders move atomically; the original owner's burden count decreases.
-6. Activate one human-confirmed care rule. Send a reminder to the subject through App and optional A3 TTS, run a short deterministic timeout/escalation, then acknowledge and close it.
-7. Show safe notification history and evidence provenance without claiming production delivery.
+1. Open `/` and see a seven-day timetable backed by the local SQLite Fixture.
+2. Filter timetable items by family member and inspect their category, owner, time, status, and related responsibility domain.
+3. Open 林秀、陈建国 or 周素兰 as a member Agent.
+4. Ask about schedule, responsibilities, or care information and receive a response derived from the current role-safe projection.
+5. Add a timetable item through explicit fields; the item persists after reload.
+6. Complete an item only when the current role owns it; unauthorized attempts return a safe refusal.
+7. Open `/demo` to run the existing consent, report, handover, care, and notification flow.
 
-## P0
+## P0 Scope
 
-- Three fixture roles and one family space.
-- Private conversation, explicit per-item consent, and scoped visibility.
-- Three responsibility domains, at least eight valid signals, and two discussion-only distractors.
-- Persisted five-stage responsibility fields and one neutral report.
-- One blocked two-party handover with atomic owner/reminder transfer.
-- One human-confirmed deterministic care rule and complete event trail.
-- Evidence provenance, single-evidence deletion, and whole-space reset/delete in Fixture scope.
-- Notification deduplication, priority, App adapter, notification log, and disabled-by-default A3 adapter.
-- Responsive Style A UI with the subject accessibility requirements.
+- Seven-day family timetable with member, category, status, and domain context.
+- One `timetable_items` persistence table and Fixture seed data.
+- Three member Agent entry points using the current viewer's role-safe projection.
+- Bounded read-only intents: schedule, responsibilities, care, and help.
+- Explicit structured creation of timetable items.
+- Owner-only completion of timetable items.
+- Responsive desktop and mobile layouts with keyboard and screen-reader support.
+- Regression protection for the accepted `/demo` flow.
+- Honest labeling of the credential-free deterministic Fixture intent router.
 
-## P1 Only If P0 Is Complete
+## Deliberate Constraints
 
-- Voice input, screenshot extraction, “换个说法”, temporary caregiver absence, DND settings, real enterprise chat channels, and robot neck motion.
+- No calendar library, Agent framework, vector database, ORM, background scheduler, or global state library.
+- No transcript persistence, natural-language date parsing, recurrence, drag-and-drop, or speculative automation.
+- No LLM keys or external credentials are required for the MVP.
+- No production authentication, multi-household tenancy, or enterprise administration claims.
+- Free text is read-only. Every mutation uses explicit validated fields and authorization checks.
 
-## Out of Scope
+## Acceptance Criteria
 
-- Production auth/deployment, payment, personal WeChat automation, chat-history scraping, location tracking, medical diagnosis, dosage advice, relationship scoring, A3-Ultra, Lingxi X2, autonomous navigation, or a general family-management platform.
-
-## Truth Labels
-
-- Fixture sessions are not production authentication.
-- Fake/local A3 verification is not real-device smoke.
-- Provider acceptance is not user receipt, acknowledgement, consent, or task completion.
-- Disabled enterprise channels are not implemented integrations.
+- `/` is visibly and functionally timetable-first.
+- The Fixture exposes at least six timetable items across all three members and at least three categories.
+- Each Agent can answer supported queries from current persisted, role-safe data.
+- A valid created item survives reload and a Fixture reset restores the canonical seed.
+- Only an item's owner can complete it.
+- Selecting another member's Agent never expands the current viewer's visibility or exposes raw private evidence.
+- `/demo` remains usable and its existing core browser tests pass.
+- Unit, type, lint, build, desktop/mobile E2E, and accessibility checks pass from the final clean HEAD.
