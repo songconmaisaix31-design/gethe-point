@@ -1,0 +1,99 @@
+{
+  "fixtureId": "household_four_minute",
+  "now": "2026-08-28T12:00:00.000Z",
+  "truth": {
+    "mode": "fixture",
+    "label": "Fixture data · Not production authentication or live delivery",
+    "robotEnabled": false
+  },
+  "members": [
+    { "id": "member_primary", "displayName": "林秀", "role": "primary", "capacity": "limited" },
+    { "id": "member_partner", "displayName": "陈建国", "role": "partner", "capacity": "available" },
+    { "id": "member_subject", "displayName": "周素兰", "role": "subject", "capacity": "available" }
+  ],
+  "familyMessages": [
+    { "id": "message_family_1", "speakerId": "member_primary", "text": "今晚我加班，饭在锅里，你俩先吃" },
+    { "id": "message_family_2", "speakerId": "member_partner", "text": "行，我把碗洗了" },
+    { "id": "message_family_3", "speakerId": "member_primary", "text": "奶奶那个复查你有空顺便看一下吧" }
+  ],
+  "evidence": [
+    { "id": "evidence_subject_private", "speakerId": "member_subject", "occurredAt": "2026-08-28T08:15:00.000Z", "text": "腿又疼了，下楼有点吃力", "visibility": "self", "deleted": false },
+    { "id": "evidence_health_deadline", "speakerId": "member_primary", "occurredAt": "2026-08-20T08:00:00.000Z", "text": "医生说一个月以后复查，挂骨科", "visibility": "space", "deleted": false },
+    { "id": "evidence_health_report", "speakerId": "member_primary", "occurredAt": "2026-08-21T09:00:00.000Z", "text": "上次检查报告在客厅电视柜第二个抽屉", "visibility": "space", "deleted": false },
+    { "id": "evidence_health_meal", "speakerId": "member_subject", "occurredAt": "2026-08-21T10:00:00.000Z", "text": "复查不需要空腹，下午去更舒服", "visibility": "care_related", "deleted": false },
+    { "id": "evidence_health_hospital", "speakerId": "member_subject", "occurredAt": "2026-08-21T11:00:00.000Z", "text": "我只去市三院", "visibility": "care_related", "deleted": false },
+    { "id": "evidence_school_form", "speakerId": "member_primary", "occurredAt": "2026-08-22T08:00:00.000Z", "text": "新生体检表要在八月二十八日前交回", "visibility": "space", "deleted": false },
+    { "id": "evidence_care_medicine", "speakerId": "member_partner", "occurredAt": "2026-08-22T09:00:00.000Z", "text": "血压药一天两次，饭后吃", "visibility": "care_related", "deleted": false },
+    { "id": "evidence_home_storage", "speakerId": "member_primary", "occurredAt": "2026-08-23T08:00:00.000Z", "text": "换季衣服还没收", "visibility": "space", "deleted": false },
+    { "id": "evidence_health_contact", "speakerId": "member_primary", "occurredAt": "2026-08-23T09:00:00.000Z", "text": "市三院骨科联系人是李医生", "visibility": "care_related", "deleted": false },
+    { "id": "evidence_discussion_house", "speakerId": "member_partner", "occurredAt": "2026-08-24T08:00:00.000Z", "text": "明年是不是该考虑换个大点的房子", "visibility": "space", "deleted": false },
+    { "id": "evidence_discussion_swim", "speakerId": "member_primary", "occurredAt": "2026-08-24T09:00:00.000Z", "text": "听说隔壁孩子去学游泳了", "visibility": "space", "deleted": false }
+  ],
+  "signals": [
+    { "id": "signal_health_deadline", "evidenceId": "evidence_health_deadline", "summary": "骨科复查期限临近", "status": "confirmed" },
+    { "id": "signal_health_report", "evidenceId": "evidence_health_report", "summary": "上次报告位置已知", "status": "confirmed" },
+    { "id": "signal_health_meal", "evidenceId": "evidence_health_meal", "summary": "复查不需要空腹", "status": "confirmed" },
+    { "id": "signal_health_hospital", "evidenceId": "evidence_health_hospital", "summary": "就诊地点偏好市三院", "status": "confirmed" },
+    { "id": "signal_school_form", "evidenceId": "evidence_school_form", "summary": "体检表有明确截止日", "status": "confirmed" },
+    { "id": "signal_care_medicine", "evidenceId": "evidence_care_medicine", "summary": "血压药需要每日饭后提醒", "status": "confirmed" },
+    { "id": "signal_home_storage", "evidenceId": "evidence_home_storage", "summary": "换季衣物待收纳", "status": "confirmed" },
+    { "id": "signal_health_contact", "evidenceId": "evidence_health_contact", "summary": "骨科联系人已知", "status": "confirmed" }
+  ],
+  "discussionOnlyEvidenceIds": ["evidence_discussion_house", "evidence_discussion_swim"],
+  "domains": [
+    { "id": "domain_health", "name": "奶奶的近期健康照护", "ownerId": "member_primary", "status": "active", "nextAction": "预约市三院骨科下午号", "visibility": "care_related" },
+    { "id": "domain_school", "name": "孩子的开学准备", "ownerId": "member_primary", "status": "active", "nextAction": "八月二十八日前交回体检表", "visibility": "space" },
+    { "id": "domain_home", "name": "家里的日常补给与收纳", "ownerId": "member_primary", "status": "active", "nextAction": null, "visibility": "space" }
+  ],
+  "tasks": [
+    { "id": "task_health_booking", "domainId": "domain_health", "title": "挂市三院骨科复查号", "status": "open", "futureReminderOwnerId": "member_primary", "discoveredBy": "member_primary", "deadlineKeptBy": "member_primary", "scheduledBy": "member_primary", "executedBy": "member_primary", "followedUpBy": "member_primary" },
+    { "id": "task_health_meal", "domainId": "domain_health", "title": "确认复查是否需要空腹", "status": "open", "futureReminderOwnerId": "member_primary", "discoveredBy": "member_primary", "deadlineKeptBy": "member_primary", "scheduledBy": "member_primary", "executedBy": null, "followedUpBy": "member_primary" },
+    { "id": "task_health_report", "domainId": "domain_health", "title": "带上次检查报告", "status": "open", "futureReminderOwnerId": "member_primary", "discoveredBy": "member_primary", "deadlineKeptBy": "member_primary", "scheduledBy": "member_primary", "executedBy": null, "followedUpBy": "member_primary" },
+    { "id": "task_health_visit", "domainId": "domain_health", "title": "陪诊当天到场", "status": "open", "futureReminderOwnerId": "member_primary", "discoveredBy": "member_primary", "deadlineKeptBy": "member_primary", "scheduledBy": "member_primary", "executedBy": null, "followedUpBy": "member_primary" },
+    { "id": "task_health_followup", "domainId": "domain_health", "title": "两周后复诊预约", "status": "open", "futureReminderOwnerId": "member_primary", "discoveredBy": "member_primary", "deadlineKeptBy": "member_primary", "scheduledBy": "member_primary", "executedBy": null, "followedUpBy": "member_primary" },
+    { "id": "task_school_form", "domainId": "domain_school", "title": "交回新生体检表", "status": "open", "futureReminderOwnerId": "member_primary", "discoveredBy": "member_primary", "deadlineKeptBy": "member_primary", "scheduledBy": "member_primary", "executedBy": "member_primary", "followedUpBy": "member_primary" },
+    { "id": "task_school_supplies", "domainId": "domain_school", "title": "买齐校服与文具", "status": "open", "futureReminderOwnerId": "member_primary", "discoveredBy": "member_primary", "deadlineKeptBy": "member_primary", "scheduledBy": "member_primary", "executedBy": null, "followedUpBy": "member_primary" },
+    { "id": "task_home_storage", "domainId": "domain_home", "title": "收换季衣物", "status": "completed", "futureReminderOwnerId": null, "discoveredBy": "member_primary", "deadlineKeptBy": "member_primary", "scheduledBy": "member_primary", "executedBy": "member_partner", "followedUpBy": "member_primary" }
+  ],
+  "report": {
+    "title": "本周责任集中度",
+    "periodLabel": "2026-08-24 至 2026-08-30",
+    "neutralSummary": "本周家庭协调工作集中在一位成员身上；执行已有分担，发现、安排和跟进仍可进一步明确所有权。",
+    "excludedNeedsReviewCount": 0
+  },
+  "handover": {
+    "id": "handover_health",
+    "domainId": "domain_health",
+    "fromMemberId": "member_primary",
+    "toMemberId": "member_partner",
+    "state": "blocked",
+    "missingItems": ["last_report"],
+    "confirmedBy": [],
+    "version": 0
+  },
+  "careRule": {
+    "id": "care_rule_medicine",
+    "subjectId": "member_subject",
+    "state": "draft",
+    "scheduleLabel": "每天 20:00 饭后",
+    "acknowledgementTimeoutSeconds": 60,
+    "escalationMemberIds": ["member_partner", "member_primary"],
+    "version": 0,
+    "activationRequiresActorId": "member_subject"
+  },
+  "notificationExpectations": {
+    "initial": [],
+    "trigger": [
+      { "recipientId": "member_subject", "channel": "app", "status": "shown_in_app" },
+      { "recipientId": "member_subject", "channel": "robot_a3", "status": "disabled" }
+    ],
+    "duplicateStatus": "deduplicated",
+    "escalationOrder": ["member_partner", "member_primary"]
+  },
+  "expectedRoleEvidenceIds": {
+    "primary": ["evidence_health_deadline", "evidence_health_report", "evidence_health_meal", "evidence_health_hospital", "evidence_school_form", "evidence_care_medicine", "evidence_home_storage", "evidence_health_contact", "evidence_discussion_house", "evidence_discussion_swim"],
+    "partner": ["evidence_health_deadline", "evidence_health_report", "evidence_health_meal", "evidence_health_hospital", "evidence_school_form", "evidence_care_medicine", "evidence_home_storage", "evidence_health_contact", "evidence_discussion_house", "evidence_discussion_swim"],
+    "subject": ["evidence_subject_private", "evidence_health_deadline", "evidence_health_report", "evidence_health_meal", "evidence_health_hospital", "evidence_school_form", "evidence_care_medicine", "evidence_home_storage", "evidence_health_contact", "evidence_discussion_house", "evidence_discussion_swim"]
+  },
+  "expectedBurdenCount": { "beforeHandover": 7, "afterHandover": 2 }
+}
