@@ -10,7 +10,60 @@ import {
   MVP_CORE_DISPLAY,
   MVP_CORE_TEST_IDS,
 } from "../src/features/experience/fixture-display";
-import type { ExperienceSnapshot } from "../src/features/experience/model";
+import type {
+  ExperienceSnapshot,
+  MemberRole,
+} from "../src/features/experience/model";
+import { selectFixtureRole } from "../src/features/experience/role-selection";
+
+const MEMBER_ROLES = ["primary", "partner", "subject"] as const satisfies readonly MemberRole[];
+
+const ALL_CARDS = [
+  MVP_CORE_TEST_IDS.cards.consent,
+  MVP_CORE_TEST_IDS.cards.report,
+  MVP_CORE_TEST_IDS.cards.responsibility,
+  MVP_CORE_TEST_IDS.cards.handover,
+] as const;
+
+const ALL_ACTIONS = [
+  MVP_CORE_TEST_IDS.shareConsent,
+  MVP_CORE_TEST_IDS.noConsent,
+  MVP_CORE_TEST_IDS.publishSignal,
+  MVP_CORE_TEST_IDS.generateReport,
+  MVP_CORE_TEST_IDS.supplyHandoverInfo,
+  MVP_CORE_TEST_IDS.confirmFrom,
+  MVP_CORE_TEST_IDS.confirmTo,
+] as const;
+
+const ROLE_ACCEPTANCE = {
+  primary: {
+    surface: MVP_CORE_TEST_IDS.primarySurface,
+    cards: [MVP_CORE_TEST_IDS.cards.report, MVP_CORE_TEST_IDS.cards.handover],
+    actions: [
+      MVP_CORE_TEST_IDS.generateReport,
+      MVP_CORE_TEST_IDS.supplyHandoverInfo,
+      MVP_CORE_TEST_IDS.confirmFrom,
+    ],
+  },
+  partner: {
+    surface: MVP_CORE_TEST_IDS.partnerSurface,
+    cards: [MVP_CORE_TEST_IDS.cards.responsibility],
+    actions: [MVP_CORE_TEST_IDS.confirmTo],
+  },
+  subject: {
+    surface: MVP_CORE_TEST_IDS.subjectSurface,
+    cards: [MVP_CORE_TEST_IDS.cards.consent],
+    actions: [
+      MVP_CORE_TEST_IDS.shareConsent,
+      MVP_CORE_TEST_IDS.noConsent,
+      MVP_CORE_TEST_IDS.publishSignal,
+    ],
+  },
+} as const satisfies Readonly<Record<MemberRole, {
+  readonly surface: string;
+  readonly cards: readonly (typeof ALL_CARDS)[number][];
+  readonly actions: readonly string[];
+}>>;
 
 const initialSnapshot: ExperienceSnapshot = {
   stage: "consent",
@@ -45,12 +98,13 @@ const initialSnapshot: ExperienceSnapshot = {
 
 const renderSnapshot = (
   snapshot: ExperienceSnapshot,
+  selectedRole: MemberRole,
   commandsDisabled = false,
 ): string =>
   renderToStaticMarkup(
     createElement(ExperienceView, {
       snapshot,
-      selectedRole: "primary",
+      selectedRole,
       pendingActionId: null,
       error: null,
       commandsDisabled,
@@ -59,62 +113,106 @@ const renderSnapshot = (
     }),
   );
 
-const renderInitial = (): string => renderSnapshot(initialSnapshot);
-
 const occurrences = (input: string, value: string): number => input.split(value).length - 1;
 
-describe("reset desktop card contract", () => {
-  it("renders one truth boundary, three synchronized surfaces, and all canonical display facts", () => {
-    const html = renderInitial();
+const testId = (value: string): string => `data-testid="${value}"`;
 
-    expect(occurrences(html, "Fixture truth boundary")).toBe(1);
-    for (const label of MVP_CORE_DISPLAY.truthBadges) {
-      expect(occurrences(html, `>${label}<`)).toBe(1);
+const roleLinkTags = (html: string): readonly string[] =>
+  (html.match(/<a\b[^>]*>/g) ?? []).filter((tag) => /(?:\?|&amp;|&)role=/.test(tag));
+
+const roleFromLink = (tag: string): string | undefined =>
+  /(?:\?|&amp;|&)role=([^&"]+)/.exec(tag)?.[1];
+
+const cssVariable = (css: string, name: string): string | undefined =>
+  new RegExp(`${name}\\s*:\\s*([^;]+);`, "i").exec(css)?.[1]?.trim();
+
+const normalizeHex = (value: string | undefined): string | null => {
+  const digits = /^#([\da-f]{3}|[\da-f]{6})$/i.exec(value ?? "")?.[1];
+  if (digits === undefined) {
+    return null;
+  }
+  const expanded =
+    digits.length === 3
+      ? digits.replace(/[\da-f]/gi, (digit) => `${digit}${digit}`)
+      : digits;
+  return `#${expanded.toLowerCase()}`;
+};
+
+describe("selected-role responsive web app contract", () => {
+  it("allowlists query roles and exposes one navigation target per role", () => {
+    expect(MEMBER_ROLES.map((role) => selectFixtureRole(role))).toEqual(MEMBER_ROLES);
+    expect(selectFixtureRole(["partner", "subject"])).toBe("partner");
+    expect(selectFixtureRole(undefined)).toBe("primary");
+    expect(selectFixtureRole("administrator")).toBe("primary");
+
+    for (const selectedRole of MEMBER_ROLES) {
+      const links = roleLinkTags(renderSnapshot(initialSnapshot, selectedRole));
+      expect(links.map(roleFromLink)).toEqual(MEMBER_ROLES);
+      expect(
+        links.filter((link) => link.includes('aria-current="page"')).map(roleFromLink),
+      ).toEqual([selectedRole]);
     }
-    for (const label of Object.values(MVP_CORE_DISPLAY.contractTruthLabels)) {
+  });
+
+  it("renders only the selected role with one truthful fixture boundary", () => {
+    for (const selectedRole of MEMBER_ROLES) {
+      const html = renderSnapshot(initialSnapshot, selectedRole);
+
+      expect(occurrences(html, "Fixture truth boundary")).toBe(1);
+      expect(occurrences(html, "data-role=")).toBe(1);
+      for (const role of MEMBER_ROLES) {
+        expect(occurrences(html, testId(ROLE_ACCEPTANCE[role].surface))).toBe(
+          role === selectedRole ? 1 : 0,
+        );
+      }
+    }
+
+    const html = renderSnapshot(initialSnapshot, "primary");
+    for (const label of [
+      ...MVP_CORE_DISPLAY.truthBadges,
+      ...Object.values(MVP_CORE_DISPLAY.contractTruthLabels),
+    ]) {
       expect(occurrences(html, `>${label}<`)).toBe(1);
     }
     expect(html).toContain(MVP_CORE_DISPLAY.fictionalNotice);
-    expect(html).toContain(MVP_CORE_DISPLAY.privateMessage);
-    expect(html).toContain(MVP_CORE_DISPLAY.memberNames.primary);
-    expect(html).toContain(MVP_CORE_DISPLAY.memberNames.partner);
-    expect(html).toContain(MVP_CORE_DISPLAY.memberNames.subject);
-    expect(occurrences(html, "data-role=")).toBe(3);
-    expect(html).toContain(`data-testid="${MVP_CORE_TEST_IDS.subjectSurface}"`);
-    expect(html).toContain(`data-testid="${MVP_CORE_TEST_IDS.primarySurface}"`);
-    expect(html).toContain(`data-testid="${MVP_CORE_TEST_IDS.partnerSurface}"`);
   });
 
-  it("renders exactly one of each deep card with ordered title, content, state, and actions zones", () => {
-    const html = renderInitial();
+  it("keeps cards, actions, and private content inside their owning role", () => {
+    for (const selectedRole of MEMBER_ROLES) {
+      const html = renderSnapshot(initialSnapshot, selectedRole);
+      const acceptance = ROLE_ACCEPTANCE[selectedRole];
 
-    for (const card of Object.values(MVP_CORE_TEST_IDS.cards)) {
-      const positions = [card.root, card.title, card.content, card.state, card.actions].map(
-        (testId) => html.indexOf(`data-testid="${testId}"`),
-      );
-      expect(positions.every((position) => position >= 0)).toBe(true);
-      expect(positions).toEqual([...positions].sort((left, right) => left - right));
-      expect(occurrences(html, `data-testid="${card.root}"`)).toBe(1);
+      for (const card of ALL_CARDS) {
+        expect(occurrences(html, testId(card.root))).toBe(
+          acceptance.cards.some((ownedCard) => ownedCard.root === card.root) ? 1 : 0,
+        );
+      }
+      for (const action of ALL_ACTIONS) {
+        expect(occurrences(html, testId(action))).toBe(
+          acceptance.actions.some((ownedAction) => ownedAction === action) ? 1 : 0,
+        );
+      }
+
+      const privateCount = selectedRole === "subject" ? 1 : 0;
+      expect(occurrences(html, testId(MVP_CORE_TEST_IDS.privateMessage))).toBe(privateCount);
+      expect(occurrences(html, MVP_CORE_DISPLAY.privateMessage)).toBe(privateCount);
     }
   });
 
-  it("keeps reset actions in their owned role surfaces and separates consent from publish", () => {
-    const html = renderInitial();
-    const primaryStart = html.indexOf(`data-testid="${MVP_CORE_TEST_IDS.primarySurface}"`);
-    const partnerStart = html.indexOf(`data-testid="${MVP_CORE_TEST_IDS.partnerSurface}"`);
-    const subjectStart = html.indexOf(`data-testid="${MVP_CORE_TEST_IDS.subjectSurface}"`);
-
-    expect(html.indexOf(`data-testid="${MVP_CORE_TEST_IDS.supplyHandoverInfo}"`)).toBeGreaterThan(primaryStart);
-    expect(html.indexOf(`data-testid="${MVP_CORE_TEST_IDS.confirmTo}"`)).toBeGreaterThan(partnerStart);
-    expect(html.indexOf(`data-testid="${MVP_CORE_TEST_IDS.shareConsent}"`)).toBeGreaterThan(subjectStart);
-    expect(html).toContain(">补齐上次检查结果<");
-    expect(html).toContain(">告诉家里人<");
-    expect(html).toContain(">先别说<");
-    expect(html).toContain(">只告诉指定成员<");
-    expect(html).toContain(`data-testid="${MVP_CORE_TEST_IDS.publishSignal}"`);
+  it("orders each owned card as title, content, state, then actions", () => {
+    for (const selectedRole of MEMBER_ROLES) {
+      const html = renderSnapshot(initialSnapshot, selectedRole);
+      for (const card of ROLE_ACCEPTANCE[selectedRole].cards) {
+        const positions = [card.root, card.title, card.content, card.state, card.actions].map(
+          (marker) => html.indexOf(testId(marker)),
+        );
+        expect(positions.every((position) => position >= 0)).toBe(true);
+        expect(positions).toEqual([...positions].sort((left, right) => left - right));
+      }
+    }
   });
 
-  it("renders both confirmations while atomic system acceptance is still pending", async () => {
+  it("keeps atomic acceptance facts in their owning roles", async () => {
     const client = createHttpExperienceClient({
       fetch: () => Promise.resolve(Response.json({
         ...initialSnapshot.server,
@@ -131,50 +229,60 @@ describe("reset desktop card contract", () => {
         },
       })),
     });
+    const snapshot = await client.load();
+    const primaryHtml = renderSnapshot(snapshot, "primary");
+    const partnerHtml = renderSnapshot(snapshot, "partner");
 
-    const html = renderSnapshot(await client.load());
-
-    expect(html).toContain("双方已确认，等待系统完成交接");
-    expect(html).toContain("系统完成原子接受前，负责人和提醒仍保持原归属");
-    expect(html).toContain(
-      `data-testid="${MVP_CORE_TEST_IDS.handoverStatus}">awaiting_confirmations`,
-    );
-    expect(html).toContain(
-      `data-testid="${MVP_CORE_TEST_IDS.fromConfirmation}">confirmed`,
-    );
-    expect(html).toContain(
-      `data-testid="${MVP_CORE_TEST_IDS.toConfirmation}">confirmed`,
-    );
+    expect(primaryHtml).toContain("双方已确认，等待系统完成交接");
+    expect(primaryHtml).toContain("系统完成原子接受前，负责人和提醒仍保持原归属");
+    expect(primaryHtml).toContain(`${testId(MVP_CORE_TEST_IDS.handoverStatus)}>awaiting_confirmations`);
+    expect(primaryHtml).toContain(`${testId(MVP_CORE_TEST_IDS.fromConfirmation)}>confirmed`);
+    expect(primaryHtml).toContain(`${testId(MVP_CORE_TEST_IDS.toConfirmation)}>confirmed`);
+    expect(primaryHtml).not.toContain(testId(MVP_CORE_TEST_IDS.confirmTo));
+    expect(partnerHtml).toContain(testId(MVP_CORE_TEST_IDS.confirmTo));
+    expect(partnerHtml).not.toContain(testId(MVP_CORE_TEST_IDS.handoverStatus));
   });
 
-  it("disables every write action while a reload is pending", () => {
-    const buttonTags = renderSnapshot(initialSnapshot, true).match(/<button\b[^>]*>/g) ?? [];
+  it("disables selected-role writes while a reload is pending", () => {
+    for (const selectedRole of MEMBER_ROLES) {
+      const actionButtons = (renderSnapshot(initialSnapshot, selectedRole, true)
+        .match(/<button\b[^>]*>/g) ?? [])
+        .filter((tag) => /\bclass="[^"]*\baction-button\b/.test(tag));
 
-    expect(buttonTags.length).toBeGreaterThan(0);
-    expect(buttonTags.every((tag) => tag.includes("disabled=\"\""))).toBe(true);
+      expect(actionButtons.length).toBeGreaterThan(0);
+      expect(actionButtons.every((tag) => tag.includes('disabled=""'))).toBe(true);
+    }
   });
 
-  it("exposes exact Style A aliases, deep geometry, compact rail, and no remote assets", async () => {
+  it("keeps Style A and responsive app-shell CSS without phone showcase assumptions", async () => {
     const css = await readFile(new URL("../src/app/globals.css", import.meta.url), "utf8");
-
+    const compactCss = css.replace(/\s+/g, " ");
     const aliases = [
-      ["--style-a-background", "#F4F1EA"],
-      ["--style-a-surface", "#FFFFFF"],
-      ["--style-a-text", "#1F1C17"],
-      ["--style-a-primary", "#33513F"],
-      ["--style-a-accent", "#8A5A3B"],
-      ["--style-a-warning", "#9C4E22"],
+      ["--style-a-background", "#f4f1ea"],
+      ["--style-a-surface", "#ffffff"],
+      ["--style-a-text", "#1f1c17"],
+      ["--style-a-primary", "#33513f"],
+      ["--style-a-accent", "#8a5a3b"],
+      ["--style-a-warning", "#9c4e22"],
     ] as const;
-    for (const [name, value] of aliases) {
-      expect(css).toContain(`${name}: ${value}`);
+
+    for (const [name, expected] of aliases) {
+      expect(normalizeHex(cssVariable(css, name))).toBe(expected);
     }
-    expect(css).toContain("grid-template-columns: 250px minmax(0, 1fr)");
-    expect(css).toContain("grid-template-columns: repeat(3, minmax(0, 304px))");
-    expect(css).toContain("padding: 18px 16px");
-    expect(css).toContain("gap: 8px");
-    for (const height of [240, 260, 300]) {
-      expect(css).toContain(`min-height: ${String(height)}px`);
+    for (const minHeight of [240, 260, 300]) {
+      expect(compactCss).toContain(`min-height: ${String(minHeight)}px`);
     }
-    expect(css).not.toMatch(/@import|url\(|fonts\.googleapis|fonts\.gstatic/i);
+
+    expect(compactCss).toMatch(/:focus-visible[^}]*outline:\s*(?:[2-9]|\d{2,})px solid[^}]*outline-offset:\s*[1-9]\d*px/i);
+    expect(css).toMatch(/@media\s*\(\s*prefers-reduced-motion\s*:\s*reduce\s*\)[\s\S]*(?:animation:\s*none|transition-duration:\s*0\.0?1ms)/i);
+    expect(css).not.toMatch(/@import\b|url\(\s*["']?(?:https?:)?\/\/|fonts\.googleapis|fonts\.gstatic/i);
+
+    expect(compactCss).toMatch(/\.fixture-shell\s*\{[^}]*height:\s*100dvh/i);
+    expect(compactCss).toMatch(/\.fixture-layout\s*\{[^}]*grid-template-columns:\s*(?:minmax|clamp)\([^;]+\)\s+minmax\(0,\s*1fr\)/i);
+    expect(compactCss).toMatch(/\.role-grid\s*\{[^}]*grid-template-columns:\s*(?:minmax\(0,\s*1fr\)|1fr)/i);
+    expect(css).toMatch(/@media\s*\(\s*max-width:\s*[5-9]\d{2}px\s*\)[\s\S]*?\.fixture-layout\s*\{[^}]*?(?:display:\s*block|grid-template-columns:\s*1fr)/i);
+
+    expect(css).not.toMatch(/\b304px\b|repeat\(3\s*,\s*minmax\(0\s*,/i);
+    expect(compactCss).not.toMatch(/\.role-device\s*\{[^}]*(?:border:\s*8px solid|border-radius:\s*30px|#171612)/i);
   });
 });
