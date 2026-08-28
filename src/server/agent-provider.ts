@@ -5,7 +5,7 @@ const DEFAULT_MODEL = "step-2-mini";
 const DEFAULT_TIMEOUT_MS = 3_000;
 const MAX_REQUEST_BYTES = 8_192;
 const MAX_RESPONSE_BYTES = 16_384;
-const MAX_PROVIDER_TEXT_CHARS = 720;
+const MAX_PROVIDER_TEXT_CHARS = 500;
 const MAX_PROVIDER_TEXT_BYTES = 2_048;
 
 export interface AgentProviderTimetableItem {
@@ -17,7 +17,6 @@ export interface AgentProviderTimetableItem {
 }
 
 export interface AgentProviderRequest {
-  readonly question: string;
   readonly targetDisplayName: string;
   readonly intent: AgentIntent;
   readonly deterministicAnswer: string;
@@ -139,11 +138,24 @@ export function createStepFunAgentProvider(
           {
             role: "system",
             content:
-              "Rewrite the deterministic answer in concise Chinese using only the supplied facts. Do not add facts, identifiers, actions, authorization decisions, or private details.",
+              "Rewrite the deterministic answer in concise Chinese using only the supplied facts. Do not diagnose, blame anyone, invent facts, add identifiers, add actions, make authorization decisions, or include private details.",
           },
           {
             role: "user",
-            content: JSON.stringify(request),
+            content: JSON.stringify({
+              targetDisplayName: request.targetDisplayName,
+              intent: request.intent,
+              deterministicAnswer: request.deterministicAnswer,
+              visibleTimetable: request.visibleTimetable.map((item) => ({
+                title: item.title,
+                startsAt: item.startsAt,
+                endsAt: item.endsAt,
+                category: item.category,
+                status: item.status,
+              })),
+              visibleResponsibilityCount: request.visibleResponsibilityCount,
+              visibleCareRuleCount: request.visibleCareRuleCount,
+            }),
           },
         ],
         max_tokens: 180,

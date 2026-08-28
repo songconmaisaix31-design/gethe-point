@@ -9,7 +9,6 @@ const PRIVATE_EVIDENCE = "腿又疼了，下楼有点吃力";
 const SECRET = "test-secret-must-not-leak";
 
 const request: AgentProviderRequest = {
-  question: "请查看今天的日程安排",
   targetDisplayName: "周素兰",
   intent: "schedule",
   deterministicAnswer: "周素兰当前有 1 项可见日程：晚间用药。",
@@ -39,10 +38,14 @@ test("StepFun sends one bounded request to the fixed endpoint and validates text
     });
   }) as typeof fetch;
 
+  const requestWithUnexpectedPrivateField = {
+    ...request,
+    privateEvidence: PRIVATE_EVIDENCE,
+  } as AgentProviderRequest;
   const result = await createStepFunAgentProvider({
     apiKey: SECRET,
     fetchImpl,
-  }).rewrite(request);
+  }).rewrite(requestWithUnexpectedPrivateField);
 
   assert.equal(result, "今晚有一项可见的用药安排。");
   assert.equal(calls, 1);
@@ -54,7 +57,8 @@ test("StepFun sends one bounded request to the fixed endpoint and validates text
   assert.equal(body.model, "step-2-mini");
   assert.equal(body.max_tokens, 180);
   assert.equal(body.messages.length, 2);
-  assert.equal(outboundBody.includes(request.question), true);
+  assert.match(body.messages[0]?.content ?? "", /Do not diagnose, blame anyone, invent facts/);
+  assert.match(body.messages[0]?.content ?? "", /add actions/);
   assert.equal(outboundBody.includes(PRIVATE_EVIDENCE), false);
   assert.equal(outboundBody.includes(SECRET), false);
   assert.equal(outboundBody.includes("evidence_"), false);
@@ -121,7 +125,7 @@ test("StepFun falls back once for network, HTTP, JSON, empty, and oversized fail
     },
     {
       name: "oversized text",
-      response: async () => Response.json({ choices: [{ message: { content: "答".repeat(721) } }] }),
+      response: async () => Response.json({ choices: [{ message: { content: "答".repeat(501) } }] }),
     },
     {
       name: "oversized response body",

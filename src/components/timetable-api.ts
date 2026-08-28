@@ -42,7 +42,7 @@ export interface AgentResponse {
   readonly text: string;
   readonly referencedItemIds: readonly string[];
   readonly suggestedActions: readonly ("view_timetable" | "add_item" | "open_demo")[];
-  readonly engine: "fixture_intent_router";
+  readonly engine: "stepfun" | "fixture_intent_router";
 }
 
 export interface CreateTimetableItem {
@@ -135,7 +135,7 @@ function isAgentResponse(value: unknown): value is AgentResponse {
     value.suggestedActions.every((item) =>
       ["view_timetable", "add_item", "open_demo"].includes(String(item)),
     ) &&
-    value.engine === "fixture_intent_router"
+    (value.engine === "stepfun" || value.engine === "fixture_intent_router")
   );
 }
 

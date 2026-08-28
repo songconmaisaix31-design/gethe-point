@@ -53,10 +53,12 @@ describe("timetable contracts and seed", () => {
   test("seeds six canonical items across every member and category", () => {
     const { database } = fixture();
     const rows = database
-      .prepare("SELECT owner_id, category FROM timetable_items")
+      .prepare("SELECT owner_id, category, starts_at, ends_at FROM timetable_items")
       .all() as unknown as readonly {
         readonly owner_id: string;
         readonly category: string;
+        readonly starts_at: string;
+        readonly ends_at: string;
       }[];
 
     assert.equal(rows.length, 6);
@@ -67,6 +69,10 @@ describe("timetable contracts and seed", () => {
     assert.deepEqual(
       [...new Set(rows.map((item) => item.category))].sort(),
       ["care", "family", "responsibility"],
+    );
+    assert.equal(
+      rows.every((item) => item.starts_at.endsWith("Z") && item.ends_at.endsWith("Z")),
+      true,
     );
   });
 });
@@ -92,6 +98,7 @@ describe("timetable persistence and authorization", () => {
     assert.ok(item);
     assert.equal(item.ownerId, "member_subject");
     assert.equal(item.visibility, "household");
+    assert.equal(item.startsAt, "2026-08-29T11:00:00.000Z");
     assert.equal(item.endsAt, "2026-08-29T11:30:00.000Z");
 
     const reloaded = createDemoService(database).getState({ role: "primary" });
@@ -207,6 +214,19 @@ describe("timetable persistence and authorization", () => {
       hasCode("conflict"),
     );
   });
+
+  test("returns the same not-found result for hidden and missing timetable items", async () => {
+    const { service } = fixture();
+    for (const itemId of ["timetable_school_form", "timetable_missing"]) {
+      await assert.rejects(
+        service.execute(
+          { role: "partner" },
+          { type: "complete_timetable_item", itemId },
+        ),
+        hasCode("not_found"),
+      );
+    }
+  });
 });
 
 describe("Fixture member Agent", () => {
@@ -227,7 +247,7 @@ describe("Fixture member Agent", () => {
       { role: "subject" },
       {
         targetMemberId: "member_subject",
-        message: "请查看照护安排",
+        message: "只在这次对话里说的私密症状",
         intentHint: "care",
       },
     );
@@ -246,6 +266,7 @@ describe("Fixture member Agent", () => {
     assert.deepEqual(before, after);
     const serializedRequest = JSON.stringify(providerRequest);
     assert.equal(serializedRequest.includes("腿又疼了，下楼有点吃力"), false);
+    assert.equal(serializedRequest.includes("只在这次对话里说的私密症状"), false);
     assert.equal(serializedRequest.includes("evidence_subject_private"), false);
     assert.equal(serializedRequest.includes("notificationLogs"), false);
     assert.equal(serializedRequest.includes("member_subject"), false);
@@ -254,7 +275,7 @@ describe("Fixture member Agent", () => {
   test("invalid or throwing injected providers retain the deterministic response", async () => {
     const invalidService = createDemoService(createDemoDatabase(), [], {
       async rewrite(): Promise<unknown> {
-        return "答".repeat(721);
+        return "答".repeat(501);
       },
     });
     const throwingService = createDemoService(createDemoDatabase(), [], {

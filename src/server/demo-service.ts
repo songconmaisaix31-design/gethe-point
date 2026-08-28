@@ -501,7 +501,6 @@ export function createDemoService(
     }
 
     const providerRequest: AgentProviderRequest = {
-      question: request.message,
       targetDisplayName: target.displayName,
       intent,
       deterministicAnswer: text,
@@ -616,7 +615,7 @@ export function createDemoService(
         .run(
           itemId,
           title,
-          action.startsAt,
+          new Date(startsAtMs).toISOString(),
           new Date(endsAtMs).toISOString(),
           action.category,
           action.ownerId,
@@ -635,7 +634,11 @@ export function createDemoService(
   function completeTimetableItem(actorId: string, itemId: string): void {
     transaction(() => {
       const item = row<TimetableRow>(
-        database.prepare("SELECT * FROM timetable_items WHERE id = ?").get(itemId),
+        database
+          .prepare(
+            "SELECT * FROM timetable_items WHERE id = ? AND (visibility = 'household' OR owner_id = ?)",
+          )
+          .get(itemId, actorId),
       );
       assertDomain(item, "not_found", "The timetable item is unavailable.");
       assertDomain(

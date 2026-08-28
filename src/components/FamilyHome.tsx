@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { Role } from "../contracts";
 import {
@@ -28,14 +28,36 @@ const CATEGORY_LABELS: Readonly<Record<TimetableCategory, string>> = {
   care: "照护",
   family: "家庭",
 };
+const STATUS_LABELS = {
+  planned: "计划中",
+  completed: "已完成",
+} as const;
 const QUICK_QUERIES: readonly { label: string; message: string; intent: AgentIntent }[] = [
   { label: "看日程", message: "这周有什么安排？", intent: "schedule" },
   { label: "看责任", message: "现在有哪些责任需要留意？", intent: "responsibilities" },
   { label: "看照护", message: "有哪些照护安排？", intent: "care" },
 ];
+const SHANGHAI_TIME_ZONE = "Asia/Shanghai";
+const SHANGHAI_DATE_FORMAT = new Intl.DateTimeFormat("en-CA", {
+  timeZone: SHANGHAI_TIME_ZONE,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+const SHANGHAI_TIME_FORMAT = new Intl.DateTimeFormat("zh-CN", {
+  timeZone: SHANGHAI_TIME_ZONE,
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+});
 
-function isoDay(value: string): string {
-  return value.slice(0, 10);
+function shanghaiDay(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value.slice(0, 10);
+  const parts = SHANGHAI_DATE_FORMAT.formatToParts(date);
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((item) => item.type === type)?.value ?? "";
+  return `${part("year")}-${part("month")}-${part("day")}`;
 }
 
 function addUtcDays(day: string, amount: number): string {
@@ -45,7 +67,7 @@ function addUtcDays(day: string, amount: number): string {
 }
 
 function weekDays(now: string): readonly string[] {
-  const today = isoDay(now);
+  const today = shanghaiDay(now);
   const date = new Date(`${today}T00:00:00Z`);
   const offset = (date.getUTCDay() + 6) % 7;
   const monday = addUtcDays(today, -offset);
@@ -61,8 +83,16 @@ function dayLabel(day: string): { readonly weekday: string; readonly date: strin
 }
 
 function timeLabel(value: string): string {
-  const match = value.match(/T(\d{2}):(\d{2})/);
-  return match ? `${match[1]}:${match[2]}` : value;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : SHANGHAI_TIME_FORMAT.format(date);
+}
+
+function serializeShanghaiDateTimeLocal(value: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value);
+  if (!match) {
+    throw new TimetableApiError("请选择有效的开始时间。", "invalid_request");
+  }
+  return `${match[1]}-${match[2]}-${match[3]}T${match[4]}:${match[5]}:00+08:00`;
 }
 
 function apiMessage(error: unknown, fallback: string): string {
@@ -86,37 +116,45 @@ export function FamilyHome() {
   const [selectedAgentId, setSelectedAgentId] = useState("member_primary");
   const [message, setMessage] = useState("");
   const [agentResponse, setAgentResponse] = useState<AgentResponse | null>(null);
+  const requestVersion = useRef(0);
 
   const load = useCallback(async (nextRole: Role) => {
+    const version = ++requestVersion.current;
     setLoading(true);
     setError(null);
     try {
       const nextState = await getTimetableState(nextRole);
+      if (version !== requestVersion.current) return;
       setState(nextState);
       const viewer = nextState.members.find((member) => member.role === nextRole);
       if (viewer) setSelectedAgentId(viewer.id);
     } catch (caught: unknown) {
-      setError(apiMessage(caught, "家庭日程暂时无法加载。"));
+      if (version === requestVersion.current) {
+        setError(apiMessage(caught, "家庭日程暂时无法加载。"));
+      }
     } finally {
-      setLoading(false);
+      if (version === requestVersion.current) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
     let cancelled = false;
+    const version = ++requestVersion.current;
 
     void getTimetableState(role)
       .then((nextState) => {
-        if (cancelled) return;
+        if (cancelled || version !== requestVersion.current) return;
         setState(nextState);
         const nextViewer = nextState.members.find((member) => member.role === role);
         if (nextViewer) setSelectedAgentId(nextViewer.id);
       })
       .catch((caught: unknown) => {
-        if (!cancelled) setError(apiMessage(caught, "家庭日程暂时无法加载。"));
+        if (!cancelled && version === requestVersion.current) {
+          setError(apiMessage(caught, "家庭日程暂时无法加载。"));
+        }
       })
       .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (!cancelled && version === requestVersion.current) setLoading(false);
       });
 
     return () => {
@@ -133,43 +171,57 @@ export function FamilyHome() {
         (categoryFilter === null || item.category === categoryFilter),
     );
   }, [categoryFilter, memberFilter, state]);
-  const selectedItem = state?.timetableItems.find(({ id }) => id === selectedItemId) ?? null;
+  const selectedItem = filteredItems.find(({ id }) => id === selectedItemId) ?? null;
   const selectedAgent = state?.members.find(({ id }) => id === selectedAgentId) ?? state?.members[0];
   const viewer = state?.members.find((member) => member.role === role);
 
-  async function runAction(label: string, action: Parameters<typeof postTimetableAction>[1]) {
+  async function runAction(
+    label: string,
+    action: Parameters<typeof postTimetableAction>[1],
+  ): Promise<boolean> {
+    const version = requestVersion.current;
     setPending(action.type === "complete_timetable_item" ? action.itemId : action.type);
     setError(null);
     setNotice(null);
     try {
-      setState(await postTimetableAction(role, action));
+      const nextState = await postTimetableAction(role, action);
+      if (version !== requestVersion.current) return false;
+      setState(nextState);
       setNotice(label);
+      return true;
     } catch (caught: unknown) {
-      setError(apiMessage(caught, "日程操作没有完成。"));
+      if (version === requestVersion.current) {
+        setError(apiMessage(caught, "日程操作没有完成。"));
+      }
+      return false;
     } finally {
-      setPending(null);
+      if (version === requestVersion.current) setPending(null);
     }
   }
 
   async function sendAgentQuery(nextMessage: string, intentHint?: AgentIntent) {
     const trimmed = nextMessage.trim();
     if (!selectedAgent || trimmed.length === 0) return;
+    const version = requestVersion.current;
+    const targetMemberId = selectedAgent.id;
     setPending("agent");
     setError(null);
     setAgentResponse(null);
     try {
-      setAgentResponse(
-        await queryMemberAgent(role, {
-          targetMemberId: selectedAgent.id,
-          message: trimmed,
-          ...(intentHint ? { intentHint } : {}),
-        }),
-      );
+      const response = await queryMemberAgent(role, {
+        targetMemberId,
+        message: trimmed,
+        ...(intentHint ? { intentHint } : {}),
+      });
+      if (version !== requestVersion.current) return;
+      setAgentResponse(response);
       setMessage("");
     } catch (caught: unknown) {
-      setError(apiMessage(caught, "成员 Agent 暂时无法回答。"));
+      if (version === requestVersion.current) {
+        setError(apiMessage(caught, "成员 Agent 暂时无法回答。"));
+      }
     } finally {
-      setPending(null);
+      if (version === requestVersion.current) setPending(null);
     }
   }
 
@@ -178,19 +230,28 @@ export function FamilyHome() {
     void sendAgentQuery(message);
   }
 
-  function submitItem(event: FormEvent<HTMLFormElement>) {
+  async function submitItem(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const domainId = String(form.get("domainId") ?? "");
-    void runAction("日程已添加，并同步到本周安排。", {
+    let startsAt: string;
+    try {
+      startsAt = serializeShanghaiDateTimeLocal(String(form.get("startsAt") ?? ""));
+    } catch (caught: unknown) {
+      setError(apiMessage(caught, "请选择有效的开始时间。"));
+      return;
+    }
+    const created = await runAction("日程已添加，并同步到本周安排。", {
       type: "create_timetable_item",
       ownerId: String(form.get("ownerId") ?? ""),
       title: String(form.get("title") ?? "").trim(),
-      startsAt: new Date(String(form.get("startsAt") ?? "")).toISOString(),
+      startsAt,
       durationMinutes: Number(form.get("durationMinutes")),
       category: String(form.get("category")) as TimetableCategory,
       ...(domainId ? { domainId } : {}),
     });
+    if (created) formElement.reset();
   }
 
   return (
@@ -200,7 +261,7 @@ export function FamilyHome() {
           <Image src="/dujide-logo-roof-ink.svg" alt="" width={54} height={42} priority />
           <span>都记得<small>We Remember</small></span>
         </a>
-        <p className="fixture-note"><strong>本地 Fixture</strong><span>确定性意图路由器 · 非实时大模型</span></p>
+        <p className="fixture-note"><strong>本地 Fixture</strong><span>确定性核心 · StepFun 可选文本改写</span></p>
         <Link className="demo-link" href="/demo" data-testid="open-demo">打开四分钟演示</Link>
       </header>
 
@@ -214,11 +275,15 @@ export function FamilyHome() {
                 key={item}
                 type="button"
                 aria-pressed={role === item}
-                disabled={loading}
+                disabled={loading || pending !== null}
                 onClick={() => {
+                  if (role === item) return;
+                  requestVersion.current += 1;
                   setLoading(true);
                   setError(null);
+                  setState(null);
                   setRole(item);
+                  setSelectedItemId(null);
                   setAgentResponse(null);
                   setNotice(null);
                 }}
@@ -249,7 +314,7 @@ export function FamilyHome() {
         {notice ? <p className="home-alert" role="status">{notice}</p> : null}
         {loading && !state ? <div className="home-loading" role="status"><span aria-hidden="true" />正在读取家庭日程…</div> : null}
 
-        {state ? (
+        {state?.role === role ? (
           <div className="home-layout">
             <section className="timetable-panel" aria-labelledby="week-title">
               <div className="panel-heading">
@@ -281,8 +346,8 @@ export function FamilyHome() {
                 {days.map((day) => {
                   const label = dayLabel(day);
                   const items = filteredItems
-                    .filter((item) => isoDay(item.startsAt) === day)
-                    .sort((left, right) => left.startsAt.localeCompare(right.startsAt));
+                    .filter((item) => shanghaiDay(item.startsAt) === day)
+                    .sort((left, right) => Date.parse(left.startsAt) - Date.parse(right.startsAt));
                   return (
                     <section className="timetable-day" key={day} data-testid={`timetable-day-${day}`} aria-labelledby={`day-${day}`}>
                       <header><strong id={`day-${day}`}>{label.weekday}</strong><span>{label.date}</span></header>
@@ -298,7 +363,7 @@ export function FamilyHome() {
                           >
                             <time dateTime={item.startsAt}>{timeLabel(item.startsAt)}</time>
                             <strong>{item.title}</strong>
-                            <span>{memberName(state, item.ownerId)} · {CATEGORY_LABELS[item.category]}</span>
+                            <span>{memberName(state, item.ownerId)} · {CATEGORY_LABELS[item.category]} · {STATUS_LABELS[item.status]}</span>
                           </button>
                         ))}
                         {items.length === 0 ? <p className="day-empty">暂无安排</p> : null}
@@ -332,6 +397,7 @@ export function FamilyHome() {
                     type="button"
                     data-testid={`member-agent-${member.id}`}
                     aria-pressed={selectedAgent?.id === member.id}
+                    disabled={pending === "agent"}
                     onClick={() => { setSelectedAgentId(member.id); setAgentResponse(null); }}
                   >
                     <span aria-hidden="true">{member.displayName.slice(-1)}</span>
@@ -363,11 +429,11 @@ export function FamilyHome() {
 
               <div className="agent-response" data-testid="agent-response" aria-live="polite">
                 {agentResponse ? (
-                  <><p>{agentResponse.text}</p><small>回答引擎：Fixture intent router · {agentResponse.intent}</small></>
+                  <><p>{agentResponse.text}</p><small>回答引擎：{agentResponse.engine === "stepfun" ? "StepFun" : "Fixture 意图路由器"} · {agentResponse.intent}</small></>
                 ) : <p>可以查询日程、责任与照护信息。自由文本不会新增、完成或修改任何事项。</p>}
               </div>
 
-              <AddItemForm state={state} viewerId={viewer?.id ?? ""} selectedAgentId={selectedAgent?.id ?? ""} pending={pending === "create_timetable_item"} onSubmit={submitItem} />
+              <AddItemForm key={`${state.role}:${selectedAgent?.id ?? ""}`} state={state} viewerId={viewer?.id ?? ""} selectedAgentId={selectedAgent?.id ?? ""} pending={pending === "create_timetable_item"} onSubmit={submitItem} />
             </aside>
           </div>
         ) : null}
@@ -392,7 +458,7 @@ function ItemDetail({
     <article className="item-detail" aria-live="polite">
       <div><p className="eyebrow">安排详情</p><h3>{item.title}</h3></div>
       <dl>
-        <div><dt>时间</dt><dd>{isoDay(item.startsAt)} {timeLabel(item.startsAt)}–{timeLabel(item.endsAt)}</dd></div>
+        <div><dt>时间</dt><dd>{shanghaiDay(item.startsAt)} {timeLabel(item.startsAt)}–{timeLabel(item.endsAt)}</dd></div>
         <div><dt>负责人</dt><dd>{memberName(state, item.ownerId)}</dd></div>
         <div><dt>类别</dt><dd>{CATEGORY_LABELS[item.category]}</dd></div>
         <div><dt>责任域</dt><dd>{domain?.name ?? "未关联"}</dd></div>
@@ -421,19 +487,32 @@ function AddItemForm({
 }) {
   const ownerOptions = state.role === "subject" ? state.members.filter(({ id }) => id === viewerId) : state.members;
   const defaultOwner = ownerOptions.some(({ id }) => id === selectedAgentId) ? selectedAgentId : viewerId;
+  const [ownerId, setOwnerId] = useState(defaultOwner);
+  const [category, setCategory] = useState<TimetableCategory>("family");
+
+  function selectOwner(nextOwnerId: string) {
+    setOwnerId(nextOwnerId);
+    if (nextOwnerId !== viewerId && category === "responsibility") {
+      setCategory("family");
+    }
+  }
+
   return (
     <details className="add-item" open>
       <summary>添加一项明确安排</summary>
-      <form data-testid="add-item-form" onSubmit={onSubmit}>
-        <label>事项名称<input name="title" required maxLength={80} placeholder="例如：晚间用药" /></label>
+      <form data-testid="add-item-form" aria-label="添加家庭日程" onSubmit={onSubmit}>
+        <label htmlFor="timetable-title">事项名称</label>
+        <input id="timetable-title" name="title" required maxLength={80} placeholder="例如：晚间用药" />
         <div className="form-row">
-          <label>负责人<select name="ownerId" key={defaultOwner} defaultValue={defaultOwner} required>{ownerOptions.map((member) => <option key={member.id} value={member.id}>{member.displayName}</option>)}</select></label>
-          <label>类别<select name="category" defaultValue="family"><option value="family">家庭</option><option value="care">照护</option><option value="responsibility">责任</option></select></label>
+          <label htmlFor="timetable-owner">负责人<select id="timetable-owner" name="ownerId" value={ownerId} required onChange={(event) => selectOwner(event.target.value)}>{ownerOptions.map((member) => <option key={member.id} value={member.id}>{member.displayName}</option>)}</select></label>
+          <label htmlFor="timetable-category">类别<select id="timetable-category" name="category" value={category} onChange={(event) => setCategory(event.target.value as TimetableCategory)}><option value="family">家庭</option><option value="care">照护</option><option value="responsibility" disabled={ownerId !== viewerId}>责任</option></select></label>
         </div>
-        <label>开始时间<input name="startsAt" type="datetime-local" required /></label>
+        <label htmlFor="timetable-start">开始时间</label>
+        <input id="timetable-start" name="startsAt" type="datetime-local" min="2026-08-24T00:00" max="2026-08-30T23:45" aria-describedby="timetable-timezone" required />
+        <small id="timetable-timezone">北京时间（UTC+8）</small>
         <div className="form-row">
-          <label>时长<select name="durationMinutes" defaultValue="30"><option value="15">15 分钟</option><option value="30">30 分钟</option><option value="60">1 小时</option><option value="120">2 小时</option></select></label>
-          <label>责任域<select name="domainId" defaultValue=""><option value="">不关联</option>{state.domains.map((domain) => <option key={domain.id} value={domain.id}>{domain.name}</option>)}</select></label>
+          <label htmlFor="timetable-duration">时长<select id="timetable-duration" name="durationMinutes" defaultValue="30"><option value="15">15 分钟</option><option value="30">30 分钟</option><option value="60">1 小时</option><option value="120">2 小时</option></select></label>
+          <label htmlFor="timetable-domain">责任域<select id="timetable-domain" name="domainId" defaultValue=""><option value="">不关联</option>{state.domains.map((domain) => <option key={domain.id} value={domain.id}>{domain.name}</option>)}</select></label>
         </div>
         <button type="submit" disabled={pending}>{pending ? "正在添加…" : "添加到日程"}</button>
       </form>

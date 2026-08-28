@@ -127,12 +127,12 @@ const SCHEMA = `
 `;
 
 const TIMETABLE_SEED_STATEMENT = `INSERT INTO timetable_items VALUES
-  ('timetable_school_form', '交回新生体检表', '2026-08-28T09:00:00+08:00', '2026-08-28T09:30:00+08:00', 'responsibility', 'member_primary', 'domain_school', 'planned', 'self', 'member_primary', '2026-08-28T12:00:00.000Z', NULL),
-  ('timetable_family_dinner', '家庭晚餐', '2026-08-28T18:30:00+08:00', '2026-08-28T19:30:00+08:00', 'family', 'member_partner', 'domain_home', 'planned', 'household', 'member_partner', '2026-08-28T12:00:00.000Z', NULL),
-  ('timetable_medicine', '晚间用药', '2026-08-28T20:00:00+08:00', '2026-08-28T20:30:00+08:00', 'care', 'member_subject', 'domain_health', 'planned', 'household', 'member_subject', '2026-08-28T12:00:00.000Z', NULL),
-  ('timetable_health_booking', '预约骨科复查', '2026-08-29T10:00:00+08:00', '2026-08-29T10:30:00+08:00', 'responsibility', 'member_primary', 'domain_health', 'planned', 'self', 'member_primary', '2026-08-28T12:00:00.000Z', NULL),
-  ('timetable_grocery', '采购家庭日用品', '2026-08-29T16:00:00+08:00', '2026-08-29T17:00:00+08:00', 'family', 'member_partner', 'domain_home', 'planned', 'household', 'member_partner', '2026-08-28T12:00:00.000Z', NULL),
-  ('timetable_walk', '陪奶奶散步', '2026-08-30T08:00:00+08:00', '2026-08-30T08:30:00+08:00', 'care', 'member_subject', 'domain_health', 'planned', 'household', 'member_subject', '2026-08-28T12:00:00.000Z', NULL)`;
+  ('timetable_school_form', '交回新生体检表', '2026-08-28T01:00:00.000Z', '2026-08-28T01:30:00.000Z', 'responsibility', 'member_primary', 'domain_school', 'planned', 'self', 'member_primary', '2026-08-28T12:00:00.000Z', NULL),
+  ('timetable_family_dinner', '家庭晚餐', '2026-08-28T10:30:00.000Z', '2026-08-28T11:30:00.000Z', 'family', 'member_partner', 'domain_home', 'planned', 'household', 'member_partner', '2026-08-28T12:00:00.000Z', NULL),
+  ('timetable_medicine', '晚间用药', '2026-08-28T12:00:00.000Z', '2026-08-28T12:30:00.000Z', 'care', 'member_subject', 'domain_health', 'planned', 'household', 'member_subject', '2026-08-28T12:00:00.000Z', NULL),
+  ('timetable_health_booking', '预约骨科复查', '2026-08-29T02:00:00.000Z', '2026-08-29T02:30:00.000Z', 'responsibility', 'member_primary', 'domain_health', 'planned', 'self', 'member_primary', '2026-08-28T12:00:00.000Z', NULL),
+  ('timetable_grocery', '采购家庭日用品', '2026-08-29T08:00:00.000Z', '2026-08-29T09:00:00.000Z', 'family', 'member_partner', 'domain_home', 'planned', 'household', 'member_partner', '2026-08-28T12:00:00.000Z', NULL),
+  ('timetable_walk', '陪奶奶散步', '2026-08-30T00:00:00.000Z', '2026-08-30T00:30:00.000Z', 'care', 'member_subject', 'domain_health', 'planned', 'household', 'member_subject', '2026-08-28T12:00:00.000Z', NULL)`;
 
 const SEED_STATEMENTS = [
   `INSERT INTO demo_state VALUES (1, '2026-08-28T12:00:00.000Z')`,
@@ -186,6 +186,14 @@ export type DemoDatabase = DatabaseSync;
 export function createDemoDatabase(path = ":memory:"): DemoDatabase {
   const database = new DatabaseSync(path);
   database.exec(SCHEMA);
+  database.exec(`
+    UPDATE timetable_items
+    SET starts_at = strftime('%Y-%m-%dT%H:%M:%fZ', starts_at)
+    WHERE strftime('%Y-%m-%dT%H:%M:%fZ', starts_at) IS NOT NULL;
+    UPDATE timetable_items
+    SET ends_at = strftime('%Y-%m-%dT%H:%M:%fZ', ends_at)
+    WHERE strftime('%Y-%m-%dT%H:%M:%fZ', ends_at) IS NOT NULL;
+  `);
   const state = database
     .prepare("SELECT COUNT(*) AS count FROM demo_state")
     .get() as { readonly count: number };
