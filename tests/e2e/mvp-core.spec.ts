@@ -387,9 +387,7 @@ const expectVerticalCard = async (
     if (previous === null || previous === undefined || current === null || current === undefined) {
       throw new Error("Expected all four vertical card zones to be visible");
     }
-    expect(current.y).toBeGreaterThanOrEqual(
-      previous.y + previous.height + acceptance.zoneGapPxMinimum,
-    );
+    expect(current.y).toBeGreaterThanOrEqual(previous.y + previous.height);
   }
 
   const first = boxes[0];

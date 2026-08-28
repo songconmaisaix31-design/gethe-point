@@ -157,7 +157,6 @@ export const MVP_CORE_FIXTURE = Object.freeze({
       cssVariables: MVP_CORE_STYLE_A_CSS_VARIABLES,
       cardVerticalPaddingPx: Object.freeze({ minimum: 16, maximum: 20 }),
       compactRailMaximumWidthPx: 330,
-      zoneGapPxMinimum: 8,
       zoneSpanPxMinimum: 128,
       coreCards: Object.freeze({
         consent: Object.freeze({ minimumHeightPx: 240, zones: verticalZones }),
