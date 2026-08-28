@@ -1,0 +1,35 @@
+{
+  "name": "we-remember-mvp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.0.0 <25"
+  },
+  "packageManager": "pnpm@11.2.2",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test:unit": "node --test \"src/server/**/*.test.ts\" \"tests/unit/**/*.test.ts\"",
+    "test:e2e": "playwright test --project=desktop --project=mobile",
+    "test:a11y": "playwright test --project=accessibility"
+  },
+  "dependencies": {
+    "next": "16.3.3",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.62.1",
+    "@types/node": "26.4.0",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.5",
+    "eslint": "9.39.4",
+    "eslint-config-next": "16.3.3",
+    "typescript": "6.0.3"
+  }
+}
