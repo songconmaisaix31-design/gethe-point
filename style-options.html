@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="a">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UI 风格选型 · 都记得 We Remember</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+/* =========================================================================
+   都记得 · UI 风格选型
+   5 个方向，共用一套语义化 token。选定后把对应 [data-theme] 的变量
+   提升为 :root，即为正式设计系统的起点（PRD 6.4 要求开发前定稿）。
+   ========================================================================= */
+
+:root{
+  --page-bg:#F0EDE8;
+  --page-surface:#FFFFFF;
+  --page-ink:#1C1A16;
+  --page-dim:#6B6660;
+  --page-line:rgba(28,26,22,.11);
+  --cn:"PingFang SC","HarmonyOS Sans SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  --serif-cn:"Songti SC","Noto Serif CJK SC","Source Han Serif SC",serif;
+}
+
+/* ─────────────── A · 纸页（墨绿 / 衬线 / 文档感） ─────────────── */
+[data-theme="a"]{
+  --bg:#F4F1EA; --surface:#FFFFFF; --surface2:#EAE5DA; --surface3:#DFD8C9;
+  --text:#1F1C17; --dim:#6E695E; --line:rgba(31,28,23,.13);
+  --primary:#33513F; --primary-ink:#FFFFFF; --primary-soft:#E3EAE2;
+  --accent:#8A5A3B; --accent-soft:#F0E5DC;
+  --warn:#9C4E22; --warn-soft:#F6E7DA;
+  --ok:#33513F;
+  --bubble-me:#33513F; --bubble-me-ink:#FFFFFF;
+  --bubble-you:#FFFFFF; --bubble-you-ink:#1F1C17;
+  --nav-bg:#EDE9E0;
+  --radius:10px; --radius-sm:8px; --pill:6px;
+  --border:1px solid rgba(31,28,23,.13);
+  --card-shadow:0 1px 3px rgba(31,28,23,.07);
+  --shadow:0 4px 18px rgba(31,28,23,.10);
+  --display:"Instrument Serif"; --display-cn:var(--serif-cn);
+  --display-w:400; --display-ls:0;
+  --label-ls:.10em; --body-w:400;
+}
+/* ─────────────── B · 晨雾（雾蓝 / 大圆角 / 柔光） ─────────────── */
+[data-theme="b"]{
+  --bg:#F2F4F3; --surface:#FFFFFF; --surface2:#E8EDEC; --surface3:#DBE3E2;
+  --text:#22282A; --dim:#616C6F; --line:rgba(34,40,42,.09);
+  --primary:#4F7B93; --primary-ink:#FFFFFF; --primary-soft:#E4EDF1;
+  --accent:#6E9280; --accent-soft:#E5EDE8;
+  --warn:#B0703C; --warn-soft:#F6EBE0;
+  --ok:#6E9280;
+  --bubble-me:#4F7B93; --bubble-me-ink:#FFFFFF;
+  --bubble-you:#FFFFFF; --bubble-you-ink:#22282A;
+  --nav-bg:rgba(242,244,243,.92);
+  --radius:22px; --radius-sm:18px; --pill:999px;
+  --border:1px solid rgba(34,40,42,.07);
+  --card-shadow:0 4px 16px rgba(34,55,60,.07);
+  --shadow:0 12px 34px rgba(34,55,60,.11);
+  --display:"Inter"; --display-cn:var(--cn);
+  --display-w:600; --display-ls:-.015em;
+  --label-ls:.04em; --body-w:400;
+}
+/* ─────────────── C · 亚麻（陶土 / 黄铜 / 暖） ─────────────── */
+[data-theme="c"]{
+  --bg:#EFE7DC; --surface:#FBF7F1; --surface2:#E5DACA; --surface3:#D8C9B4;
+  --text:#2A231C; --dim:#6B6153; --line:rgba(42,35,28,.15);
+  --primary:#7C4A34; --primary-ink:#FDF8F2; --primary-soft:#EFDFD4;
+  --accent:#9A7842; --accent-soft:#EEE4CF;
+  --warn:#95401E; --warn-soft:#F3DFD2;
+  --ok:#5A6B45;
+  --bubble-me:#7C4A34; --bubble-me-ink:#FDF8F2;
+  --bubble-you:#FBF7F1; --bubble-you-ink:#2A231C;
+  --nav-bg:#E8DFD2;
+  --radius:14px; --radius-sm:12px; --pill:999px;
+  --border:1px solid rgba(42,35,28,.15);
+  --card-shadow:0 2px 8px rgba(80,58,38,.09);
+  --shadow:0 10px 28px rgba(80,58,38,.14);
+  --display:"Inter"; --display-cn:var(--cn);
+  --display-w:600; --display-ls:-.01em;
+  --label-ls:.08em; --body-w:400;
+}
+/* ─────────────── D · 夜灯（暖深灰 / 沙金 / 夜间） ─────────────── */
+[data-theme="d"]{
+  --bg:#1A1816; --surface:#242120; --surface2:#2E2A28; --surface3:#3A3532;
+  --text:#F0EAE2; --dim:#A29A90; --line:rgba(240,234,226,.13);
+  --primary:#C8A882; --primary-ink:#1A1816; --primary-soft:#332C25;
+  --accent:#8FB3A0; --accent-soft:#26302B;
+  --warn:#DE9155; --warn-soft:#3A2A1E;
+  --ok:#8FB3A0;
+  --bubble-me:#C8A882; --bubble-me-ink:#1A1816;
+  --bubble-you:#2A2624; --bubble-you-ink:#F0EAE2;
+  --nav-bg:#211E1C;
+  --radius:18px; --radius-sm:14px; --pill:999px;
+  --border:1px solid rgba(240,234,226,.11);
+  --card-shadow:0 2px 10px rgba(0,0,0,.35);
+  --shadow:0 14px 36px rgba(0,0,0,.5);
+  --display:"Inter"; --display-cn:var(--cn);
+  --display-w:600; --display-ls:-.015em;
+  --label-ls:.08em; --body-w:400;
+}
+/* ─────────────── E · 素白（纯白 / 靛蓝 / 无障碍优先） ─────────────── */
+[data-theme="e"]{
+  --bg:#F7F7F5; --surface:#FFFFFF; --surface2:#ECECE8; --surface3:#DEDED8;
+  --text:#101010; --dim:#55554F; --line:rgba(16,16,16,.16);
+  --primary:#1F3D7A; --primary-ink:#FFFFFF; --primary-soft:#E3E8F2;
+  --accent:#1F3D7A; --accent-soft:#E3E8F2;
+  --warn:#8C3A1E; --warn-soft:#F5E3DC;
+  --ok:#1F5B3F;
+  --bubble-me:#1F3D7A; --bubble-me-ink:#FFFFFF;
+  --bubble-you:#FFFFFF; --bubble-you-ink:#101010;
+  --nav-bg:#FFFFFF;
+  --radius:12px; --radius-sm:10px; --pill:999px;
+  --border:1.5px solid rgba(16,16,16,.16);
+  --card-shadow:none;
+  --shadow:0 4px 16px rgba(0,0,0,.08);
+  --display:"Inter"; --display-cn:var(--cn);
+  --display-w:700; --display-ls:-.02em;
+  --label-ls:.06em; --body-w:500;
+}
+
+/* ============================ 页面外壳 ============================ */
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  background:var(--page-bg); color:var(--page-ink);
+  font-family:"Inter",var(--cn);
+  padding:38px 24px 90px; -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1420px;margin:0 auto}
+.masthead{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;flex-wrap:wrap}
+h1{font-size:27px;font-weight:600;letter-spacing:-.02em}
+h1 em{font-style:normal;color:var(--page-dim);font-weight:400}
+.sub{color:var(--page-dim);font-size:13.5px;margin-top:9px;line-height:1.75;max-width:760px}
+.sub code{background:rgba(0,0,0,.05);padding:1px 5px;border-radius:4px;font-size:12.5px}
+
+.toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.toggle{
+  display:flex;align-items:center;gap:8px;font-size:13px;color:var(--page-ink);
+  background:var(--page-surface);border:1px solid var(--page-line);
+  border-radius:999px;padding:9px 15px;cursor:pointer;user-select:none;
+}
+.toggle input{width:15px;height:15px;accent-color:#33513F;cursor:pointer}
+
+/* 切换器 */
+.tabs{display:flex;gap:9px;flex-wrap:wrap;margin:24px 0 20px}
+.tab{
+  font:inherit;font-size:13.5px;font-weight:500;cursor:pointer;
+  padding:11px 17px;border-radius:999px;border:1px solid var(--page-line);
+  background:var(--page-surface);color:var(--page-ink);
+  display:flex;align-items:center;gap:9px;transition:transform .14s,box-shadow .14s;
+}
+.tab:hover{transform:translateY(-1px);box-shadow:0 4px 14px rgba(0,0,0,.09)}
+.tab:focus-visible{outline:3px solid #33513F;outline-offset:2px}
+.tab[aria-selected="true"]{background:var(--page-ink);color:#fff;border-color:var(--page-ink)}
+.tab .dot{width:11px;height:11px;border-radius:50%;flex:none;box-shadow:inset 0 0 0 1px rgba(0,0,0,.12)}
+.tab .key{font-size:11px;opacity:.55;letter-spacing:.08em}
+
+/* 说明卡 */
+.info{background:var(--page-surface);border:1px solid var(--page-line);border-radius:16px;padding:24px 26px;margin-bottom:28px}
+.info-top{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.info-top h2{font-size:20px;font-weight:600;letter-spacing:-.01em}
+.info-top .tagline{font-size:13.5px;color:var(--page-dim)}
+.info-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:22px;margin-top:20px}
+.info-grid h3{font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--page-dim);margin-bottom:9px;font-weight:600}
+.info-grid p{font-size:13.5px;line-height:1.68}
+.info-grid li{font-size:13.5px;line-height:1.68;margin-left:16px}
+.swatches{display:flex;gap:8px;flex-wrap:wrap;padding-bottom:22px}
+.sw{width:36px;height:36px;border-radius:8px;border:1px solid rgba(0,0,0,.12);position:relative}
+.sw b{position:absolute;top:40px;left:0;font-size:9px;font-weight:500;color:var(--page-dim);white-space:nowrap;letter-spacing:.02em}
+.pro{color:#1C5334}.con{color:#8A3A16}
+.a11y{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;background:#E9F0E9;color:#1C5334;padding:4px 10px;border-radius:999px}
+.a11y.warnish{background:#F7EADF;color:#8A3A16}
+
+/* ============================ 手机壳 ============================ */
+.screens{display:flex;gap:24px;flex-wrap:wrap;justify-content:center;align-items:flex-start}
+.phone-col{display:flex;flex-direction:column;align-items:center;gap:11px;width:322px}
+.phone-label{font-size:12.5px;color:var(--page-dim);text-align:center;line-height:1.5}
+.phone-label b{display:block;color:var(--page-ink);font-size:13.5px;font-weight:600;margin-bottom:2px}
+.phone{
+  width:322px;height:668px;border-radius:44px;padding:11px;background:#100F0E;
+  box-shadow:0 26px 58px rgba(28,26,22,.26);flex:none;
+}
+.screen{
+  width:100%;height:100%;border-radius:34px;overflow:hidden;
+  background:var(--bg);color:var(--text);
+  font-family:var(--cn);font-weight:var(--body-w);
+  display:flex;flex-direction:column;position:relative;
+  --fs:15px;
+}
+.screen *{font-family:inherit}
+.screen.senior{--fs:20px}
+body.big .screen.senior{--fs:24px}
+
+/* 状态栏 / 导航栏（微信式） */
+.statusbar{display:flex;justify-content:space-between;align-items:center;padding:14px 22px 4px;font-size:11.5px;color:var(--text);flex:none;font-weight:600;letter-spacing:.02em}
+.statusbar .right{display:flex;gap:5px;align-items:center;opacity:.8}
+.navbar{
+  display:flex;align-items:center;gap:8px;padding:8px 16px 12px;flex:none;
+  background:var(--nav-bg);border-bottom:1px solid var(--line);
+  backdrop-filter:blur(12px);
+}
+.navbar .back{font-size:20px;color:var(--text);line-height:1;width:22px}
+.navbar .title{flex:1;text-align:center;font-size:15.5px;font-weight:600;letter-spacing:-.01em}
+.navbar .title small{display:block;font-size:10.5px;font-weight:400;color:var(--dim);letter-spacing:var(--label-ls);margin-top:1px}
+.navbar .more{font-size:19px;color:var(--text);width:22px;text-align:right;line-height:1}
+.screen.senior .navbar .title{font-size:19px}
+
+.body{flex:1;overflow-y:auto;padding:16px 14px 14px;scrollbar-width:none}
+.body::-webkit-scrollbar{display:none}
+.eyebrow{font-size:10.5px;letter-spacing:var(--label-ls);text-transform:uppercase;color:var(--dim);font-weight:600}
+
+/* 时间分隔 */
+.timesep{text-align:center;margin:4px 0 16px}
+.timesep span{font-size:11px;color:var(--dim);background:var(--surface2);padding:3px 10px;border-radius:var(--pill)}
+.screen.senior .timesep span{font-size:14px}
+
+/* 气泡 */
+.msg{display:flex;gap:9px;margin-bottom:16px;align-items:flex-start}
+.msg.me{flex-direction:row-reverse}
+.avatar{
+  width:38px;height:38px;border-radius:var(--radius-sm);flex:none;
+  background:var(--surface2);color:var(--dim);
+  display:grid;place-items:center;font-size:12px;font-weight:600;letter-spacing:.02em;
+}
+.avatar.ai{background:var(--primary);color:var(--primary-ink)}
+.bubble{
+  max-width:76%;padding:11px 13px;border-radius:var(--radius-sm);
+  background:var(--bubble-you);color:var(--bubble-you-ink);
+  box-shadow:var(--card-shadow);position:relative;
+  line-height:1.6;font-size:var(--fs);word-break:break-word;
+}
+.bubble::after{content:"";position:absolute;top:13px;width:8px;height:8px;background:inherit;transform:rotate(45deg);left:-3px;border-radius:1px}
+.msg.me .bubble{background:var(--bubble-me);color:var(--bubble-me-ink)}
+.msg.me .bubble::after{left:auto;right:-3px}
+.sender{font-size:11px;color:var(--dim);margin-bottom:4px;display:block}
+
+/* 结构化卡片消息 */
+.cardmsg{max-width:88%;background:var(--surface);border:var(--border);border-radius:var(--radius);padding:14px;box-shadow:var(--card-shadow);position:relative}
+.cardmsg .ct{font-size:calc(var(--fs) + 1px);font-weight:600;line-height:1.5;letter-spacing:-.01em}
+.cardmsg .quote{
+  margin:11px 0;padding:9px 11px;background:var(--surface2);
+  border-left:3px solid var(--accent);border-radius:0 var(--radius-sm) var(--radius-sm) 0;
+  font-size:var(--fs);line-height:1.55;
+}
+.cardmsg .foot{font-size:calc(var(--fs) - 4px);color:var(--dim);line-height:1.6;margin-top:11px}
+.opts{display:flex;flex-direction:column;gap:9px;margin-top:12px}
+.opt{
+  font:inherit;font-size:var(--fs);font-weight:600;cursor:pointer;text-align:left;
+  min-height:52px;padding:12px 14px;border-radius:var(--radius-sm);
+  background:var(--surface2);color:var(--text);border:var(--border);
+  display:flex;align-items:center;gap:10px;transition:transform .12s;
+}
+.screen.senior .opt{min-height:60px}
+.opt:hover{transform:translateY(-1px)}
+.opt:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.opt.primary{background:var(--primary);color:var(--primary-ink);border-color:transparent}
+.opt.ghost{background:transparent}
+.opt .ico{flex:none;width:22px;text-align:center;font-size:calc(var(--fs) - 1px)}
+
+/* 输入栏（微信式） */
+.inputbar{
+  flex:none;display:flex;align-items:center;gap:9px;padding:10px 13px 20px;
+  background:var(--nav-bg);border-top:1px solid var(--line);
+}
+.inputbar .ib{
+  flex:1;min-height:36px;border-radius:var(--radius-sm);background:var(--surface);
+  border:var(--border);display:flex;align-items:center;padding:0 12px;
+  font-size:calc(var(--fs) - 2px);color:var(--dim);
+}
+.inputbar .icobtn{
+  width:34px;height:34px;flex:none;border-radius:50%;background:var(--surface2);
+  display:grid;place-items:center;color:var(--text);font-size:15px;
+}
+.voicebar{
+  flex:none;padding:12px 14px 22px;background:var(--nav-bg);border-top:1px solid var(--line);
+  display:flex;flex-direction:column;gap:9px;
+}
+.holdtalk{
+  min-height:64px;border-radius:var(--radius-sm);background:var(--primary);color:var(--primary-ink);
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  font-size:var(--fs);font-weight:600;letter-spacing:.02em;cursor:pointer;
+}
+.voicebar .alt{display:flex;gap:9px}
+.voicebar .alt div{
+  flex:1;min-height:44px;border-radius:var(--radius-sm);background:var(--surface2);
+  border:var(--border);display:grid;place-items:center;font-size:calc(var(--fs) - 3px);color:var(--dim);
+}
+
+/* ============ 主责任人首页 ============ */
+.hero{padding:6px 4px 18px}
+.hero .q{
+  font-family:var(--display),var(--display-cn);font-weight:var(--display-w);
+  letter-spacing:var(--display-ls);font-size:23px;line-height:1.38;
+}
+.hero .count{display:flex;align-items:baseline;gap:9px;margin-top:14px}
+.hero .count b{font-family:var(--display),var(--display-cn);font-weight:var(--display-w);font-size:44px;line-height:1;letter-spacing:-.02em}
+.hero .count span{font-size:12.5px;color:var(--dim);line-height:1.5}
+.hero .count b.drop{animation:drop .5s ease}
+@keyframes drop{0%{transform:translateY(-6px);opacity:.3}100%{transform:none;opacity:1}}
+
+.sec{margin-top:18px}
+.sec > .eyebrow{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.dcard{
+  background:var(--surface);border:var(--border);border-radius:var(--radius);
+  padding:13px;margin-bottom:10px;box-shadow:var(--card-shadow);
+}
+.dcard .row1{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.dcard .nm{font-size:14.5px;font-weight:600;letter-spacing:-.01em;line-height:1.4}
+.dcard .meta{font-size:11.5px;color:var(--dim);margin-top:6px;line-height:1.55}
+.dcard.fading{opacity:0;transform:translateX(18px);max-height:0;margin:0;padding:0;border-width:0;transition:all .5s ease}
+.badge{
+  font-size:10.5px;font-weight:600;letter-spacing:var(--label-ls);flex:none;
+  padding:4px 9px;border-radius:var(--pill);white-space:nowrap;
+}
+.badge.none{background:var(--warn-soft);color:var(--warn)}
+.badge.mine{background:var(--surface2);color:var(--dim)}
+.badge.his{background:var(--primary-soft);color:var(--primary)}
+.badge.ok{background:var(--accent-soft);color:var(--ok)}
+.ev{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;color:var(--dim);margin-top:9px;border:1px dashed var(--line);padding:3px 8px;border-radius:var(--pill)}
+
+/* 责任集中度表 */
+.report{background:var(--surface);border:var(--border);border-radius:var(--radius);padding:14px;box-shadow:var(--card-shadow)}
+.report table{width:100%;border-collapse:collapse}
+.report th{font-size:10.5px;letter-spacing:var(--label-ls);color:var(--dim);font-weight:600;text-align:right;padding:0 0 8px}
+.report th:first-child{text-align:left}
+.report td{font-size:12.5px;padding:6px 0;border-top:1px solid var(--line);text-align:right}
+.report td:first-child{text-align:left;color:var(--text)}
+.report td b{font-weight:600;font-variant-numeric:tabular-nums}
+.bar{height:5px;border-radius:3px;background:var(--surface3);margin-top:4px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--dim);opacity:.65}
+.narr{font-size:12px;line-height:1.72;color:var(--dim);margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
+
+/* 底部 tab bar */
+.tabbar{
+  flex:none;display:flex;background:var(--nav-bg);border-top:1px solid var(--line);
+  padding:7px 0 20px;
+}
+.tabbar div{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10px;color:var(--dim)}
+.tabbar div.on{color:var(--primary);font-weight:600}
+[data-theme="d"] .tabbar div.on{color:var(--primary)}
+.tabbar svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:1.7}
+
+/* ============ 交接卡 ============ */
+.hcard{background:var(--surface);border:var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--card-shadow)}
+.hcard .hhead{padding:15px;border-bottom:1px solid var(--line)}
+.hcard .hhead .t{font-family:var(--display),var(--display-cn);font-weight:var(--display-w);letter-spacing:var(--display-ls);font-size:19px;line-height:1.35}
+.flow{display:flex;align-items:center;gap:9px;margin-top:12px;font-size:12px}
+.flow .who{display:flex;align-items:center;gap:6px}
+.flow .av{width:26px;height:26px;border-radius:var(--radius-sm);background:var(--surface2);display:grid;place-items:center;font-size:10px;font-weight:600;color:var(--dim)}
+.flow .arrow{color:var(--dim);flex:1;text-align:center;letter-spacing:.1em}
+.statuspill{display:inline-flex;align-items:center;gap:7px;font-size:11.5px;font-weight:600;letter-spacing:var(--label-ls);padding:6px 11px;border-radius:var(--pill);margin-top:13px}
+.statuspill.blocked{background:var(--warn-soft);color:var(--warn)}
+.statuspill.pending{background:var(--surface2);color:var(--dim)}
+.statuspill.done{background:var(--accent-soft);color:var(--ok)}
+.statuspill .pulse{width:7px;height:7px;border-radius:50%;background:currentColor}
+.hsec{padding:13px 15px;border-bottom:1px solid var(--line)}
+.hsec h5{font-size:10.5px;letter-spacing:var(--label-ls);text-transform:uppercase;color:var(--dim);font-weight:600;margin-bottom:7px}
+.hsec p{font-size:12.5px;line-height:1.65}
+.hsec ul{margin-left:15px}
+.hsec li{font-size:12.5px;line-height:1.7}
+.missing{background:var(--warn-soft);border-left:3px solid var(--warn)}
+.missing h5{color:var(--warn)}
+.missing li{color:var(--text)}
+.missing li.filled{text-decoration:line-through;opacity:.5}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.chip{font-size:10.5px;color:var(--dim);border:1px dashed var(--line);padding:3px 8px;border-radius:var(--pill)}
+.hact{padding:13px 15px;display:flex;flex-direction:column;gap:9px}
+.btn{
+  font:inherit;font-size:13.5px;font-weight:600;cursor:pointer;min-height:46px;
+  border-radius:var(--radius-sm);border:var(--border);background:var(--surface2);color:var(--text);
+  display:flex;align-items:center;justify-content:center;gap:8px;transition:transform .12s;
+}
+.btn:hover{transform:translateY(-1px)}
+.btn:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.btn.primary{background:var(--primary);color:var(--primary-ink);border-color:transparent}
+.btn:disabled{opacity:.45;cursor:not-allowed;transform:none}
+.note{font-size:11.5px;color:var(--dim);line-height:1.65;text-align:center;padding:0 15px 15px}
+
+/* toast */
+.toast{
+  position:absolute;left:14px;right:14px;bottom:22px;z-index:5;
+  background:var(--surface);border:var(--border);border-radius:var(--radius);
+  padding:12px 14px;box-shadow:var(--shadow);font-size:12.5px;line-height:1.6;
+  opacity:0;transform:translateY(10px);pointer-events:none;transition:all .3s ease;
+}
+.toast.show{opacity:1;transform:none}
+.toast b{display:block;font-weight:600;margin-bottom:3px}
+
+/* 群聊系统条 */
+.syssep{text-align:center;margin:2px 0 14px}
+.syssep span{font-size:10.5px;color:var(--dim);line-height:1.6;background:var(--surface2);padding:5px 11px;border-radius:var(--pill);display:inline-block;max-width:86%}
+.escalate{border-left:3px solid var(--warn)}
+.escalate .ct{color:var(--warn)}
+.lvl{display:flex;gap:7px;align-items:center;font-size:11px;color:var(--dim);margin-top:9px}
+.lvl i{width:6px;height:6px;border-radius:50%;background:var(--surface3);display:block}
+.lvl i.on{background:var(--warn)}
+.simbtn{
+  font:inherit;font-size:12px;font-weight:600;cursor:pointer;width:100%;min-height:40px;margin-top:2px;
+  border-radius:var(--radius-sm);border:1px dashed var(--line);background:transparent;color:var(--dim);
+}
+.simbtn:hover{color:var(--text)}
+.simbtn:disabled{opacity:.4;cursor:not-allowed}
+
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+footer{max-width:1420px;margin:46px auto 0;padding-top:22px;border-top:1px solid var(--page-line);color:var(--page-dim);font-size:12.5px;line-height:1.8}
+footer b{color:var(--page-ink)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="masthead">
+    <div>
+      <h1>都记得 <em>· UI 风格选型</em></h1>
+      <p class="sub">
+        五个方向，都符合 PRD 6.4 的约束：低饱和、暖中性、克制，<b>不使用</b>游戏化 / 竞技感视觉语言。
+        每个方向用同一套语义 token（<code>--primary</code> / <code>--warn</code> / <code>--radius</code>…）描述，
+        你选定后直接把对应变量提升为 <code>:root</code>，就是正式设计系统的起点。
+        下面四屏是微信小程序形态的手机页，嵌在 web 里展示，卡片按钮真的可以点。
+      </p>
+    </div>
+    <div class="toolbar">
+      <label class="toggle"><input type="checkbox" id="bigfont"> 模拟系统字号放大（被看护人侧）</label>
+    </div>
+  </div>
+
+  <div class="tabs" role="tablist" aria-label="UI 风格方向">
+    <button class="tab" role="tab" data-t="a" aria-selected="true"><span class="dot" style="background:#33513F"></span>A · 纸页<span class="key">墨绿 / 衬线</span></button>
+    <button class="tab" role="tab" data-t="b" aria-selected="false"><span class="dot" style="background:#4F7B93"></span>B · 晨雾<span class="key">雾蓝 / 柔光</span></button>
+    <button class="tab" role="tab" data-t="c" aria-selected="false"><span class="dot" style="background:#7C4A34"></span>C · 亚麻<span class="key">陶土 / 黄铜</span></button>
+    <button class="tab" role="tab" data-t="d" aria-selected="false"><span class="dot" style="background:#C8A882"></span>D · 夜灯<span class="key">暖深色</span></button>
+    <button class="tab" role="tab" data-t="e" aria-selected="false"><span class="dot" style="background:#1F3D7A"></span>E · 素白<span class="key">高对比 / 无障碍优先</span></button>
+  </div>
+
+  <div class="info" id="info"></div>
+
+  <div class="screens">
+
+    <!-- ════════════ 屏 1：被看护人（奶奶）· 1:1 对话 + 同意门 ════════════ -->
+    <div class="phone-col">
+      <div class="phone">
+        <div class="screen senior" id="s1">
+          <div class="statusbar"><span>9:41</span><span class="right">●●● ⏻ 84%</span></div>
+          <div class="navbar">
+            <span class="back">‹</span>
+            <span class="title">都记得<small>随时可以跟我说话</small></span>
+            <span class="more">⋯</span>
+          </div>
+          <div class="body" id="s1body">
+            <div class="timesep"><span>上午 8:14</span></div>
+
+            <div class="msg">
+              <div class="avatar ai">记</div>
+              <div class="bubble">奶奶早上好。昨天睡得还行吗？</div>
+            </div>
+
+            <div class="msg me">
+              <div class="avatar">奶奶</div>
+              <div class="bubble">还行。就是这两天腿又疼了，下楼有点吃力</div>
+            </div>
+
+            <div class="msg">
+              <div class="avatar ai">记</div>
+              <div class="bubble">我记下了。上个月复查医生说过一个月后再看一次，快到时间了。</div>
+            </div>
+
+            <div class="msg" id="consentWrap">
+              <div class="avatar ai">记</div>
+              <div class="cardmsg">
+                <div class="ct">要不要把这件事告诉家里人？</div>
+                <div class="quote">「这两天腿又疼了，下楼有点吃力」</div>
+                <div class="opts">
+                  <button class="opt primary" data-consent="space"><span class="ico">✓</span>告诉家里人</button>
+                  <button class="opt" data-consent="member"><span class="ico">◔</span>只告诉女儿</button>
+                  <button class="opt ghost" data-consent="self"><span class="ico">·</span>先别说</button>
+                </div>
+                <div class="foot">你不同意，这句话就只留在我们俩之间，不会进家里的记录。</div>
+              </div>
+            </div>
+          </div>
+          <div class="voicebar">
+            <div class="holdtalk">◉ 按住说话</div>
+            <div class="alt"><div>打字</div><div>拍照片</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="phone-label"><b>① 被看护人 · 同意门</b>正文 ≥20px、点击区 ≥60px、语音优先，单屏只有一件事要做</div>
+    </div>
+
+    <!-- ════════════ 屏 2：主责任人（妈妈）· 责任地图首页 ════════════ -->
+    <div class="phone-col">
+      <div class="phone">
+        <div class="screen" id="s2">
+          <div class="statusbar"><span>9:41</span><span class="right">●●● ⏻ 84%</span></div>
+          <div class="navbar">
+            <span class="back"></span>
+            <span class="title">都记得<small>林家 · 4 位成员</small></span>
+            <span class="more">⋯</span>
+          </div>
+          <div class="body">
+            <div class="hero">
+              <div class="q">这周，有哪些事<br>一直只有你在记得？</div>
+              <div class="count"><b id="onlyMe">7</b><span>件事的发现、记时间、<br>安排和跟进都落在你身上</span></div>
+            </div>
+
+            <div class="sec">
+              <div class="eyebrow"><span>责任域</span><span>3 个</span></div>
+
+              <div class="dcard" id="domCare">
+                <div class="row1">
+                  <div class="nm">奶奶的近期健康照护</div>
+                  <span class="badge none" id="careBadge">无主人</span>
+                </div>
+                <div class="meta">下一步：约复查号，确认是否需要空腹<br>关联 5 条信号 · 最早一条来自 8 月 12 日</div>
+                <span class="ev">◷ 5 条原话可溯源</span>
+              </div>
+
+              <div class="dcard">
+                <div class="row1">
+                  <div class="nm">孩子的开学准备</div>
+                  <span class="badge mine">主人：你</span>
+                </div>
+                <div class="meta">下一步：周五前交体检表<br>发现 / 记时间 / 安排 / 跟进：都是你</div>
+              </div>
+
+              <div class="dcard">
+                <div class="row1">
+                  <div class="nm">家里的日常补给</div>
+                  <span class="badge his">主人：他</span>
+                </div>
+                <div class="meta">上周已交接 · 本周提醒不再发给你</div>
+              </div>
+            </div>
+
+            <div class="sec">
+              <div class="eyebrow"><span>本周责任集中度</span><span>8.19 – 8.25</span></div>
+              <div class="report">
+                <table>
+                  <thead><tr><th>工作阶段</th><th>你</th><th>他</th></tr></thead>
+                  <tbody>
+                    <tr><td>发现问题<div class="bar"><i style="width:100%"></i></div></td><td><b>3</b></td><td><b>0</b></td></tr>
+                    <tr><td>记住截止时间<div class="bar"><i style="width:100%"></i></div></td><td><b>3</b></td><td><b>0</b></td></tr>
+                    <tr><td>制定安排<div class="bar"><i style="width:100%"></i></div></td><td><b>3</b></td><td><b>0</b></td></tr>
+                    <tr><td>实际执行<div class="bar"><i style="width:66%"></i></div></td><td><b>2</b></td><td><b>1</b></td></tr>
+                    <tr><td>跟进结果<div class="bar"><i style="width:100%"></i></div></td><td><b>3</b></td><td><b>0</b></td></tr>
+                  </tbody>
+                </table>
+                <p class="narr">本周家庭协调工作集中在一位成员身上。执行任务有所分担，但发现、安排与跟进尚未形成完整的责任所有权。</p>
+              </div>
+            </div>
+          </div>
+          <div class="tabbar">
+            <div class="on">
+              <svg viewBox="0 0 24 24"><path d="M3 9.5 12 3l9 6.5V21H3z"/><path d="M9 21v-7h6v7"/></svg>责任地图
+            </div>
+            <div>
+              <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>待办
+            </div>
+            <div>
+              <svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 1 1-3.2-6.4"/><path d="M3 20l1.6-4"/></svg>对话
+            </div>
+            <div>
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.4"/><path d="M5 21c1.2-4 3.7-5.6 7-5.6s5.8 1.6 7 5.6"/></svg>我
+            </div>
+          </div>
+          <div class="toast" id="toast2"><b>提醒已转移</b>「奶奶的近期健康照护」的提醒此后发给爸爸，你不会再收到催办。</div>
+        </div>
+      </div>
+      <div class="phone-label"><b>② 主责任人 · 责任地图</b>首页不是聊天框。数字用于呈现分布，不打分、不排名、不给任何人标红</div>
+    </div>
+
+    <!-- ════════════ 屏 3：交接卡 · blocked ════════════ -->
+    <div class="phone-col">
+      <div class="phone">
+        <div class="screen" id="s3">
+          <div class="statusbar"><span>9:42</span><span class="right">●●● ⏻ 84%</span></div>
+          <div class="navbar">
+            <span class="back">‹</span>
+            <span class="title">责任交接<small>Handover #H-021</small></span>
+            <span class="more">⋯</span>
+          </div>
+          <div class="body">
+            <div class="hcard">
+              <div class="hhead">
+                <div class="t">奶奶的近期健康照护</div>
+                <div class="flow">
+                  <span class="who"><span class="av">你</span>移交</span>
+                  <span class="arrow">──→</span>
+                  <span class="who">接手<span class="av">爸爸</span></span>
+                </div>
+                <div class="statuspill blocked" id="hStatus"><span class="pulse"></span>BLOCKED · 信息不足</div>
+              </div>
+
+              <div class="hsec">
+                <h5>这一整块包含什么</h5>
+                <p>发现症状变化、记住复查时间、挂号与陪诊、保存报告、两周后复诊。不是「陪奶奶去一次医院」。</p>
+              </div>
+
+              <div class="hsec">
+                <h5>历史与约束</h5>
+                <ul>
+                  <li>7 月 15 日骨科门诊，医生嘱一个月后复查</li>
+                  <li>奶奶不愿上午空腹出门，偏好下午号</li>
+                  <li>只能挂市三院，其他医院她不肯去</li>
+                </ul>
+                <div class="chips"><span class="chip">◷ 来自奶奶 8/12 原话</span><span class="chip">◷ 来自你 7/15 原话</span></div>
+              </div>
+
+              <div class="hsec missing" id="missing">
+                <h5>未确定事项 · 2 项</h5>
+                <ul>
+                  <li>上次的检查报告存在哪里</li>
+                  <li>复查是否需要空腹</li>
+                </ul>
+              </div>
+
+              <div class="hsec">
+                <h5>接手后第一件事</h5>
+                <p>本周内挂市三院骨科下午号，挂号后把时间同步给奶奶本人。</p>
+              </div>
+
+              <div class="hact">
+                <button class="btn primary" id="fillBtn">补齐这 2 项信息</button>
+                <button class="btn" id="ackBtn" disabled>等待爸爸确认接收</button>
+              </div>
+              <p class="note" id="hNote">信息补齐、且双方都确认之前，所有权不转移。责任不允许落到地上。</p>
+            </div>
+          </div>
+          <div class="toast" id="toast3"><b>ACCEPTED</b>所有权已转移给爸爸。此后该责任域的全部提醒发给他。</div>
+        </div>
+      </div>
+      <div class="phone-label"><b>③ 交接卡 · blocked</b>「未确定事项」必须视觉突出，因为它就是阻断的原因。每条结论旁有证据入口</div>
+    </div>
+
+    <!-- ════════════ 屏 4：家庭群 · 看护升级 ════════════ -->
+    <div class="phone-col">
+      <div class="phone">
+        <div class="screen" id="s4">
+          <div class="statusbar"><span>20:03</span><span class="right">●●● ⏻ 81%</span></div>
+          <div class="navbar">
+            <span class="back">‹</span>
+            <span class="title">林家（4）<small>都记得 · 家庭群</small></span>
+            <span class="more">⋯</span>
+          </div>
+          <div class="body" id="s4body">
+            <div class="timesep"><span>晚上 8:00</span></div>
+
+            <div class="syssep"><span>爸爸声明「我现在开会，两小时内不在」· 本时段看护临时移交，妈妈进入待命</span></div>
+
+            <div class="msg">
+              <div class="avatar ai">记</div>
+              <div class="cardmsg">
+                <div class="ct">血压药 · 晚 20:00</div>
+                <div class="foot" style="margin-top:8px">已直接提醒奶奶本人。等待她回应「吃了」。</div>
+                <div class="lvl"><i class="on"></i><i></i><i></i><span>已通知本人 · 60 秒无回应则升级</span></div>
+              </div>
+            </div>
+
+            <button class="simbtn" id="simBtn">▷ 模拟：60 秒无回应</button>
+          </div>
+          <div class="inputbar">
+            <span class="icobtn">◉</span>
+            <span class="ib">说点什么…</span>
+            <span class="icobtn">☺</span>
+            <span class="icobtn">＋</span>
+          </div>
+        </div>
+      </div>
+      <div class="phone-label"><b>④ 家庭群 · 看护升级链</b>提醒先给被看护人本人。这一段是确定性状态机，没有一行 LLM</div>
+    </div>
+
+  </div>
+
+  <footer>
+    <b>怎么选：</b>先看屏 ① 的老人侧是否舒服，那是硬约束最多的一屏；再看屏 ② 的数字表是否读起来中性、不像成绩单。
+    <br><b>我的建议：</b>主用 <b>A 纸页</b>（记录感与「证据可溯源」的产品主张最贴合，衬线数字在报告表里很稳），把 <b>E 素白</b> 的对比度和字号规则作为被看护人侧的无障碍覆盖层；<b>D 夜灯</b> 留作夜间模式，老人夜里吃药提醒会用到。
+    <br>告诉我选哪个（可以混搭，比如「A 的色板 + B 的圆角」），我接着做完整可交互原型，按 PRD 第 8 章的 7 步 Demo 脚本串起来。
+  </footer>
+
+</div>
+
+<script>
+/* ============================ 风格说明数据 ============================ */
+const THEMES = {
+  a:{
+    name:"A · 纸页", tagline:"墨绿 + 棕 / 衬线标题 / 近直角 / 纸感暖白",
+    why:"把产品当成一份家庭档案来做。细边框、极小圆角、衬线标题，读起来像可信的记录而不是应用界面。和「每条结论都能点开看原话」的证据主张最合拍。",
+    pros:["报告表里的数字用衬线，稳、不像游戏 UI","文档感天然支撑「审计 / 留痕 / 溯源」","墨绿做主色，中性、无性别暗示，也不喜庆"],
+    cons:["圆角小、边框细，第一眼偏冷淡，缺一点亲切","衬线中文字体在安卓端回退不稳定，需要兜底字号"],
+    ratio:"15.0:1", ratioOk:true,
+    sw:[["#F4F1EA","页面底"],["#FFFFFF","卡片"],["#33513F","主色"],["#8A5A3B","强调"],["#9C4E22","阻断"],["#1F1C17","正文"]]
+  },
+  b:{
+    name:"B · 晨雾", tagline:"雾蓝 + 鼠尾草绿 / 大圆角 / 柔光无边框",
+    why:"最温和的一版。22px 圆角、几乎看不见边框、只用弥散阴影分层。适合「这不是一个催你干活的工具」的定位，老人侧压迫感最低。",
+    pros:["柔和度最高，被看护人侧最不像被管理","无边框 + 柔光，卡片密集时也不显杂乱","雾蓝偏冷静，避免健康类信息显得紧张"],
+    cons:["大圆角 + 弱边框在密集数据表上层级会变浅","柔光阴影投影仪上会被压掉，路演现场可能糊"],
+    ratio:"13.5:1", ratioOk:true,
+    sw:[["#F2F4F3","页面底"],["#FFFFFF","卡片"],["#4F7B93","主色"],["#6E9280","强调"],["#B0703C","阻断"],["#22282A","正文"]]
+  },
+  c:{
+    name:"C · 亚麻", tagline:"陶土红棕 + 黄铜 / 中圆角 / 暖亚麻底",
+    why:"最有「家」的体温的一版。亚麻米底 + 陶土主色，像布面和陶器。中等圆角配可见细边框，层级清楚，同时不冷。",
+    pros:["暖度最高，最像在讲家里的事而不是讲 SaaS","可见边框 + 中圆角，信息层级最扎实","投影效果好，色彩在会场不容易失真"],
+    cons:["陶土色偏暖偏红，和「阻断」的橙红需要仔细拉开距离","米底在低质量投影上可能显脏"],
+    ratio:"12.6:1", ratioOk:true,
+    sw:[["#EFE7DC","页面底"],["#FBF7F1","卡片"],["#7C4A34","主色"],["#9A7842","强调"],["#95401E","阻断"],["#2A231C","正文"]]
+  },
+  d:{
+    name:"D · 夜灯", tagline:"暖深灰 + 沙金 / 夜间模式候选",
+    why:"不是纯黑，是带暖调的深灰，配沙金主色。真实场景里吃药提醒常在晚上和夜里发生，老人半夜看手机需要一版不刺眼的。建议作为夜间模式而不是主方案。",
+    pros:["夜间不刺眼，老人侧的真实使用场景刚好覆盖","沙金主色在深底上对比充足，不靠饱和度取胜","路演演到「晚 20:00 吃药」那段切过来有叙事效果"],
+    cons:["深色底的报告表在投影上细节容易丢","老人普遍更习惯浅色，作为默认主题有可用性风险","截图和文档里做主视觉不占优势"],
+    ratio:"14.8:1", ratioOk:true,
+    sw:[["#1A1816","页面底"],["#242120","卡片"],["#C8A882","主色"],["#8FB3A0","强调"],["#DE9155","阻断"],["#F0EAE2","正文"]]
+  },
+  e:{
+    name:"E · 素白", tagline:"纯白 + 单一靛蓝 / 最高对比 / 无障碍优先",
+    why:"把 PRD 6.2 的无障碍硬指标顶到最高：19:1 正文对比、更粗的边框、更重的字重、只用一个强调色。最不好看，但最不会出错，也最适合真实长辈试用。",
+    pros:["对比度和可读性最高，长辈试用通过率最有保障","只有一个强调色，绝不会被看成花哨或游戏化","1.5px 边框在投影和低端屏上都立得住"],
+    cons:["观感偏医疗 / 政务，缺少「家」的温度","视觉记忆点最弱，路演截图不出彩"],
+    ratio:"17.7:1", ratioOk:true,
+    sw:[["#F7F7F5","页面底"],["#FFFFFF","卡片"],["#1F3D7A","主色"],["#1F3D7A","强调"],["#8C3A1E","阻断"],["#101010","正文"]]
+  }
+};
+
+const infoEl = document.getElementById('info');
+function renderInfo(k){
+  const t = THEMES[k];
+  infoEl.innerHTML = `
+    <div class="info-top">
+      <h2>${t.name}</h2>
+      <span class="tagline">${t.tagline}</span>
+      <span class="a11y ${t.ratioOk?'':'warnish'}" style="margin-left:auto">正文对比度 ${t.ratio} · WCAG AAA</span>
+    </div>
+    <div class="info-grid">
+      <div>
+        <h3>为什么是这个方向</h3>
+        <p>${t.why}</p>
+      </div>
+      <div>
+        <h3>色板</h3>
+        <div class="swatches">${t.sw.map(s=>`<div class="sw" style="background:${s[0]}"><b>${s[1]}<br>${s[0]}</b></div>`).join('')}</div>
+      </div>
+      <div>
+        <h3 class="pro">优点</h3>
+        <ul>${t.pros.map(p=>`<li class="pro">${p}</li>`).join('')}</ul>
+      </div>
+      <div>
+        <h3 class="con">风险</h3>
+        <ul>${t.cons.map(p=>`<li class="con">${p}</li>`).join('')}</ul>
+      </div>
+    </div>`;
+}
+
+/* ============================ 主题切换 ============================ */
+const tabs = [...document.querySelectorAll('.tab')];
+function setTheme(k){
+  document.documentElement.dataset.theme = k;
+  tabs.forEach(b=>b.setAttribute('aria-selected', String(b.dataset.t===k)));
+  renderInfo(k);
+}
+tabs.forEach((b,i)=>{
+  b.addEventListener('click',()=>setTheme(b.dataset.t));
+  b.addEventListener('keydown',e=>{
+    if(e.key==='ArrowRight'||e.key==='ArrowLeft'){
+      e.preventDefault();
+      const n = tabs[(i + (e.key==='ArrowRight'?1:tabs.length-1)) % tabs.length];
+      n.focus(); setTheme(n.dataset.t);
+    }
+  });
+});
+setTheme('a');
+
+document.getElementById('bigfont').addEventListener('change',e=>{
+  document.body.classList.toggle('big', e.target.checked);
+});
+
+/* ============================ 屏 1：同意门交互 ============================ */
+const s1body = document.getElementById('s1body');
+const consentWrap = document.getElementById('consentWrap');
+const CONSENT_REPLY = {
+  space:{ me:'告诉家里人', ai:'好。我把「腿疼」和「该复查了」放进家里的记录，标注是你本人同意的。你随时可以让我撤回。' },
+  member:{ me:'只告诉女儿', ai:'好。这件事只有你女儿能看到，其他人看不到。' },
+  self:{ me:'先别说',   ai:'好，那就只留在我们俩之间。它不会进家里的记录，也不会出现在任何报告里。' }
+};
+consentWrap.addEventListener('click',e=>{
+  const btn = e.target.closest('[data-consent]');
+  if(!btn) return;
+  const r = CONSENT_REPLY[btn.dataset.consent];
+  consentWrap.remove();
+  s1body.insertAdjacentHTML('beforeend', `
+    <div class="msg me"><div class="avatar">奶奶</div><div class="bubble">${r.me}</div></div>
+    <div class="msg"><div class="avatar ai">记</div><div class="bubble">${r.ai}</div></div>
+  `);
+  s1body.scrollTop = s1body.scrollHeight;
+});
+
+/* ============================ 屏 3：交接状态机 ============================ */
+const hStatus = document.getElementById('hStatus');
+const hNote   = document.getElementById('hNote');
+const fillBtn = document.getElementById('fillBtn');
+const ackBtn  = document.getElementById('ackBtn');
+const missing = document.getElementById('missing');
+const toast3  = document.getElementById('toast3');
+const toast2  = document.getElementById('toast2');
+
+fillBtn.addEventListener('click',()=>{
+  missing.querySelectorAll('li').forEach(li=>li.classList.add('filled'));
+  missing.querySelector('h5').textContent = '未确定事项 · 已补齐';
+  missing.classList.remove('missing');
+  hStatus.className = 'statuspill pending';
+  hStatus.innerHTML = '<span class="pulse"></span>PENDING_ACK · 等接手人确认';
+  hNote.textContent = '信息已补齐。仍需爸爸本人确认接收，所有权才转移。';
+  fillBtn.disabled = true;
+  fillBtn.textContent = '✓ 信息已补齐';
+  ackBtn.disabled = false;
+  ackBtn.classList.add('primary');
+  ackBtn.textContent = '爸爸确认接收（模拟）';
+});
+
+ackBtn.addEventListener('click',()=>{
+  hStatus.className = 'statuspill done';
+  hStatus.innerHTML = '<span class="pulse"></span>ACCEPTED · 已交接';
+  hNote.textContent = '双方确认时间戳齐全，所有权已转移。这条记录不可删除，只能归档。';
+  ackBtn.disabled = true;
+  ackBtn.classList.remove('primary');
+  ackBtn.textContent = '✓ 双方已确认';
+  toast3.classList.add('show');
+  setTimeout(()=>toast3.classList.remove('show'), 4200);
+
+  // 屏 2 联动：妈妈那侧的条目消失，计数下降（Demo 脚本第 5 步的情绪落点）
+  const dom = document.getElementById('domCare');
+  const cnt = document.getElementById('onlyMe');
+  document.getElementById('careBadge').className = 'badge his';
+  document.getElementById('careBadge').textContent = '主人：爸爸';
+  setTimeout(()=>{
+    dom.classList.add('fading');
+    setTimeout(()=>{
+      dom.remove();
+      cnt.textContent = '6';
+      cnt.classList.add('drop');
+      toast2.classList.add('show');
+      setTimeout(()=>toast2.classList.remove('show'), 4200);
+    }, 520);
+  }, 500);
+});
+
+/* ============================ 屏 4：看护升级链 ============================ */
+const s4body = document.getElementById('s4body');
+const simBtn = document.getElementById('simBtn');
+simBtn.addEventListener('click',()=>{
+  simBtn.disabled = true;
+  simBtn.textContent = '状态机运行中…';
+  const steps = [
+    { d:400, html:`<div class="syssep"><span>20:01:00  CareEvent → ack_timeout（超时阈值 60s，确定性判定）</span></div>` },
+    { d:900, html:`<div class="msg"><div class="avatar ai">记</div><div class="cardmsg escalate">
+        <div class="ct">升级 L1 · 奶奶未回应吃药提醒</div>
+        <div class="foot" style="margin-top:8px">已通知主看护人爸爸。仍无响应则升级到其他家庭成员。</div>
+        <div class="lvl"><i class="on"></i><i class="on"></i><i></i><span>L1 主看护人</span></div>
+      </div></div>` },
+    { d:1600, html:`<div class="msg"><div class="avatar ai">记</div><div class="cardmsg escalate">
+        <div class="ct">升级 L2 · 建议有人到现场确认</div>
+        <div class="foot" style="margin-top:8px">已通知妈妈与姐姐。系统不做判断，只建议有人去看一眼。</div>
+        <div class="lvl"><i class="on"></i><i class="on"></i><i class="on"></i><span>L2 其他家庭成员</span></div>
+      </div></div>` },
+    { d:2300, html:`<div class="msg me"><div class="avatar">爸爸</div><div class="bubble">会开完了，我打过去，奶奶说刚吃了</div></div>` },
+    { d:3000, html:`<div class="msg"><div class="avatar ai">记</div><div class="cardmsg">
+        <div class="ct">已闭环 · closed</div>
+        <div class="foot" style="margin-top:8px">20:03 由爸爸处理。本次提醒、超时、两级升级、闭环全部写入 CareEvent，报告页可回溯。</div>
+      </div></div>` },
+    { d:3200, fn:()=>{ simBtn.textContent = '✓ 这一段没有一行 LLM'; } }
+  ];
+  steps.forEach(s=>setTimeout(()=>{
+    if(s.fn) return s.fn();
+    simBtn.insertAdjacentHTML('beforebegin', s.html);
+    s4body.scrollTop = s4body.scrollHeight;
+  }, s.d));
+});
+</script>
+</body>
+</html>
