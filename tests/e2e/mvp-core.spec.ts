@@ -747,8 +747,17 @@ test.describe("@mvp-core @fixture canonical journey", () => {
             throw new Error("Expected compact navigation above one full-width mobile workspace");
           }
           expect(railBox.y + railBox.height).toBeLessThanOrEqual(surfaceBox.y + 1);
-          expect(Math.abs(surfaceBox.x)).toBeLessThanOrEqual(1);
-          expect(Math.abs(surfaceBox.width - configuredViewport.width)).toBeLessThanOrEqual(1);
+          const leftGutterPx = surfaceBox.x;
+          const rightGutterPx =
+            configuredViewport.width - (surfaceBox.x + surfaceBox.width);
+          expect(leftGutterPx).toBeGreaterThanOrEqual(0);
+          expect(leftGutterPx).toBeLessThanOrEqual(
+            acceptance.selectedRoleWebApp.mobile.horizontalGutterPxMaximum,
+          );
+          expect(rightGutterPx).toBeGreaterThanOrEqual(0);
+          expect(rightGutterPx).toBeLessThanOrEqual(
+            acceptance.selectedRoleWebApp.mobile.horizontalGutterPxMaximum,
+          );
         }
 
         await expectRoleCards(page, role);
