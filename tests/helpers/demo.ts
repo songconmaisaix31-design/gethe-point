@@ -46,6 +46,13 @@ export async function switchRole(page: Page, role: Role): Promise<void> {
     await button.click();
     await expect(button).toHaveAttribute("aria-pressed", "true");
   }
+
+  if (await page.getByTestId("family-home").count()) {
+    await expect(page.locator(".home-loading")).toBeHidden();
+    await expect(page.getByTestId("timetable-grid")).toBeVisible();
+    return;
+  }
+
   await expect(page.locator(".loading-card")).toBeHidden();
   await expect(page.locator("#main-content").getByRole("heading", { level: 1 })).toContainText(
     roleLabels[role],

@@ -4,7 +4,7 @@ import { getState, postAction, resetDemo, switchRole } from "../helpers/demo";
 
 test.beforeEach(async ({ page, request }) => {
   await resetDemo(request);
-  await page.goto("/");
+  await page.goto("/demo");
 });
 
 test("three role projections keep direct-message evidence private until explicit consent", async ({ page }) => {

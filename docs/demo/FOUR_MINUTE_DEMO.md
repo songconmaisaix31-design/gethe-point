@@ -2,6 +2,8 @@
 
 This script demonstrates one fictional household. It is not production authentication, live delivery, medical advice, or real-device Robot A3 evidence.
 
+Open `/demo` for this accepted V1.1 flow. The timetable-first product home remains at `/`; use its “打开四分钟演示” link to enter this route.
+
 ## 0:00–0:35 — Three roles and private input
 
 1. Reset the Fixture.
