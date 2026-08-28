@@ -1,14 +1,13 @@
 import { expect, test } from "@playwright/test";
 
-import {
-  AgentIntents,
-  type AgentQueryResponse,
-} from "../../src/contracts";
+import type { AgentQueryResponse } from "../../src/contracts";
 import { getState, resetDemo, switchRole } from "../helpers/demo";
 
 const privateEvidenceText = "腿又疼了，下楼有点吃力";
 const hiddenPrimaryItemIds = ["timetable_school_form", "timetable_health_booking"];
+const hiddenPrimaryItemTitles = ["交回新生体检表", "预约骨科复查"];
 const targetMemberIds = ["member_primary", "member_partner", "member_subject"] as const;
+const expectedAgentIntents = ["schedule", "responsibilities", "care", "help"] as const;
 
 test.describe.configure({ mode: "serial" });
 
@@ -59,17 +58,24 @@ test("persists structured timetable creation across reload", async ({ page }) =>
   const created = (await getState(page.request, "primary")).timetableItems.find(
     (item) => item.title === title,
   );
+  expect(created).toBeDefined();
+  if (!created) throw new Error("Created timetable item was not returned.");
   expect(created).toMatchObject({
     ownerId: "member_subject",
     category: "family",
     domainId: "domain_home",
     status: "planned",
+    startsAt: "2026-08-30T06:30:00.000Z",
+    endsAt: "2026-08-30T07:30:00.000Z",
   });
 
   await page.reload();
   await expect(page.getByTestId("timetable-grid")).toBeVisible();
   await expect(page.getByText(title, { exact: true })).toBeVisible();
-  expect((await getState(page.request, "primary")).timetableItems.some(({ id }) => id === created?.id)).toBeTruthy();
+  expect((await getState(page.request, "primary")).timetableItems.find(({ id }) => id === created.id)).toMatchObject({
+    startsAt: "2026-08-30T06:30:00.000Z",
+    endsAt: "2026-08-30T07:30:00.000Z",
+  });
 });
 
 test("refuses non-owner completion and persists the owner's explicit completion", async ({ page }) => {
@@ -109,7 +115,7 @@ test("all member Agent intents stay read-only, role-safe, and honestly labelled 
   const visibleItemIds = new Set(before.timetableItems.map(({ id }) => id));
 
   for (const targetMemberId of targetMemberIds) {
-    for (const intentHint of AgentIntents) {
+    for (const intentHint of expectedAgentIntents) {
       const response = await page.request.post("/api/demo/agent?role=partner", {
         data: {
           targetMemberId,
@@ -123,15 +129,19 @@ test("all member Agent intents stay read-only, role-safe, and honestly labelled 
       expect(answer.targetMemberId).toBe(targetMemberId);
       expect(answer.engine).toBe("fixture_intent_router");
       expect(answer.text.trim().length).toBeGreaterThan(0);
-      expect(JSON.stringify(answer)).not.toContain(privateEvidenceText);
+      const serializedAnswer = JSON.stringify(answer);
+      expect(serializedAnswer).not.toContain(privateEvidenceText);
+      for (const hiddenTitle of hiddenPrimaryItemTitles) {
+        expect(serializedAnswer).not.toContain(hiddenTitle);
+      }
       expect(answer.referencedItemIds.every((id) => visibleItemIds.has(id))).toBeTruthy();
       for (const hiddenId of hiddenPrimaryItemIds) {
-        expect(answer.referencedItemIds).not.toContain(hiddenId);
+        expect(serializedAnswer).not.toContain(hiddenId);
       }
     }
   }
 
-  expect((await getState(page.request, "partner")).timetableItems).toEqual(before.timetableItems);
+  expect(await getState(page.request, "partner")).toEqual(before);
 
   await page.getByTestId("member-agent-member_subject").click();
   await page.getByTestId("agent-message").fill("这周有什么安排？");
