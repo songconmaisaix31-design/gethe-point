@@ -44,3 +44,15 @@
 ## Secret handling
 
 - Do not read or record secret values. Record only the name and approved configuration location of any future secret.
+
+## Multi-channel routing decisions
+
+- Channel integrations are transport adapters around the existing product boundary. Platform SDKs must not enter consent, responsibility, handover, care, privacy, or AI feature modules.
+- WeCom message-push webhooks are outbound-only. Bidirectional WeCom work must use the intelligent robot callback or long-connection capability and must prove the exact target conversation type before implementation.
+- An ordinary personal WeChat family group is not a supported official integration target. Do not use simulated login, unofficial protocols, session scraping, or message archives as a workaround.
+- Feishu and DingTalk integrations use application-bot event capabilities; custom group webhooks are never treated as inbound transports.
+- External identities and conversations require explicit binding. Never infer a member or space from display name, phone number, or platform group membership.
+- Platform redelivery is handled by a durable inbox plus domain idempotency. Outbound delivery uses a durable outbox and never treats platform acceptance as proof that a user received, read, consented to, or completed an action.
+- External group visibility does not bypass We Remember's per-signal consent. L0 content remains speaker-owned until the existing shared-write boundary succeeds.
+- Consequential channel actions require a short-lived, actor/conversation/target/version-bound nonce or an authenticated web fallback. Free text must not confirm consent, handover, or care actions by inference.
+- The routing design is recorded in `docs/architecture/channel-routing.md`; its future frozen-contract delta is `docs/architecture/channel-routing-contract.md`.
