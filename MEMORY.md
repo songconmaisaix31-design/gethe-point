@@ -16,6 +16,8 @@
 - AI handles ambiguous interpretation and produces validated drafts. Deterministic code owns authorization, state transitions, reminders, care escalation, deletion, and audit.
 - Care rules require human activation. Care escalation must not depend on an LLM.
 - Reports describe responsibility distribution neutrally; they must not score, rank, diagnose, or blame family members.
+- On 2026-08-28, the product direction was corrected to a real responsive Web App for desktop, tablet, and mobile, not a multi-phone showcase. `origin/main:prototype.html` freezes the Style A visual language, while `origin/main:style-options.html` explicitly treats its embedded phone screens as showcase-only.
+- The accepted responsive structure renders one allowlisted selected role: desktop keeps a persistent application sidebar and broad workspace, tablet reflows without clipping, and mobile uses a full-width single column with visible compact role, status, and reset navigation. Preserve consent, responsibility, and handover truth; typed API and security behavior; substantial four-zone cards; and acceptance at `1440x900`, `1024x768`, and `390x844`.
 
 ## Fleet-kit deployment
 
