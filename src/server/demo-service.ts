@@ -37,11 +37,18 @@ import type { DemoDatabase } from "./database.ts";
 import { resetDemoDatabase } from "./database.ts";
 // @ts-expect-error Node's native TypeScript runner requires an explicit extension.
 import { appNotificationAdapter, createA3NotificationAdapter } from "./notifications.ts";
+import type {
+  AgentProviderRequest,
+  AgentTextProvider,
+} from "./agent-provider.ts";
+// @ts-expect-error Node's native TypeScript runner requires an explicit extension.
+import { validateProviderText } from "./agent-provider.ts";
 import type { FixtureSession } from "./types.ts";
 
 const DEDUPE_WINDOW_MS = 5 * 60 * 1_000;
 const FIXTURE_WEEK_START_MS = Date.parse("2026-08-24T00:00:00+08:00");
 const FIXTURE_WEEK_END_MS = Date.parse("2026-08-31T00:00:00+08:00");
+const MAX_PROVIDER_TIMETABLE_ITEMS = 8;
 
 interface MemberRow {
   readonly id: string;
@@ -196,7 +203,7 @@ export interface DemoService {
   queryAgent(
     session: FixtureSession,
     request: AgentQueryRequest,
-  ): AgentQueryResponse;
+  ): Promise<AgentQueryResponse>;
 }
 
 export function createDemoService(
@@ -205,6 +212,7 @@ export function createDemoService(
       appNotificationAdapter,
       createA3NotificationAdapter(),
   ],
+  agentProvider?: AgentTextProvider,
 ): DemoService {
   const adaptersByChannel = new Map(
     adapters.map((adapter) => [adapter.channel, adapter]),
@@ -429,10 +437,10 @@ export function createDemoService(
     };
   }
 
-  function queryAgent(
+  async function queryAgent(
     session: FixtureSession,
     request: AgentQueryRequest,
-  ): AgentQueryResponse {
+  ): Promise<AgentQueryResponse> {
     const state = getState(session);
     const target = state.members.find(
       (member) => member.id === request.targetMemberId,
@@ -479,7 +487,7 @@ export function createDemoService(
       suggestedActions = ["view_timetable", "add_item", "open_demo"];
     }
 
-    return {
+    const deterministicResponse: AgentQueryResponse = {
       intent,
       targetMemberId: target.id,
       text,
@@ -487,6 +495,43 @@ export function createDemoService(
       suggestedActions,
       engine: "fixture_intent_router",
     };
+
+    if (!agentProvider) {
+      return deterministicResponse;
+    }
+
+    const providerRequest: AgentProviderRequest = {
+      question: request.message,
+      targetDisplayName: target.displayName,
+      intent,
+      deterministicAnswer: text,
+      visibleTimetable: targetItems
+        .slice(0, MAX_PROVIDER_TIMETABLE_ITEMS)
+        .map((item) => ({
+          title: item.title,
+          startsAt: item.startsAt,
+          endsAt: item.endsAt,
+          category: item.category,
+          status: item.status,
+        })),
+      visibleResponsibilityCount: state.domains.filter(
+        (domain) => domain.ownerId === target.id,
+      ).length,
+      visibleCareRuleCount: state.careRules.filter(
+        (rule) => rule.subjectId === target.id,
+      ).length,
+    };
+
+    try {
+      const providerText = validateProviderText(
+        await agentProvider.rewrite(providerRequest),
+      );
+      return providerText
+        ? { ...deterministicResponse, text: providerText, engine: "stepfun" }
+        : deterministicResponse;
+    } catch {
+      return deterministicResponse;
+    }
   }
 
   function memberIdForRole(role: Role): string {

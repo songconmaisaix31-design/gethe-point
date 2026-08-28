@@ -210,12 +210,79 @@ describe("timetable persistence and authorization", () => {
 });
 
 describe("Fixture member Agent", () => {
-  test("is read-only and routes supported Chinese intents deterministically", () => {
+  test("provider rewrites only text from a bounded role-safe summary without mutating data", async () => {
+    const database = createDemoDatabase();
+    let providerRequest: unknown;
+    const service = createDemoService(database, [], {
+      async rewrite(request): Promise<unknown> {
+        providerRequest = request;
+        return "今晚有两项可见的照护安排。";
+      },
+    });
+    const before = database
+      .prepare("SELECT * FROM timetable_items ORDER BY id")
+      .all();
+
+    const response = await service.queryAgent(
+      { role: "subject" },
+      {
+        targetMemberId: "member_subject",
+        message: "请查看照护安排",
+        intentHint: "care",
+      },
+    );
+    const after = database
+      .prepare("SELECT * FROM timetable_items ORDER BY id")
+      .all();
+
+    assert.equal(response.text, "今晚有两项可见的照护安排。");
+    assert.equal(response.engine, "stepfun");
+    assert.equal(response.intent, "care");
+    assert.deepEqual(response.referencedItemIds, [
+      "timetable_medicine",
+      "timetable_walk",
+    ]);
+    assert.deepEqual(response.suggestedActions, ["view_timetable", "open_demo"]);
+    assert.deepEqual(before, after);
+    const serializedRequest = JSON.stringify(providerRequest);
+    assert.equal(serializedRequest.includes("腿又疼了，下楼有点吃力"), false);
+    assert.equal(serializedRequest.includes("evidence_subject_private"), false);
+    assert.equal(serializedRequest.includes("notificationLogs"), false);
+    assert.equal(serializedRequest.includes("member_subject"), false);
+  });
+
+  test("invalid or throwing injected providers retain the deterministic response", async () => {
+    const invalidService = createDemoService(createDemoDatabase(), [], {
+      async rewrite(): Promise<unknown> {
+        return "答".repeat(721);
+      },
+    });
+    const throwingService = createDemoService(createDemoDatabase(), [], {
+      async rewrite(): Promise<unknown> {
+        throw new Error("provider failure");
+      },
+    });
+
+    const request = {
+      targetMemberId: "member_subject",
+      message: "日程安排",
+    } as const;
+    const invalid = await invalidService.queryAgent({ role: "subject" }, request);
+    const throwing = await throwingService.queryAgent({ role: "subject" }, request);
+
+    assert.equal(invalid.engine, "fixture_intent_router");
+    assert.equal(throwing.engine, "fixture_intent_router");
+    assert.equal(invalid.text, throwing.text);
+    assert.deepEqual(invalid.referencedItemIds, throwing.referencedItemIds);
+    assert.deepEqual(invalid.suggestedActions, throwing.suggestedActions);
+  });
+
+  test("is read-only and routes supported Chinese intents deterministically", async () => {
     const { database, service } = fixture();
     const before = database
       .prepare("SELECT * FROM timetable_items ORDER BY id")
       .all();
-    const response = service.queryAgent(
+    const response = await service.queryAgent(
       { role: "subject" },
       { targetMemberId: "member_subject", message: "我的用药和健康安排" },
     );
@@ -227,7 +294,7 @@ describe("Fixture member Agent", () => {
     assert.equal(response.engine, "fixture_intent_router");
     assert.deepEqual(before, after);
 
-    const hinted = service.queryAgent(
+    const hinted = await service.queryAgent(
       { role: "subject" },
       {
         targetMemberId: "member_subject",
@@ -239,13 +306,13 @@ describe("Fixture member Agent", () => {
     assert.deepEqual(hinted.referencedItemIds, ["timetable_medicine", "timetable_walk"]);
   });
 
-  test("target selection never expands the caller's role-safe projection", () => {
+  test("target selection never expands the caller's role-safe projection", async () => {
     const { service } = fixture();
-    const ownerView = service.queryAgent(
+    const ownerView = await service.queryAgent(
       { role: "primary" },
       { targetMemberId: "member_primary", message: "日程安排" },
     );
-    const otherView = service.queryAgent(
+    const otherView = await service.queryAgent(
       { role: "partner" },
       { targetMemberId: "member_primary", message: "日程安排" },
     );
@@ -258,11 +325,10 @@ describe("Fixture member Agent", () => {
     assert.equal(otherView.text.includes("腿又疼了"), false);
   });
 
-  test("rejects an unknown target member without exposing data", () => {
+  test("rejects an unknown target member without exposing data", async () => {
     const { service } = fixture();
-    assert.throws(
-      () =>
-        service.queryAgent(
+    await assert.rejects(
+      service.queryAgent(
           { role: "primary" },
           { targetMemberId: "member_missing", message: "日程" },
         ),

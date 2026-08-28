@@ -312,7 +312,7 @@ export interface AgentQueryResponse {
     | "add_item"
     | "open_demo"
   )[];
-  readonly engine: "fixture_intent_router";
+  readonly engine: "stepfun" | "fixture_intent_router";
 }
 
 export const SafeErrorSchema = z

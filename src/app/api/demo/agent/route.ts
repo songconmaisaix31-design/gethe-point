@@ -16,7 +16,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       throw domainError("invalid_request", "The Agent query is invalid.");
     }
     return NextResponse.json(
-      getDemoService().queryAgent({ role }, query.data),
+      await getDemoService().queryAgent({ role }, query.data),
     );
   } catch (error) {
     return safeErrorResponse(error);
