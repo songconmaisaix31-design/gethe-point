@@ -334,27 +334,79 @@ export const PartnerConfirmationPanel = ({
   commandsDisabled,
   onAction,
 }: CoreCardProps) => {
+  const ids = MVP_CORE_TEST_IDS.cards.handover;
   const handover = snapshot.server.handover;
   const canConfirm =
     handover.status === "awaiting_confirmations" && !handover.toConfirmed;
 
   return (
-    <section className="partner-confirmation-panel" aria-label="接手方确认">
-      <p className="eyebrow">独立确认</p>
-      <h3>{MVP_CORE_DISPLAY.memberNames.partner}</h3>
-      <p>
-        当前交接状态：<strong>{handover.status}</strong>
-      </p>
-      <p>提出方：{handover.fromConfirmed ? "confirmed" : "pending"}</p>
-      <p>接手方：{handover.toConfirmed ? "confirmed" : "pending"}</p>
-      <CommandButton
-        command="confirm_handover_to"
-        label="接手方确认接收"
-        testId={MVP_CORE_TEST_IDS.confirmTo}
-        disabled={commandsDisabled || !canConfirm}
-        pendingActionId={pendingActionId}
-        onAction={onAction}
-      />
+    <section
+      className="content-card core-card handover-card partner-handover-card"
+      data-testid={ids.root}
+      aria-label="接手方交接确认"
+    >
+      <header className="card-zone card-title-zone" data-testid={ids.title}>
+        <div>
+          <p className="eyebrow">待确认的责任交接</p>
+          <h3>{MVP_CORE_DISPLAY.domain.name}</h3>
+        </div>
+        <span className={`state-badge state-${handover.status}`}>{handover.status}</span>
+      </header>
+
+      <div className="card-zone card-body-zone" data-testid={ids.content}>
+        <div className="handover-fact">
+          <span>接收的是一整块责任</span>
+          <p>{MVP_CORE_DISPLAY.domain.scope}</p>
+        </div>
+        <div className="handover-fact">
+          <span>接手后第一步</span>
+          <p>{MVP_CORE_DISPLAY.domain.nextAction}</p>
+        </div>
+        {handover.status === "blocked" ? (
+          <div className="missing-zone">
+            <strong>缺少：{MVP_CORE_DISPLAY.handover.missingLabel}</strong>
+            <p>{MVP_CORE_DISPLAY.handover.missingReason}</p>
+          </div>
+        ) : null}
+      </div>
+
+      <div className={`card-zone state-zone state-zone-${handover.status}`} data-testid={ids.state}>
+        <strong data-testid={MVP_CORE_TEST_IDS.handoverStatus}>{handover.status}</strong>
+        <div className="confirmation-grid" aria-label="双方确认状态">
+          <p>
+            {MVP_CORE_DISPLAY.memberNames.primary} · 提出方
+            <b data-testid={MVP_CORE_TEST_IDS.fromConfirmation}>
+              {handover.fromConfirmed ? "confirmed" : "pending"}
+            </b>
+          </p>
+          <p>
+            {MVP_CORE_DISPLAY.memberNames.partner} · 接手方
+            <b data-testid={MVP_CORE_TEST_IDS.toConfirmation}>
+              {handover.toConfirmed ? "confirmed" : "pending"}
+            </b>
+          </p>
+        </div>
+        <div className="ownership-zone">
+          <strong data-testid={MVP_CORE_TEST_IDS.domainOwner}>
+            当前负责人：{ownerName(snapshot.server.domainOwnerId)}
+          </strong>
+          <p data-testid={MVP_CORE_TEST_IDS.reminderOwner}>
+            {MVP_CORE_DISPLAY.reminder.label} · {ownerName(snapshot.server.reminderOwnerId)}
+          </p>
+        </div>
+      </div>
+
+      <footer className="card-zone card-actions-zone" data-testid={ids.actions}>
+        <CommandButton
+          command="confirm_handover_to"
+          label="接手方确认接收"
+          testId={MVP_CORE_TEST_IDS.confirmTo}
+          disabled={commandsDisabled || !canConfirm}
+          pendingActionId={pendingActionId}
+          onAction={onAction}
+        />
+        <p className="action-note">信息完整且双方独立确认前，负责人和提醒不会转移。</p>
+      </footer>
     </section>
   );
 };

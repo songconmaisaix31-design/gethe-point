@@ -10,11 +10,28 @@ import type {
   ExperienceSnapshot,
   MemberRole,
 } from "../features/experience/model";
-import { ROLE_ORDER } from "../features/experience/model";
 import { useExperience } from "../features/experience/use-experience";
 import { RoleSurface } from "./RoleSurface";
 import { ScenarioRail } from "./ScenarioRail";
 import { TruthLabels } from "./TruthLabels";
+
+const ROLE_PAGE_COPY = Object.freeze({
+  primary: Object.freeze({
+    kicker: "主责任人工作台",
+    title: "责任地图与交接",
+    summary: "把责任分布、阻断原因和真正移交后的负责人放在同一个工作区。",
+  }),
+  partner: Object.freeze({
+    kicker: "接手方工作台",
+    title: "我的责任与待确认交接",
+    summary: "看清已经拥有的责任，以及需要本人确认接收的一整块交接。",
+  }),
+  subject: Object.freeze({
+    kicker: "本人私密对话",
+    title: "我的对话与分享决定",
+    summary: "私聊默认只属于你；是否告诉家里人，由你逐条决定。",
+  }),
+});
 
 export interface ExperienceViewProps {
   readonly snapshot: ExperienceSnapshot;
@@ -48,55 +65,59 @@ export const ExperienceView = ({
   onAction,
   onReload,
 }: ExperienceViewProps) => (
-  <main className="fixture-shell" data-testid={MVP_CORE_TEST_IDS.root}>
-    <TruthLabels
-      writeCount={snapshot.server.writeCount}
-      sharedRowCount={snapshot.server.sharedRows}
-    />
+  <main
+    className="fixture-shell"
+    data-role={selectedRole}
+    data-testid={MVP_CORE_TEST_IDS.root}
+  >
     <div className="fixture-layout">
       <ScenarioRail
         snapshot={snapshot}
+        selectedRole={selectedRole}
         pendingActionId={pendingActionId}
         commandsDisabled={commandsDisabled}
         onAction={onAction}
       />
-      <section className="experience-stage" aria-label="三角色同步体验">
-        <h1 className="screen-reader-only">{snapshot.stageTitle}</h1>
-        <header className="stage-heading">
-          <div>
-            <p className="stage-kicker">固定 QA-002 Fixture</p>
-            <h2>{snapshot.stageTitle}</h2>
-            <p>{snapshot.stageSummary}</p>
-          </div>
-          <span className="stage-revision">服务端快照 · r{snapshot.server.revision}</span>
-        </header>
-
-        {error === null ? null : (
-          <div className="integration-error" role="alert">
+      <section className="experience-stage" aria-label={ROLE_PAGE_COPY[selectedRole].title}>
+        <TruthLabels
+          writeCount={snapshot.server.writeCount}
+          sharedRowCount={snapshot.server.sharedRows}
+        />
+        <div className="stage-content">
+          <header className="stage-heading">
             <div>
-              <strong>操作结果需要核对</strong>
-              <p>
-                {error.message} {truthMessage(error)}
-              </p>
+              <p className="stage-kicker">{ROLE_PAGE_COPY[selectedRole].kicker}</p>
+              <h1>{ROLE_PAGE_COPY[selectedRole].title}</h1>
+              <p>{ROLE_PAGE_COPY[selectedRole].summary}</p>
             </div>
-            <button type="button" className="action-button secondary-action" onClick={onReload}>
-              重新加载服务端状态
-            </button>
-          </div>
-        )}
+            <div className="stage-status" aria-live="polite">
+              <span>当前服务端状态 · r{snapshot.server.revision}</span>
+              <strong>{snapshot.stageTitle}</strong>
+              <small>{snapshot.stageSummary}</small>
+            </div>
+          </header>
 
-        <div className="role-grid">
-          {ROLE_ORDER.map((role) => (
-            <RoleSurface
-              role={role}
-              selectedRole={selectedRole}
-              snapshot={snapshot}
-              pendingActionId={pendingActionId}
-              commandsDisabled={commandsDisabled}
-              onAction={onAction}
-              key={role}
-            />
-          ))}
+          {error === null ? null : (
+            <div className="integration-error" role="alert">
+              <div>
+                <strong>操作结果需要核对</strong>
+                <p>
+                  {error.message} {truthMessage(error)}
+                </p>
+              </div>
+              <button type="button" className="action-button secondary-action" onClick={onReload}>
+                重新加载服务端状态
+              </button>
+            </div>
+          )}
+
+          <RoleSurface
+            role={selectedRole}
+            snapshot={snapshot}
+            pendingActionId={pendingActionId}
+            commandsDisabled={commandsDisabled}
+            onAction={onAction}
+          />
         </div>
       </section>
     </div>
