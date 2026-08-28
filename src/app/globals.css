@@ -823,10 +823,13 @@ th {
   .subject-phone {
     border-width: 6px;
     border-radius: 26px;
+    overflow: visible;
   }
 
   .chat-body {
+    max-height: none;
     padding: 20px 12px;
+    overflow: visible;
   }
 
   .message {
@@ -835,6 +838,11 @@ th {
 
   .consent-card {
     padding: 17px 13px;
+  }
+
+  .voice-control {
+    position: static;
+    margin-bottom: 20px;
   }
 
   .status-message.error {
@@ -848,8 +856,7 @@ th {
   *::before,
   *::after {
     scroll-behavior: auto !important;
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+    animation: none !important;
+    transition: none !important;
   }
 }

@@ -163,6 +163,7 @@ export function DemoApp() {
             type="button"
             aria-pressed={role === item}
             onClick={() => {
+              if (role === item) return;
               setLoading(true);
               setError(null);
               setRole(item);
@@ -325,7 +326,7 @@ function ResponsibilityReport({ state }: { readonly state: RoleSafeProjection })
           </tbody>
         </table>
       </div>
-      <p className="neutral-note">这张表只呈现已记录的责任分布，不评分、不排名，也不判断任何家庭成员。</p>
+      <p className="neutral-note">这张表只呈现已记录的责任分布，供家庭成员确认与协作。</p>
       {state.report.excludedNeedsReviewCount > 0 ? (
         <p className="review-note">{state.report.excludedNeedsReviewCount} 条因证据待复核，未计入报告。</p>
       ) : null}
@@ -424,7 +425,9 @@ function SubjectSurface({
   readonly disabled: boolean;
   readonly act: (label: string, action: DemoAction) => Promise<void>;
 }) {
-  const evidence = state.evidence.find((item) => item.speakerId === member.id && !item.deleted);
+  const evidence = state.evidence.find(
+    (item) => item.id === "evidence_subject_private" && item.speakerId === member.id && !item.deleted,
+  );
 
   return (
     <div className="subject-layout">
@@ -437,12 +440,12 @@ function SubjectSurface({
           <div className="message agent">奶奶早上好。昨天睡得还行吗？</div>
           {evidence ? <div className="message mine">{evidence.text}</div> : <div className="message mine">腿这两天又疼了，下楼有点吃力。</div>}
           <div className="message agent">我记下了。要不要把这件事告诉家里人？</div>
-          <div className="consent-card" data-testid="consent-space">
+          <div className="consent-card">
             <h3>这句话由你决定</h3>
             <p>每次共享都单独确认。选择“不说”不会进入家庭空间或责任报告。</p>
             {evidence ? (
               <div className="senior-actions">
-                <button className="primary-button" type="button" disabled={disabled} onClick={() => void act("已按你的选择告诉家里人。", {
+                <button className="primary-button" data-testid="consent-space" type="button" disabled={disabled} onClick={() => void act("已按你的选择告诉家里人。", {
                   type: "share_evidence", evidenceId: evidence.id, visibility: "space",
                 })}>告诉家里人</button>
                 <button className="secondary-button" type="button" disabled={disabled} onClick={() => void act("只向照护相关成员共享。", {
@@ -513,10 +516,14 @@ function CareCard({
 }
 
 function NotificationLog({ state }: { readonly state: RoleSafeProjection }) {
+  const latestEvent = latestCareEvent(state.careEvents);
   return (
     <section className="paper-card" data-testid="notification-log" aria-labelledby="notification-title">
       <p className="eyebrow">通知记录</p>
       <h2 id="notification-title">送达事实，不多说一步</h2>
+      {latestEvent ? (
+        <p className="safety-note">看护事件：{latestEvent.state === "closed" ? "已闭环" : latestEvent.state}</p>
+      ) : null}
       {state.notificationLogs.length ? (
         <ul className="notification-list">
           {state.notificationLogs.map((log) => (

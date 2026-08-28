@@ -32,13 +32,13 @@ describe("consented evidence", () => {
     assert.equal(
       service
         .getState({ role: "primary" })
-        .evidence.some((item) => item.id === "evidence_private_pain"),
+        .evidence.some((item) => item.id === "evidence_subject_private"),
       false,
     );
     assert.equal(
       service
         .getState({ role: "subject" })
-        .evidence.some((item) => item.id === "evidence_private_pain"),
+        .evidence.some((item) => item.id === "evidence_subject_private"),
       true,
     );
 
@@ -47,7 +47,7 @@ describe("consented evidence", () => {
         { role: "primary" },
         {
           type: "share_evidence",
-          evidenceId: "evidence_private_pain",
+          evidenceId: "evidence_subject_private",
           visibility: "space",
         },
       ),
@@ -58,14 +58,14 @@ describe("consented evidence", () => {
       { role: "subject" },
       {
         type: "share_evidence",
-        evidenceId: "evidence_private_pain",
+        evidenceId: "evidence_subject_private",
         visibility: "self",
       },
     );
     assert.equal(
       service
         .getState({ role: "primary" })
-        .signals.some((item) => item.evidenceId === "evidence_private_pain"),
+        .signals.some((item) => item.evidenceId === "evidence_subject_private"),
       false,
     );
 
@@ -73,26 +73,26 @@ describe("consented evidence", () => {
       { role: "subject" },
       {
         type: "share_evidence",
-        evidenceId: "evidence_private_pain",
+        evidenceId: "evidence_subject_private",
         visibility: { members: ["member_primary"] },
       },
     );
     assert.equal(
       service
         .getState({ role: "primary" })
-        .signals.some((item) => item.evidenceId === "evidence_private_pain"),
+        .signals.some((item) => item.evidenceId === "evidence_subject_private"),
       true,
     );
     assert.equal(
       service
         .getState({ role: "partner" })
-        .evidence.some((item) => item.id === "evidence_private_pain"),
+        .evidence.some((item) => item.id === "evidence_subject_private"),
       false,
     );
     assert.equal(
       service
         .getState({ role: "subject" })
-        .evidence.some((item) => item.id === "evidence_private_pain"),
+        .evidence.some((item) => item.id === "evidence_subject_private"),
       true,
     );
   });
@@ -103,16 +103,16 @@ describe("consented evidence", () => {
       { role: "primary" },
       {
         type: "delete_evidence",
-        evidenceId: "evidence_appointment",
+        evidenceId: "evidence_health_deadline",
         actorId: "member_primary",
       },
     );
 
     const state = service.getState({ role: "primary" });
-    assert.equal(state.evidence.find((item) => item.id === "evidence_appointment")?.text, "[deleted]");
-    assert.equal(state.signals.find((item) => item.evidenceId === "evidence_appointment")?.status, "needs_review");
-    assert.equal(state.domains.find((item) => item.id === "domain_followup")?.status, "needs_review");
-    assert.equal(state.report.tasks.some((item) => item.id === "task_followup"), false);
+    assert.equal(state.evidence.find((item) => item.id === "evidence_health_deadline")?.text, "[deleted]");
+    assert.equal(state.signals.find((item) => item.evidenceId === "evidence_health_deadline")?.status, "needs_review");
+    assert.equal(state.domains.find((item) => item.id === "domain_health")?.status, "needs_review");
+    assert.equal(state.report.tasks.some((item) => item.id === "task_health_booking"), false);
     assert.equal(state.report.excludedNeedsReviewCount, 1);
   });
 });
@@ -121,19 +121,19 @@ describe("responsibility and handover", () => {
   test("persists all five neutral responsibility stages", () => {
     const { service } = fixture();
     const report = service.getState({ role: "primary" }).report;
-    const task = report.tasks.find((item) => item.id === "task_report");
+    const task = report.tasks.find((item) => item.id === "task_health_booking");
 
     assert.deepEqual(task, {
-      id: "task_report",
-      domainId: "domain_followup",
-      title: "整理检查资料",
-      status: "completed",
-      futureReminderOwnerId: null,
+      id: "task_health_booking",
+      domainId: "domain_health",
+      title: "挂市三院骨科复查号",
+      status: "open",
+      futureReminderOwnerId: "member_primary",
       discoveredBy: "member_primary",
       deadlineKeptBy: "member_primary",
       scheduledBy: "member_primary",
       executedBy: "member_primary",
-      followedUpBy: "member_partner",
+      followedUpBy: "member_primary",
     });
     assert.equal(report.title, "本周家庭责任记录");
   });
@@ -145,7 +145,7 @@ describe("responsibility and handover", () => {
         { role: "primary" },
         {
           type: "confirm_handover",
-          handoverId: "handover_followup",
+          handoverId: "handover_health",
           actorId: "member_primary",
           expectedVersion: 0,
         },
@@ -157,7 +157,7 @@ describe("responsibility and handover", () => {
       { role: "primary" },
       {
         type: "add_handover_info",
-        handoverId: "handover_followup",
+        handoverId: "handover_health",
         item: "last_report",
       },
     );
@@ -165,7 +165,7 @@ describe("responsibility and handover", () => {
       { role: "primary" },
       {
         type: "confirm_handover",
-        handoverId: "handover_followup",
+        handoverId: "handover_health",
         actorId: "member_primary",
         expectedVersion: 1,
       },
@@ -175,7 +175,7 @@ describe("responsibility and handover", () => {
         { role: "partner" },
         {
           type: "confirm_handover",
-          handoverId: "handover_followup",
+          handoverId: "handover_health",
           actorId: "member_partner",
           expectedVersion: 1,
         },
@@ -184,7 +184,7 @@ describe("responsibility and handover", () => {
     );
 
     const beforeAcceptance = database
-      .prepare("SELECT owner_id FROM domains WHERE id = 'domain_followup'")
+      .prepare("SELECT owner_id FROM domains WHERE id = 'domain_health'")
       .get() as { readonly owner_id: string };
     assert.equal(beforeAcceptance.owner_id, "member_primary");
 
@@ -192,7 +192,7 @@ describe("responsibility and handover", () => {
       { role: "partner" },
       {
         type: "confirm_handover",
-        handoverId: "handover_followup",
+        handoverId: "handover_health",
         actorId: "member_partner",
         expectedVersion: 2,
       },
@@ -200,14 +200,14 @@ describe("responsibility and handover", () => {
 
     const accepted = service
       .getState({ role: "primary" })
-      .handovers.find((item) => item.id === "handover_followup");
+      .handovers.find((item) => item.id === "handover_health");
     assert.equal(accepted?.state, "accepted");
     assert.deepEqual(accepted?.confirmedBy, ["member_primary", "member_partner"]);
     const ownership = database
       .prepare(
         `SELECT domains.owner_id, tasks.future_reminder_owner_id
          FROM domains JOIN tasks ON tasks.domain_id = domains.id
-         WHERE domains.id = 'domain_followup' AND tasks.id = 'task_followup'`,
+         WHERE domains.id = 'domain_health' AND tasks.id = 'task_health_booking'`,
       )
       .get() as {
       readonly owner_id: string;
@@ -223,27 +223,27 @@ describe("deterministic care", () => {
     const { database, service } = fixture();
     await assert.rejects(
       service.execute(
-        { role: "primary" },
-        { type: "trigger_care_reminder", careRuleId: "care_medicine" },
+        { role: "subject" },
+        { type: "trigger_care_reminder", careRuleId: "care_rule_medicine" },
       ),
       hasCode("conflict"),
     );
     await service.execute(
-      { role: "primary" },
+      { role: "subject" },
       {
         type: "activate_care_rule",
-        careRuleId: "care_medicine",
-        actorId: "member_primary",
+        careRuleId: "care_rule_medicine",
+        actorId: "member_subject",
         expectedVersion: 0,
       },
     );
     await service.execute(
-      { role: "primary" },
-      { type: "trigger_care_reminder", careRuleId: "care_medicine" },
+      { role: "subject" },
+      { type: "trigger_care_reminder", careRuleId: "care_rule_medicine" },
     );
     await service.execute(
-      { role: "primary" },
-      { type: "advance_demo_clock", seconds: 30 },
+      { role: "subject" },
+      { type: "advance_demo_clock", seconds: 60 },
     );
 
     assert.equal(
@@ -258,23 +258,23 @@ describe("deterministic care", () => {
       )
       .all()
       .map((item) => (item as { readonly recipient_id: string }).recipient_id);
-    assert.deepEqual(recipients, ["member_primary", "member_partner"]);
+    assert.deepEqual(recipients, ["member_partner", "member_primary"]);
   });
 
   test("allows the subject to acknowledge strictly before the deadline", async () => {
     const { service } = fixture();
     await service.execute(
-      { role: "primary" },
+      { role: "subject" },
       {
         type: "activate_care_rule",
-        careRuleId: "care_medicine",
-        actorId: "member_primary",
+        careRuleId: "care_rule_medicine",
+        actorId: "member_subject",
         expectedVersion: 0,
       },
     );
     await service.execute(
-      { role: "primary" },
-      { type: "trigger_care_reminder", careRuleId: "care_medicine" },
+      { role: "subject" },
+      { type: "trigger_care_reminder", careRuleId: "care_rule_medicine" },
     );
     await service.execute(
       { role: "subject" },
@@ -286,33 +286,72 @@ describe("deterministic care", () => {
     );
     const event = service.getState({ role: "subject" }).careEvents[0];
     assert.equal(event?.state, "closed");
-    assert.equal(event?.acknowledgedAt, "2026-08-28T09:00:00.000Z");
-    assert.equal(event?.closedAt, "2026-08-28T09:00:00.000Z");
+    assert.equal(event?.acknowledgedAt, "2026-08-28T12:00:00.000Z");
+    assert.equal(event?.closedAt, "2026-08-28T12:00:00.000Z");
+  });
+
+  test("allows only the subject to close an escalated event after deadline equality", async () => {
+    const { service } = fixture();
+    await service.execute(
+      { role: "subject" },
+      {
+        type: "activate_care_rule",
+        careRuleId: "care_rule_medicine",
+        actorId: "member_subject",
+        expectedVersion: 0,
+      },
+    );
+    await service.execute(
+      { role: "subject" },
+      { type: "trigger_care_reminder", careRuleId: "care_rule_medicine" },
+    );
+    await service.execute(
+      { role: "subject" },
+      { type: "advance_demo_clock", seconds: 60 },
+    );
+    await assert.rejects(
+      service.execute(
+        { role: "partner" },
+        {
+          type: "acknowledge_care",
+          careEventId: "care_event_1",
+          actorId: "member_partner",
+        },
+      ),
+      hasCode("forbidden"),
+    );
+    await service.execute(
+      { role: "subject" },
+      {
+        type: "acknowledge_care",
+        careEventId: "care_event_1",
+        actorId: "member_subject",
+      },
+    );
+
+    const event = service.getState({ role: "subject" }).careEvents[0];
+    assert.equal(event?.state, "closed");
+    assert.equal(event?.acknowledgedAt, "2026-08-28T12:01:00.000Z");
   });
 
   test("deduplicates the same logical notification in the bounded window", async () => {
     const { database, service } = fixture();
     await service.execute(
-      { role: "primary" },
+      { role: "subject" },
       {
         type: "activate_care_rule",
-        careRuleId: "care_medicine",
-        actorId: "member_primary",
+        careRuleId: "care_rule_medicine",
+        actorId: "member_subject",
         expectedVersion: 0,
       },
     );
-    database
-      .prepare(
-        `INSERT INTO notification_logs(
-          logical_event_id, recipient_id, channel, priority, template_id,
-          status, safe_code, occurred_at
-        ) VALUES ('care_event_1', 'member_subject', 'app', 'high',
-                  'care_reminder', 'shown_in_app', NULL, '2026-08-28T09:00:00.000Z')`,
-      )
-      .run();
     await service.execute(
-      { role: "primary" },
-      { type: "trigger_care_reminder", careRuleId: "care_medicine" },
+      { role: "subject" },
+      { type: "trigger_care_reminder", careRuleId: "care_rule_medicine" },
+    );
+    await service.execute(
+      { role: "subject" },
+      { type: "trigger_care_reminder", careRuleId: "care_rule_medicine" },
     );
 
     const statuses = service
@@ -322,6 +361,10 @@ describe("deterministic care", () => {
       )
       .map((item) => item.status);
     assert.deepEqual(statuses, ["shown_in_app", "deduplicated"]);
+    const eventCount = database
+      .prepare("SELECT COUNT(*) AS count FROM care_events")
+      .get() as { readonly count: number };
+    assert.equal(eventCount.count, 1);
   });
 });
 
@@ -332,7 +375,7 @@ test("reset restores the exact Fixture state", async () => {
     { role: "primary" },
     {
       type: "add_handover_info",
-      handoverId: "handover_followup",
+      handoverId: "handover_health",
       item: "last_report",
     },
   );

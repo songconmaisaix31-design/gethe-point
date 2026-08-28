@@ -301,10 +301,7 @@ export function createDemoService(
     const handovers = rows<HandoverRow>(
       database.prepare("SELECT * FROM handovers ORDER BY rowid").all(),
     )
-      .filter(
-        (item) =>
-          item.from_member_id === viewerId || item.to_member_id === viewerId,
-      )
+      .filter((item) => visibleDomainIds.has(item.domain_id))
       .map((item) => handoverProjection(item));
     const careRules = rows<CareRuleRow>(
       database.prepare("SELECT * FROM care_rules ORDER BY rowid").all(),
@@ -330,9 +327,9 @@ export function createDemoService(
     const notificationLogs = rows<NotificationRow>(
       database
         .prepare(
-          "SELECT * FROM notification_logs WHERE recipient_id = ? ORDER BY id",
+          "SELECT * FROM notification_logs ORDER BY id",
         )
-        .all(viewerId),
+        .all(),
     ).map<NotificationLogProjection>((item) => ({
       id: `notification_${item.id}`,
       logicalEventId: item.logical_event_id,
@@ -422,7 +419,7 @@ export function createDemoService(
       database
         .prepare("UPDATE evidence SET visibility_json = ? WHERE id = ?")
         .run(JSON.stringify(visibility), evidenceId);
-      if (visibility !== "self" && evidenceId === "evidence_private_pain") {
+      if (visibility !== "self" && evidenceId === "evidence_subject_private") {
         database
           .prepare(
             `INSERT OR IGNORE INTO signals(id, evidence_id, summary, status)
@@ -546,17 +543,19 @@ export function createDemoService(
     careRuleId: string,
     expectedVersion: number,
   ): void {
-    assertDomain(
-      sessionActorId === actionActorId && sessionActorId === "member_primary",
-      "forbidden",
-      "Only the primary Fixture role can activate this rule.",
-    );
     transaction(() => {
       const current = getCareRule(careRuleId);
+      assertDomain(
+        sessionActorId === actionActorId && actionActorId === current.subject_id,
+        "forbidden",
+        "Only the care subject can activate this rule.",
+      );
       assertDomain(current.state === "draft", "conflict", "The care rule is already active.");
       assertDomain(current.version === expectedVersion, "conflict", "The care rule version changed.");
-      const fresh = getCareRule(careRuleId);
       const now = currentTime();
+      const fresh = getCareRule(careRuleId);
+      assertDomain(actionActorId === fresh.subject_id, "forbidden", "Only the care subject can activate this rule.");
+      assertDomain(fresh.state === "draft", "conflict", "The care rule is already active.");
       assertDomain(fresh.version === expectedVersion, "conflict", "The care rule version changed.");
       database
         .prepare(
@@ -574,25 +573,32 @@ export function createDemoService(
     actorId: string,
     careRuleId: string,
   ): readonly PendingNotification[] {
-    assertDomain(
-      actorId === "member_primary",
-      "forbidden",
-      "Only the primary Fixture role can trigger this reminder.",
-    );
     return transaction(() => {
       const rule = getCareRule(careRuleId);
+      assertDomain(actorId === rule.subject_id, "forbidden", "Only the care subject can trigger this reminder.");
       assertDomain(rule.state === "active", "conflict", "The care rule is not active.");
       const now = currentTime();
+      const openEvent = row<{ readonly id: string }>(
+        database
+          .prepare(
+            `SELECT id FROM care_events
+             WHERE care_rule_id = ? AND state IN ('reminded', 'escalated')
+             ORDER BY rowid DESC LIMIT 1`,
+          )
+          .get(careRuleId),
+      );
       const count = row<{ readonly count: number }>(
         database.prepare("SELECT COUNT(*) AS count FROM care_events").get(),
       );
-      const eventId = `care_event_${(count?.count ?? 0) + 1}`;
-      database
-        .prepare(
-          `INSERT INTO care_events(id, care_rule_id, state, reminded_at)
-           VALUES (?, ?, 'reminded', ?)`,
-        )
-        .run(eventId, careRuleId, now);
+      const eventId = openEvent?.id ?? `care_event_${(count?.count ?? 0) + 1}`;
+      if (!openEvent) {
+        database
+          .prepare(
+            `INSERT INTO care_events(id, care_rule_id, state, reminded_at)
+             VALUES (?, ?, 'reminded', ?)`,
+          )
+          .run(eventId, careRuleId, now);
+      }
       auditAt(actorId, "trigger_care_reminder", eventId, now, {});
       return [
         notification(eventId, rule.subject_id, "app", "high", "care_reminder", "该做已确认的照护事项了。"),
@@ -605,26 +611,26 @@ export function createDemoService(
     actorId: string,
     seconds: number,
   ): readonly PendingNotification[] {
-    assertDomain(
-      actorId === "member_primary",
-      "forbidden",
-      "Only the primary Fixture role can advance the demo clock.",
-    );
     return transaction(() => {
       const next = new Date(Date.parse(currentTime()) + seconds * 1_000).toISOString();
       database.prepare("UPDATE demo_state SET now = ? WHERE singleton = 1").run(next);
 
       const pending: PendingNotification[] = [];
-      const events = rows<CareEventRow & { readonly acknowledgement_timeout_seconds: number; readonly escalation_member_ids_json: string }>(
+      const events = rows<CareEventRow & { readonly subject_id: string; readonly acknowledgement_timeout_seconds: number; readonly escalation_member_ids_json: string }>(
         database
           .prepare(
-            `SELECT care_events.*, care_rules.acknowledgement_timeout_seconds,
+            `SELECT care_events.*, care_rules.subject_id, care_rules.acknowledgement_timeout_seconds,
                     care_rules.escalation_member_ids_json
              FROM care_events JOIN care_rules ON care_rules.id = care_events.care_rule_id
              WHERE care_events.state = 'reminded'
              ORDER BY care_events.rowid`,
           )
           .all(),
+      );
+      assertDomain(
+        events.length > 0 && events.every((event) => event.subject_id === actorId),
+        "forbidden",
+        "Only the care subject can advance this Fixture reminder.",
       );
       for (const event of events) {
         const deadline =
@@ -660,19 +666,26 @@ export function createDemoService(
   ): void {
     assertDomain(sessionActorId === actionActorId, "forbidden", "The action actor does not match the Fixture session.");
     transaction(() => {
+      const now = currentTime();
       const event = getCareEventWithRule(careEventId);
       assertDomain(actionActorId === event.subject_id, "forbidden", "Only the care subject can acknowledge this reminder.");
-      assertDomain(event.state === "reminded", "conflict", "The care event cannot be acknowledged.");
-      const now = currentTime();
+      assertDomain(
+        event.state === "reminded" || event.state === "escalated",
+        "conflict",
+        "The care event cannot be acknowledged.",
+      );
       const deadline = Date.parse(event.reminded_at) + event.acknowledgement_timeout_seconds * 1_000;
-      assertDomain(Date.parse(now) < deadline, "conflict", "The acknowledgement deadline has passed.");
-      database
+      if (event.state === "reminded") {
+        assertDomain(Date.parse(now) < deadline, "conflict", "The acknowledgement deadline has passed.");
+      }
+      const result = database
         .prepare(
           `UPDATE care_events
            SET state = 'closed', acknowledged_at = ?, closed_at = ?
-           WHERE id = ?`,
+           WHERE id = ? AND state = ?`,
         )
-        .run(now, now, careEventId);
+        .run(now, now, careEventId, event.state);
+      assertDomain(result.changes === 1, "conflict", "The care event state changed.");
       auditAt(actionActorId, "acknowledge_care", careEventId, now, {});
     });
   }

@@ -9,7 +9,7 @@ const roleLabels: Record<Role, RegExp> = {
 };
 
 export async function resetDemo(request: APIRequestContext): Promise<void> {
-  const response = await request.post("/api/demo/reset");
+  const response = await request.post("/api/demo/reset?role=primary", { data: {} });
   expect(response.ok()).toBeTruthy();
 }
 
@@ -29,8 +29,9 @@ export async function getState(
 export async function postAction(
   request: APIRequestContext,
   action: DemoAction,
+  role: Role = "subject",
 ): Promise<void> {
-  const response = await request.post("/api/demo/action", { data: action });
+  const response = await request.post(`/api/demo/action?role=${role}`, { data: action });
   expect(response.ok()).toBeTruthy();
 }
 
@@ -40,7 +41,13 @@ export async function switchRole(page: Page, role: Role): Promise<void> {
   const tagName = await switcher.evaluate((element) => element.tagName);
   if (tagName === "SELECT") {
     await switcher.selectOption(role);
-    return;
+  } else {
+    const button = switcher.getByRole("button", { name: roleLabels[role] });
+    await button.click();
+    await expect(button).toHaveAttribute("aria-pressed", "true");
   }
-  await switcher.getByRole("button", { name: roleLabels[role] }).click();
+  await expect(page.locator(".loading-card")).toBeHidden();
+  await expect(page.locator("#main-content").getByRole("heading", { level: 1 })).toContainText(
+    roleLabels[role],
+  );
 }
