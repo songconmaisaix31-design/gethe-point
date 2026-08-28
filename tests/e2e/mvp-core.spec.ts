@@ -22,6 +22,41 @@ type CardZoneIds = (typeof MVP_CORE_SEAM.testIds.cards)[keyof typeof MVP_CORE_SE
 
 const ids = MVP_CORE_SEAM.testIds;
 
+const roleSurfaceIds = Object.freeze({
+  primary: ids.primarySurface,
+  partner: ids.partnerSurface,
+  subject: ids.subjectSurface,
+} as const satisfies Readonly<Record<FixtureRole, string>>);
+
+const primaryActionIds = Object.freeze({
+  primary: ids.supplyHandoverInfo,
+  partner: ids.confirmTo,
+  subject: ids.shareConsent,
+} as const satisfies Readonly<Record<FixtureRole, string>>);
+
+const cardZonesByRole = Object.freeze({
+  primary: Object.freeze([ids.cards.report, ids.cards.handover]),
+  partner: Object.freeze([ids.cards.responsibility]),
+  subject: Object.freeze([ids.cards.consent]),
+} as const satisfies Readonly<Record<FixtureRole, readonly CardZoneIds[]>>);
+
+const cardMinimumHeights = Object.freeze({
+  [ids.cards.consent.root]:
+    MVP_CORE_FIXTURE.layoutAcceptance.styleA.coreCards.consent.minimumHeightPx,
+  [ids.cards.report.root]:
+    MVP_CORE_FIXTURE.layoutAcceptance.styleA.coreCards.report.minimumHeightPx,
+  [ids.cards.responsibility.root]:
+    MVP_CORE_FIXTURE.layoutAcceptance.styleA.coreCards.responsibility.minimumHeightPx,
+  [ids.cards.handover.root]:
+    MVP_CORE_FIXTURE.layoutAcceptance.styleA.coreCards.handover.minimumHeightPx,
+} as const);
+
+const roleNavigationOrder = Object.freeze([
+  "partner",
+  "subject",
+  "primary",
+] as const satisfies readonly FixtureRole[]);
+
 const fixtureUrl = (role: FixtureRole): string => {
   const query = new URLSearchParams({
     [MVP_CORE_SEAM.sessionSelection.roleQuery]: role,
@@ -84,6 +119,30 @@ const expectNoHorizontalOverflow = async (page: Page): Promise<void> => {
   expect(hasOverflow).toBe(false);
 };
 
+const expectNoPanelHorizontalOverflow = async (locator: Locator): Promise<void> => {
+  const geometry = await locator.evaluate((element) => ({
+    clientWidth: element.clientWidth,
+    scrollWidth: element.scrollWidth,
+  }));
+  expect(geometry.scrollWidth).toBeLessThanOrEqual(geometry.clientWidth + 1);
+};
+
+const expectHorizontallyInsideViewport = async (
+  page: Page,
+  locator: Locator,
+): Promise<void> => {
+  const box = await locator.boundingBox();
+  const viewport = page.viewportSize();
+  expect(box).not.toBeNull();
+  expect(viewport).not.toBeNull();
+  if (box === null || viewport === null) {
+    throw new Error("Expected a visible element inside a configured viewport");
+  }
+
+  expect(box.x).toBeGreaterThanOrEqual(0);
+  expect(box.x + box.width).toBeLessThanOrEqual(viewport.width + 1);
+};
+
 const expectInsideViewport = async (page: Page, locator: Locator): Promise<void> => {
   const box = await locator.boundingBox();
   const viewport = page.viewportSize();
@@ -137,6 +196,140 @@ const expectNoPairwiseOverlap = async (locators: readonly Locator[]): Promise<vo
         left.y + left.height > right.y;
       expect(overlaps).toBe(false);
     }
+  }
+};
+
+const expectOnlySelectedRole = async (
+  page: Page,
+  selectedRole: FixtureRole,
+): Promise<Locator> => {
+  for (const role of MVP_CORE_FIXTURE.roles) {
+    const surface = page.getByTestId(roleSurfaceIds[role]);
+    if (role === selectedRole) {
+      await expect(surface).toHaveCount(1);
+      await expect(surface).toBeVisible();
+    } else {
+      await expect(surface).toHaveCount(0);
+    }
+  }
+  return page.getByTestId(roleSurfaceIds[selectedRole]);
+};
+
+const expectCompleteTruthLabels = async (page: Page): Promise<void> => {
+  const labels = [
+    ...MVP_CORE_FIXTURE.display.truthBadges,
+    ...Object.values(MVP_CORE_FIXTURE.display.contractTruthLabels),
+  ];
+
+  for (const label of labels) {
+    const locator = page.getByText(label, { exact: true });
+    await expect(locator).toHaveCount(1);
+    await expect(locator).toBeVisible();
+    const rendered = await locator.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return {
+        clientWidth: element.clientWidth,
+        scrollWidth: element.scrollWidth,
+        text: element.textContent,
+        textOverflow: style.textOverflow,
+      };
+    });
+    expect(rendered.text).toBe(label);
+    expect(rendered.textOverflow.toLowerCase()).not.toBe("ellipsis");
+    expect(rendered.scrollWidth).toBeLessThanOrEqual(rendered.clientWidth + 1);
+  }
+};
+
+const expectNoDeviceFraming = async (surface: Locator): Promise<void> => {
+  const framedElements = await surface.evaluate((element) => {
+    const candidates = [element, ...element.querySelectorAll("*")];
+    return candidates.flatMap((candidate) => {
+      const style = getComputedStyle(candidate);
+      const rect = candidate.getBoundingClientRect();
+      const borderWidths = [
+        style.borderTopWidth,
+        style.borderRightWidth,
+        style.borderBottomWidth,
+        style.borderLeftWidth,
+      ].map((value) => Number.parseFloat(value));
+      const cornerRadii = [
+        style.borderTopLeftRadius,
+        style.borderTopRightRadius,
+        style.borderBottomRightRadius,
+        style.borderBottomLeftRadius,
+      ].map((value) => Number.parseFloat(value));
+      const isDeviceFrame =
+        rect.width >= 240 &&
+        rect.height >= 240 &&
+        Math.min(...borderWidths) >= 4 &&
+        Math.max(...cornerRadii) >= 20;
+
+      return isDeviceFrame
+        ? [{ className: candidate.getAttribute("class"), tagName: candidate.tagName }]
+        : [];
+    });
+  });
+  expect(framedElements).toEqual([]);
+};
+
+const expectNormalizedCssVariables = async (
+  root: Locator,
+  expectedVariables: Readonly<Record<string, string>>,
+): Promise<void> => {
+  const comparisons = await root.evaluate((element, variables) => {
+    const style = getComputedStyle(element);
+    const probe = document.createElement("span");
+    probe.style.position = "absolute";
+    probe.style.visibility = "hidden";
+    document.body.append(probe);
+
+    const normalizeColor = (value: string): string => {
+      probe.style.color = "";
+      probe.style.color = value.trim();
+      if (probe.style.color.length === 0) {
+        return `invalid:${value.trim().toLowerCase()}`;
+      }
+      return getComputedStyle(probe).color.replace(/\s+/gu, "").toLowerCase();
+    };
+
+    const result = Object.entries(variables).map(([name, expected]) => ({
+      actual: normalizeColor(style.getPropertyValue(name)),
+      expected: normalizeColor(expected),
+      name,
+    }));
+    probe.remove();
+    return result;
+  }, expectedVariables);
+
+  for (const comparison of comparisons) {
+    expect(comparison.actual, comparison.name).toBe(comparison.expected);
+  }
+};
+
+const expectPrimaryActionReachable = async (
+  page: Page,
+  surface: Locator,
+  role: FixtureRole,
+): Promise<void> => {
+  const action = page.getByTestId(primaryActionIds[role]);
+  await action.scrollIntoViewIfNeeded();
+  await expect(action).toBeVisible();
+  await expectContainedBy(action, surface);
+  await expectInsideViewport(page, action);
+  const receivesPointer = await action.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    const target = document.elementFromPoint(
+      rect.left + rect.width / 2,
+      rect.top + rect.height / 2,
+    );
+    return target !== null && (target === element || element.contains(target));
+  });
+  expect(receivesPointer).toBe(true);
+};
+
+const expectRoleCards = async (page: Page, role: FixtureRole): Promise<void> => {
+  for (const card of cardZonesByRole[role]) {
+    await expectVerticalCard(page, card, cardMinimumHeights[card.root]);
   }
 };
 
@@ -456,85 +649,108 @@ test.describe("@mvp-core @fixture canonical journey", () => {
     });
   });
 
-  test("Style A colors, rail, and four deep card zones match runtime styles @mvp-core @fixture", async ({
+  test("selected-role Web App reflows across desktop, tablet, and mobile @mvp-core @fixture @visual", async ({
     page,
   }) => {
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await openFixture(page, "primary");
-    await resetFixture(page);
-    await expectTruthBoundary(page);
-    await expectNoHorizontalOverflow(page);
+    const acceptance = MVP_CORE_FIXTURE.layoutAcceptance;
 
-    const root = page.getByTestId(ids.root);
-    const rail = page.getByTestId(ids.scenarioRail);
-    const primary = page.getByTestId(ids.primarySurface);
-    const partner = page.getByTestId(ids.partnerSurface);
-    const subject = page.getByTestId(ids.subjectSurface);
-    const surfaces = [primary, partner, subject] as const;
+    for (const [viewportName, viewport] of Object.entries(acceptance.viewports)) {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      await openFixture(page, "primary");
+      await resetFixture(page);
+      await expectTruthBoundary(page);
+      await expectCompleteTruthLabels(page);
+      await expectNoHorizontalOverflow(page);
 
-    await expect(rail).toBeVisible();
-    for (const surface of surfaces) {
-      await expect(surface).toBeVisible();
-      await expectInsideViewport(page, surface);
-      const box = await surface.boundingBox();
-      if (box === null) {
-        throw new Error("Expected a visible phone-proportioned role surface");
+      const root = page.getByTestId(ids.root);
+      const truthBoundary = page.getByRole("note", { name: "Fixture truth boundary" });
+      const rail = page.getByTestId(ids.scenarioRail);
+      await expectNoPanelHorizontalOverflow(root);
+      await expectNoPanelHorizontalOverflow(truthBoundary);
+      await expectNormalizedCssVariables(root, acceptance.styleA.cssVariables);
+
+      if (viewportName === "desktop") {
+        await expect(rail).toBeVisible();
       }
-      expect(box.width).toBeGreaterThanOrEqual(
-        MVP_CORE_FIXTURE.layoutAcceptance.styleA.phoneSurfaceWidthPx.minimum,
-      );
-      expect(box.width).toBeLessThanOrEqual(
-        MVP_CORE_FIXTURE.layoutAcceptance.styleA.phoneSurfaceWidthPx.maximum,
-      );
-      const clipsHorizontally = await surface.evaluate(
-        (element) => element.scrollWidth > element.clientWidth,
-      );
-      expect(clipsHorizontally).toBe(false);
+      if (viewportName === "mobile") {
+        const mobileAcceptance = acceptance.selectedRoleWebApp.mobile;
+        expect(mobileAcceptance.persistentSidebarVisible).toBe(false);
+        expect(mobileAcceptance.compactNavigationVisible).toBe(true);
+        await expect(rail).toBeVisible();
+        await expectHorizontallyInsideViewport(page, rail);
+        await expectNoPanelHorizontalOverflow(rail);
+
+        const roleNavigation = rail.getByRole("navigation", { name: "Fixture 角色导航" });
+        const allowedRoles = acceptance.selectedRoleWebApp.roleNavigationTargets;
+        expect(allowedRoles).toHaveLength(3);
+        await expect(roleNavigation).toBeVisible();
+        await expect(roleNavigation.getByRole("link")).toHaveCount(allowedRoles.length);
+        for (const role of allowedRoles) {
+          const roleLink = roleNavigation.locator(`a[href$="?role=${role}"]`);
+          await expect(roleLink).toHaveCount(1);
+          await expect(roleLink).toBeVisible();
+        }
+
+        const currentStatus = rail.locator('section[aria-live="polite"]');
+        await expect(currentStatus).toBeVisible();
+        await expect(
+          currentStatus.getByText("当前服务端真相", { exact: true }),
+        ).toBeVisible();
+        const resetAction = rail.getByRole("button", { name: "重置 Fixture" });
+        await expect(resetAction).toBeVisible();
+        await expect(resetAction).toBeEnabled();
+      }
+
+      for (const role of roleNavigationOrder) {
+        const navigationLink = rail.locator(`a[href$="?role=${role}"]`);
+        await expect(navigationLink).toHaveCount(1);
+        await expect(navigationLink).toBeVisible();
+        await navigationLink.click();
+        await expect(page).toHaveURL(new RegExp(`[?&]role=${role}(?:&|$)`, "u"));
+        await expect(rail.locator('a[aria-current="page"]')).toHaveCount(1);
+        await expect(navigationLink).toHaveAttribute("aria-current", "page");
+
+        const surface = await expectOnlySelectedRole(page, role);
+        await expectHorizontallyInsideViewport(page, surface);
+        await expectNoHorizontalOverflow(page);
+        await expectNoPanelHorizontalOverflow(root);
+        await expectNoPanelHorizontalOverflow(surface);
+        await expectNoDeviceFraming(surface);
+
+        if (viewportName === "desktop") {
+          const railBox = await rail.boundingBox();
+          const surfaceBox = await surface.boundingBox();
+          if (railBox === null || surfaceBox === null) {
+            throw new Error("Expected a sidebar and selected-role desktop workspace");
+          }
+          expect(surfaceBox.width).toBeGreaterThan(railBox.width);
+          await expectNoPairwiseOverlap([rail, surface]);
+        }
+
+        if (viewportName === "tablet" && (await rail.isVisible())) {
+          await expectHorizontallyInsideViewport(page, rail);
+          await expectNoPanelHorizontalOverflow(rail);
+          await expectNoPairwiseOverlap([rail, surface]);
+        }
+
+        if (viewportName === "mobile") {
+          const railBox = await rail.boundingBox();
+          const surfaceBox = await surface.boundingBox();
+          const configuredViewport = page.viewportSize();
+          if (railBox === null || surfaceBox === null || configuredViewport === null) {
+            throw new Error("Expected compact navigation above one full-width mobile workspace");
+          }
+          expect(railBox.y + railBox.height).toBeLessThanOrEqual(surfaceBox.y + 1);
+          expect(Math.abs(surfaceBox.x)).toBeLessThanOrEqual(1);
+          expect(Math.abs(surfaceBox.width - configuredViewport.width)).toBeLessThanOrEqual(1);
+        }
+
+        await expectRoleCards(page, role);
+        for (const card of cardZonesByRole[role]) {
+          await expectNoPanelHorizontalOverflow(page.getByTestId(card.root));
+        }
+        await expectPrimaryActionReachable(page, surface, role);
+      }
     }
-
-    const railBox = await rail.boundingBox();
-    if (railBox === null) {
-      throw new Error("Expected a visible compact scenario rail");
-    }
-    expect(railBox.width).toBeLessThanOrEqual(
-      MVP_CORE_FIXTURE.layoutAcceptance.styleA.compactRailMaximumWidthPx,
-    );
-    await expectNoPairwiseOverlap([rail, ...surfaces]);
-    await expectContainedBy(page.getByTestId(ids.supplyHandoverInfo), primary);
-    await expectContainedBy(page.getByTestId(ids.confirmTo), partner);
-    await expectContainedBy(page.getByTestId(ids.shareConsent), subject);
-
-    const expectedVariables = MVP_CORE_FIXTURE.layoutAcceptance.styleA.cssVariables;
-    const actualVariables = await root.evaluate(
-      (element, names) => {
-        const style = getComputedStyle(element);
-        return Object.fromEntries(
-          names.map((name) => [name, style.getPropertyValue(name).trim()]),
-        );
-      },
-      Object.keys(expectedVariables),
-    );
-    expect(actualVariables).toEqual(expectedVariables);
-
-    await expectVerticalCard(
-      page,
-      ids.cards.consent,
-      MVP_CORE_FIXTURE.layoutAcceptance.styleA.coreCards.consent.minimumHeightPx,
-    );
-    await expectVerticalCard(
-      page,
-      ids.cards.report,
-      MVP_CORE_FIXTURE.layoutAcceptance.styleA.coreCards.report.minimumHeightPx,
-    );
-    await expectVerticalCard(
-      page,
-      ids.cards.responsibility,
-      MVP_CORE_FIXTURE.layoutAcceptance.styleA.coreCards.responsibility.minimumHeightPx,
-    );
-    await expectVerticalCard(
-      page,
-      ids.cards.handover,
-      MVP_CORE_FIXTURE.layoutAcceptance.styleA.coreCards.handover.minimumHeightPx,
-    );
   });
 });
