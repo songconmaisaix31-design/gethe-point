@@ -2,6 +2,16 @@
 
 一套把“目录所有权多 Agent 开发”落到 Orca CLI、Git Worktree、机器门禁和审查证据上的仓库脚手架。
 
+## MVP core Local Fixture
+
+The accepted MVP integration is a deterministic local demonstration backed by
+the real Next.js handlers and PostgreSQL. It is visibly labeled `Fixture`,
+`Local Demo`, and `Not Production Acceptance`; it does not use production auth,
+a live model, deployment evidence, or release evidence.
+
+See [`docs/demo/MVP-INT-001.md`](docs/demo/MVP-INT-001.md) for the HTTP contract,
+session boundary, PostgreSQL receipt bridge, and exact verification scope.
+
 ## gethe-point local profile
 
 - The control plane is bound to the local `gethe-point` repository and `origin/main`.
