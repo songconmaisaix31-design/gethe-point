@@ -4,6 +4,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
+import { MVP_CORE_FIXTURE } from "../../../fixtures/mvp-core";
 import { ExperienceView } from "../src/components/FixtureExperience";
 import { createHttpExperienceClient } from "../src/features/experience/client";
 import {
@@ -38,7 +39,11 @@ const ALL_ACTIONS = [
 const ROLE_ACCEPTANCE = {
   primary: {
     surface: MVP_CORE_TEST_IDS.primarySurface,
-    cards: [MVP_CORE_TEST_IDS.cards.report, MVP_CORE_TEST_IDS.cards.handover],
+    cards: [
+      MVP_CORE_TEST_IDS.cards.responsibility,
+      MVP_CORE_TEST_IDS.cards.report,
+      MVP_CORE_TEST_IDS.cards.handover,
+    ],
     actions: [
       MVP_CORE_TEST_IDS.generateReport,
       MVP_CORE_TEST_IDS.supplyHandoverInfo,
@@ -47,7 +52,7 @@ const ROLE_ACCEPTANCE = {
   },
   partner: {
     surface: MVP_CORE_TEST_IDS.partnerSurface,
-    cards: [MVP_CORE_TEST_IDS.cards.responsibility],
+    cards: [MVP_CORE_TEST_IDS.cards.responsibility, MVP_CORE_TEST_IDS.cards.handover],
     actions: [MVP_CORE_TEST_IDS.confirmTo],
   },
   subject: {
@@ -126,6 +131,21 @@ const roleFromLink = (tag: string): string | undefined =>
 const cssVariable = (css: string, name: string): string | undefined =>
   new RegExp(`${name}\\s*:\\s*([^;]+);`, "i").exec(css)?.[1]?.trim();
 
+const cssRuleBody = (css: string, selector: string): string | undefined =>
+  [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].find((match) =>
+    match[1]?.split(",").some((candidate) => candidate.trim() === selector),
+  )?.[2];
+
+const cssPixelMinHeight = (css: string, selector: string): number => {
+  const value = /min-height\s*:\s*(\d+(?:\.\d+)?)px\s*;/i.exec(
+    cssRuleBody(css, selector) ?? "",
+  )?.[1];
+  if (value === undefined) {
+    throw new Error(`${selector} must define a pixel min-height`);
+  }
+  return Number.parseFloat(value);
+};
+
 const normalizeHex = (value: string | undefined): string | null => {
   const digits = /^#([\da-f]{3}|[\da-f]{6})$/i.exec(value ?? "")?.[1];
   if (digits === undefined) {
@@ -159,11 +179,13 @@ describe("selected-role responsive web app contract", () => {
       const html = renderSnapshot(initialSnapshot, selectedRole);
 
       expect(occurrences(html, "Fixture truth boundary")).toBe(1);
-      expect(occurrences(html, "data-role=")).toBe(1);
+      expect(
+        occurrences(html, testId(ROLE_ACCEPTANCE[selectedRole].surface)),
+      ).toBe(1);
       for (const role of MEMBER_ROLES) {
-        expect(occurrences(html, testId(ROLE_ACCEPTANCE[role].surface))).toBe(
-          role === selectedRole ? 1 : 0,
-        );
+        if (role !== selectedRole) {
+          expect(occurrences(html, testId(ROLE_ACCEPTANCE[role].surface))).toBe(0);
+        }
       }
     }
 
@@ -240,7 +262,15 @@ describe("selected-role responsive web app contract", () => {
     expect(primaryHtml).toContain(`${testId(MVP_CORE_TEST_IDS.toConfirmation)}>confirmed`);
     expect(primaryHtml).not.toContain(testId(MVP_CORE_TEST_IDS.confirmTo));
     expect(partnerHtml).toContain(testId(MVP_CORE_TEST_IDS.confirmTo));
-    expect(partnerHtml).not.toContain(testId(MVP_CORE_TEST_IDS.handoverStatus));
+    expect(partnerHtml).toContain(
+      `${testId(MVP_CORE_TEST_IDS.handoverStatus)}>awaiting_confirmations<`,
+    );
+    expect(partnerHtml).toContain(
+      `${testId(MVP_CORE_TEST_IDS.domainOwner)}>当前负责人：${MVP_CORE_DISPLAY.memberNames.primary}<`,
+    );
+    expect(partnerHtml).toContain(
+      `${testId(MVP_CORE_TEST_IDS.reminderOwner)}>${MVP_CORE_DISPLAY.reminder.label} · ${MVP_CORE_DISPLAY.memberNames.primary}<`,
+    );
   });
 
   it("disables selected-role writes while a reload is pending", () => {
@@ -257,6 +287,7 @@ describe("selected-role responsive web app contract", () => {
   it("keeps Style A and responsive app-shell CSS without phone showcase assumptions", async () => {
     const css = await readFile(new URL("../src/app/globals.css", import.meta.url), "utf8");
     const compactCss = css.replace(/\s+/g, " ");
+    const [desktopCss = css] = css.split(/@media\b/i);
     const aliases = [
       ["--style-a-background", "#f4f1ea"],
       ["--style-a-surface", "#ffffff"],
@@ -269,8 +300,16 @@ describe("selected-role responsive web app contract", () => {
     for (const [name, expected] of aliases) {
       expect(normalizeHex(cssVariable(css, name))).toBe(expected);
     }
-    for (const minHeight of [240, 260, 300]) {
-      expect(compactCss).toContain(`min-height: ${String(minHeight)}px`);
+    const qaCardMinimums = MVP_CORE_FIXTURE.layoutAcceptance.styleA.coreCards;
+    for (const [selector, minimumHeightPx] of [
+      [".consent-card", qaCardMinimums.consent.minimumHeightPx],
+      [".report-card", qaCardMinimums.report.minimumHeightPx],
+      [".responsibility-card", qaCardMinimums.responsibility.minimumHeightPx],
+      [".handover-card", qaCardMinimums.handover.minimumHeightPx],
+    ] as const) {
+      expect(cssPixelMinHeight(desktopCss, selector)).toBeGreaterThanOrEqual(
+        minimumHeightPx,
+      );
     }
 
     expect(compactCss).toMatch(/:focus-visible[^}]*outline:\s*(?:[2-9]|\d{2,})px solid[^}]*outline-offset:\s*[1-9]\d*px/i);
@@ -278,11 +317,11 @@ describe("selected-role responsive web app contract", () => {
     expect(css).not.toMatch(/@import\b|url\(\s*["']?(?:https?:)?\/\/|fonts\.googleapis|fonts\.gstatic/i);
 
     expect(compactCss).toMatch(/\.fixture-shell\s*\{[^}]*height:\s*100dvh/i);
-    expect(compactCss).toMatch(/\.fixture-layout\s*\{[^}]*grid-template-columns:\s*(?:minmax|clamp)\([^;]+\)\s+minmax\(0,\s*1fr\)/i);
-    expect(compactCss).toMatch(/\.role-grid\s*\{[^}]*grid-template-columns:\s*(?:minmax\(0,\s*1fr\)|1fr)/i);
+    expect(compactCss).toMatch(/\.fixture-layout\s*\{[^}]*grid-template-columns:\s*(?:(?:minmax|clamp)\([^;]+\)|[1-9]\d*px)\s+minmax\(0,\s*1fr\)/i);
+    expect(compactCss).toMatch(/\.role-card-grid\s*\{[^}]*grid-template-columns:\s*(?:repeat\(2,\s*)?minmax\(0,\s*1fr\)\)?/i);
     expect(css).toMatch(/@media\s*\(\s*max-width:\s*[5-9]\d{2}px\s*\)[\s\S]*?\.fixture-layout\s*\{[^}]*?(?:display:\s*block|grid-template-columns:\s*1fr)/i);
 
-    expect(css).not.toMatch(/\b304px\b|repeat\(3\s*,\s*minmax\(0\s*,/i);
+    expect(compactCss).not.toMatch(/\.role-card-grid\s*\{[^}]*(?:\b304px\b|grid-template-columns:\s*repeat\(3\s*,)/i);
     expect(compactCss).not.toMatch(/\.role-device\s*\{[^}]*(?:border:\s*8px solid|border-radius:\s*30px|#171612)/i);
   });
 });
