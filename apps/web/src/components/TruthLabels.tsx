@@ -7,19 +7,24 @@ export interface TruthLabelsProps {
 
 export const TruthLabels = ({ writeCount, sharedRowCount }: TruthLabelsProps) => (
   <aside className="truth-boundary" role="note" aria-label="Fixture truth boundary">
-    <div className="truth-badges">
-      {MVP_CORE_DISPLAY.truthBadges.map((label) => (
-        <span key={label}>{label}</span>
-      ))}
+    <div className="truth-heading">
+      <span>演示环境</span>
+      <div className="truth-badges">
+        {MVP_CORE_DISPLAY.truthBadges.map((label) => (
+          <span key={label}>{label}</span>
+        ))}
+      </div>
     </div>
-    <p className="fictional-notice" data-testid={MVP_CORE_TEST_IDS.fictionalNotice}>
-      {MVP_CORE_DISPLAY.fictionalNotice}
-    </p>
-    <p className="contract-truth-labels">
-      <span>{MVP_CORE_DISPLAY.contractTruthLabels.data}</span>
-      <span>{MVP_CORE_DISPLAY.contractTruthLabels.account}</span>
-      <span>{MVP_CORE_DISPLAY.contractTruthLabels.authentication}</span>
-    </p>
+    <div className="truth-copy">
+      <p className="fictional-notice" data-testid={MVP_CORE_TEST_IDS.fictionalNotice}>
+        {MVP_CORE_DISPLAY.fictionalNotice}
+      </p>
+      <p className="contract-truth-labels">
+        <span>{MVP_CORE_DISPLAY.contractTruthLabels.data}</span>
+        <span>{MVP_CORE_DISPLAY.contractTruthLabels.account}</span>
+        <span>{MVP_CORE_DISPLAY.contractTruthLabels.authentication}</span>
+      </p>
+    </div>
     <dl className="truth-counters" aria-label="服务端写入计数">
       <div>
         <dt>Writes</dt>

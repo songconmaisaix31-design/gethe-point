@@ -2,7 +2,12 @@ import {
   MVP_CORE_DISPLAY,
   MVP_CORE_TEST_IDS,
 } from "../features/experience/fixture-display";
-import type { ExperienceActionId, ExperienceSnapshot } from "../features/experience/model";
+import type {
+  ExperienceActionId,
+  ExperienceSnapshot,
+  MemberRole,
+} from "../features/experience/model";
+import { ROLE_ORDER } from "../features/experience/model";
 
 const SCENARIO_STEPS = Object.freeze([
   Object.freeze({ stage: "consent", title: "本人同意", detail: "一次结论，一次决定" }),
@@ -16,6 +21,12 @@ const SCENARIO_STEPS = Object.freeze([
   }),
   Object.freeze({ stage: "accepted", title: "完成交接", detail: "负责人和提醒一起转移" }),
 ] as const);
+
+const ROLE_LINK_COPY = Object.freeze({
+  primary: Object.freeze({ label: "主责任人", name: MVP_CORE_DISPLAY.memberNames.primary }),
+  partner: Object.freeze({ label: "接手方", name: MVP_CORE_DISPLAY.memberNames.partner }),
+  subject: Object.freeze({ label: "本人", name: MVP_CORE_DISPLAY.memberNames.subject }),
+});
 
 const stageIndex = (snapshot: ExperienceSnapshot): number => {
   switch (snapshot.stage) {
@@ -40,6 +51,7 @@ const stageIndex = (snapshot: ExperienceSnapshot): number => {
 
 export interface ScenarioRailProps {
   readonly snapshot: ExperienceSnapshot;
+  readonly selectedRole: MemberRole;
   readonly pendingActionId: ExperienceActionId | null;
   readonly commandsDisabled: boolean;
   readonly onAction: (actionId: ExperienceActionId) => void;
@@ -47,6 +59,7 @@ export interface ScenarioRailProps {
 
 export const ScenarioRail = ({
   snapshot,
+  selectedRole,
   pendingActionId,
   commandsDisabled,
   onAction,
@@ -57,13 +70,41 @@ export const ScenarioRail = ({
     <aside
       className="scenario-rail"
       data-testid={MVP_CORE_TEST_IDS.scenarioRail}
-      aria-label="Fixture 场景进度"
+      aria-label="应用导航与 Fixture 状态"
     >
       <header className="rail-brand">
         <p className="rail-kicker">都记得 · We Remember</p>
-        <h1>一整块责任，真正换主人</h1>
-        <p>{MVP_CORE_DISPLAY.title} · 三角色同步 Fixture · 固定核心路径</p>
+        <p className="rail-title">家庭责任工作台</p>
+        <p>{MVP_CORE_DISPLAY.title} · 当前角色 Fixture</p>
       </header>
+
+      <nav className="role-navigation" aria-label="Fixture 角色导航">
+        <p className="rail-section-label">演示角色</p>
+        <div className="role-links">
+          {ROLE_ORDER.map((role) => {
+            const copy = ROLE_LINK_COPY[role];
+            const isCurrent = role === selectedRole;
+            return (
+              <a
+                href={`?role=${role}`}
+                className="role-link"
+                data-active={isCurrent}
+                aria-current={isCurrent ? "page" : undefined}
+                key={role}
+              >
+                <span className="role-link-mark" aria-hidden="true">
+                  {role === "primary" ? "主" : role === "partner" ? "接" : "本"}
+                </span>
+                <span>
+                  <strong>{copy.label}</strong>
+                  <small>{copy.name}</small>
+                </span>
+              </a>
+            );
+          })}
+        </div>
+        <p className="role-navigation-note">角色切换仅用于演示，不代表身份认证。</p>
+      </nav>
 
       <section className="rail-current" aria-live="polite">
         <span>当前服务端真相</span>
@@ -71,28 +112,34 @@ export const ScenarioRail = ({
         <p>{snapshot.stageSummary}</p>
       </section>
 
-      <ol className="scenario-steps">
-        {SCENARIO_STEPS.map((step, index) => {
-          const state =
-            index < activeIndex ? "complete" : index === activeIndex ? "current" : "upcoming";
-          return (
-            <li
-              key={step.stage}
-              data-state={state}
-              aria-current={state === "current" ? "step" : undefined}
-            >
-              <span className="step-index">{index + 1}</span>
-              <span className="step-copy">
-                <strong>{step.title}</strong>
-                <small>{step.detail}</small>
-              </span>
-              <span className="step-state">
-                {state === "complete" ? "已完成" : state === "current" ? "当前" : "待演示"}
-              </span>
-            </li>
-          );
-        })}
-      </ol>
+      <section className="workflow-status" aria-label="核心流程状态">
+        <div className="workflow-heading">
+          <span className="rail-section-label">核心流程</span>
+          <span>{activeIndex + 1} / {SCENARIO_STEPS.length}</span>
+        </div>
+        <ol className="scenario-steps">
+          {SCENARIO_STEPS.map((step, index) => {
+            const state =
+              index < activeIndex ? "complete" : index === activeIndex ? "current" : "upcoming";
+            return (
+              <li
+                key={step.stage}
+                data-state={state}
+                aria-current={state === "current" ? "step" : undefined}
+              >
+                <span className="step-index">{index + 1}</span>
+                <span className="step-copy">
+                  <strong>{step.title}</strong>
+                  <small>{step.detail}</small>
+                </span>
+                <span className="step-state">
+                  {state === "complete" ? "已完成" : state === "current" ? "当前" : "待演示"}
+                </span>
+              </li>
+            );
+          })}
+        </ol>
+      </section>
 
       <div className="rail-boundary">
         <strong>类型化 HTTP 边界</strong>
