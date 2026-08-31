@@ -4,6 +4,8 @@
 
 此仓库是 We Remember 的旧原型保留库，目前只是归档候选，GitHub 仓库尚未在本次整理中执行 Archive。
 
+当前产品主线与规范后续地址是 `https://github.com/songconmaisaix31-design/we-remember`；原 `New-gethe-point` 地址解析到同一 GitHub 仓库。
+
 ### 范围边界
 
 - 只保留早期静态原型、初期 PRD、视觉素材和简洁比赛历史。
@@ -23,9 +25,8 @@ python -m http.server 8765
 
 在 GitHub Archive 之前必须同时满足：
 
-1. 独立 QA 验证本整理分支的内容、链接和静态原型；
-2. 再次确认当前后续仓库链接 `https://github.com/songconmaisaix31-design/New-gethe-point` 可访问；
-3. 若后续仓库已完成独立 QA 并实际改名，再把链接更新为真实存在的 `/we-remember` 地址；
-4. 由有权限的维护者在整理合并后执行 GitHub Archive。
+1. 本次链接更新提交通过独立 QA，覆盖内容、相对链接和静态原型；
+2. 该提交合并到默认分支；
+3. 由有权限的维护者在合并后执行 GitHub Archive。
 
 本分支不执行归档、改名、合并、Release 或后续仓库修改。

@@ -2,7 +2,7 @@
 
 这是 **We Remember 的早期前身仓库**，保留「都记得」在黑客松阶段的静态交互原型、初期产品需求文档和视觉素材，用于追溯最初的产品探索。它不是当前产品主线，也不接受新功能开发。
 
-当前有效的后续项目地址是 [New-gethe-point](https://github.com/songconmaisaix31-design/New-gethe-point)。只有在后续仓库完成独立 QA 并实际改名后，`/we-remember` 才会成为规范地址；在此之前不要把该未来地址写成已生效链接。
+当前产品主线与规范后续地址是 [we-remember](https://github.com/songconmaisaix31-design/we-remember)。原 `New-gethe-point` 地址会解析到同一 GitHub 仓库。
 
 ## 仓库内容
 
@@ -31,7 +31,7 @@ python -m http.server 8765
 
 该原型来自 SheNicest 黑客松阶段的早期探索，未获奖。仓库中的页面是静态演示，不应被描述为生产系统、真实消息渠道接入或当前 We Remember 的完整能力。
 
-本仓库处于归档候选状态。归档前仍需独立 QA，并再次验证上方后续项目链接；详情见 [STATUS.md](STATUS.md)。
+本仓库处于归档候选状态。只有本次链接更新提交通过独立 QA 并合并到默认分支后，才允许由维护者执行 GitHub Archive；详情见 [STATUS.md](STATUS.md)。
 
 ## License
 
